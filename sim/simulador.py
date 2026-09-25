@@ -181,19 +181,9 @@ async def serve_with_drops(ctx: ModbusServerContext, host: str, port: int, every
         await asyncio.sleep(5)
 
 
-async def main() -> None:
-    ap = argparse.ArgumentParser(description="Simulador Modbus TCP do Celiware IHM")
-    ap.add_argument("--cenario", choices=["cortadora", "vazio"], default="cortadora")
-    ap.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = aceita conexões da rede")
-    ap.add_argument("--porta", type=int, default=5020)
-    ap.add_argument("--id", type=int, default=1, help="Unit ID do escravo")
-    ap.add_argument("--cair-a-cada", type=int, default=0, metavar="N", help="derruba o servidor a cada N s")
-    args = ap.parse_args()
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
-    logging.getLogger("pymodbus").setLevel(logging.WARNING)
-
-    ctx = build_context(args.id)
+async def servir_terminal(args, ctx) -> None:
+    """Modo terminal: servidor + programa da cortadora no mesmo laço asyncio."""
     tasks = []
     if args.cenario == "cortadora":
         tasks.append(asyncio.create_task(run_process(Cortadora(ctx[args.id]))))
@@ -205,8 +195,32 @@ async def main() -> None:
         t.cancel()
 
 
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Simulador Modbus TCP do Celiware IHM")
+    ap.add_argument("--cenario", choices=["cortadora", "vazio"], default="cortadora")
+    ap.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = aceita conexões da rede")
+    ap.add_argument("--porta", type=int, default=5020)
+    ap.add_argument("--id", type=int, default=1, help="Unit ID do escravo")
+    ap.add_argument("--cair-a-cada", type=int, default=0, metavar="N", help="derruba o servidor a cada N s")
+    ap.add_argument("--painel", action="store_true", help="abre o painel gráfico (valores ao vivo, pedidos, botões de falha)")
+    args = ap.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
+    logging.getLogger("pymodbus").setLevel(logging.WARNING)
+
+    ctx = build_context(args.id)
+    if args.painel:
+        # Tk na thread principal; servidor e programa da cortadora num laço
+        # asyncio próprio, noutra thread (ver painel.Servidor).
+        from painel import Painel, Servidor
+        proc = Cortadora(ctx[args.id]) if args.cenario == "cortadora" else None
+        Painel(Servidor(ctx, args.host, args.porta, proc), args.id, args.cenario).rodar()
+    else:
+        asyncio.run(servir_terminal(args, ctx))
+
+
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         pass

@@ -106,7 +106,11 @@ class ElementConfigSheet extends StatelessWidget {
             var next = e.withProp('tagId', t.id);
             // Rótulo vazio ou ainda igual ao nome da variável anterior → segue a nova.
             final label = e.props['label'] as String?;
-            if (label == null || label.isEmpty || label == tag?.name) next = next.withProp('label', t.name);
+            // "Botão" é o rótulo padrão de quem ainda não tem variável — também é substituído.
+            final padrao = ElementCatalog.defaultProps(e.type)['label'];
+            if (label == null || label.isEmpty || label == tag?.name || label == padrao) {
+              next = next.withProp('label', t.name);
+            }
             save(next);
           },
         ));

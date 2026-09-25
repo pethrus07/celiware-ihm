@@ -40,7 +40,7 @@ lib/
 └── widgets/      Elementos de IHM, tutorial, componentes comuns.
 sim/              Simulador Modbus TCP externo (Python).
 test/             Testes automatizados.
-tool/             Gerador de ícone e da documentação em Word.
+tool/             Gerador de ícone, da documentação em Word e do vídeo de apresentação (tool/video).
 ```
 
 ## Documentação

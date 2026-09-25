@@ -173,10 +173,12 @@ class _TrendPainter extends CustomPainter {
       ..color = Ind.line
       ..strokeWidth = 1;
     final tp = TextPainter(textDirection: TextDirection.ltr);
-    for (var i = 0; i <= 4; i++) {
-      final y = plot.top + plot.height * i / 4;
+    // Linhas nos múltiplos do passo redondo (0 · 50 · 100 · 150), não em
+    // quartos da faixa — quartos de 0..150 davam "37,5 · 75 · 113".
+    final step = _niceStep((hi - lo) / 4);
+    for (var v = (lo / step).ceil() * step; v <= hi + step * 1e-6; v += step) {
+      final y = plot.bottom - plot.height * ((v - lo) / (hi - lo));
       canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
-      final v = hi - (hi - lo) * i / 4;
       tp.text = TextSpan(text: _short(v), style: const TextStyle(fontFamily: Ind.mono, fontSize: 10, color: Ind.textMuted));
       tp.layout();
       tp.paint(canvas, Offset(left - tp.width - 5, y - tp.height / 2));

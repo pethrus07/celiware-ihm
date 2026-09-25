@@ -62,3 +62,8 @@ __pycache__/
 
 # Dependências dos geradores (npm install em tool/)
 tool/node_modules/
+
+# Vídeo de apresentação: intermediários e saída (regeráveis)
+tool/video/.trabalho/
+tool/video/saida/
+sim/.comando

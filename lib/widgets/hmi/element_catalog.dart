@@ -133,7 +133,8 @@ class ElementCatalog {
       description: 'Acende com o sinal.',
       icon: Icons.lightbulb_outline_rounded,
       fit: TagFit.boolean,
-      defaultW: 2,
+      // 3 de largura: com 2, rótulo + bolinha + texto não cabem ("FACA ACIO…").
+      defaultW: 3,
       defaultH: 1,
     ),
     ElementInfo(

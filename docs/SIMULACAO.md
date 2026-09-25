@@ -42,6 +42,24 @@ O `requirements.txt` trava o pymodbus em 3.8.6: da 3.9 em diante a API de memór
 | `--porta N` | Porta TCP (padrão 5020; a 502 exige administrador no Windows). |
 | `--id N` | Unit ID do escravo (padrão 1). |
 | `--cair-a-cada N` | Derruba o servidor a cada N segundos por 5 s — o app deve esmaecer os valores e reconectar sozinho. |
+| `--painel` | Abre a janela do simulador (abaixo) em vez de rodar só no terminal. |
+
+### 2.2.1. Painel visual (`--painel`)
+
+```
+.venv\Scripts\python simulador.py --painel
+```
+
+Uma janela "Simulador Modbus TCP — Celiware IHM" mostra, ao vivo, o que o CLP simulado tem na memória e o que o app está pedindo:
+
+| Parte | O que mostra |
+|---|---|
+| Cabeçalho | Porta e ID em escuta; selo **app conectado** quando há cliente; contador de pedidos atendidos. |
+| 8 cartões | Liga máquina, status, velocidade, ajuste, produção, motor, porta e alarme — cada um com a área e o endereço (`COIL 0`, `HR 6..7`…), para conferir o cadastro das variáveis. |
+| Botões | **Abrir/Fechar porta** (a máquina para e acusa alarme), **Superaquecer motor** e **Derrubar rede (6 s)** (fecha o servidor e sobe de novo). |
+| Pedidos do app | Log de cada pedido Modbus recebido — mostra o agrupamento: variáveis vizinhas saem num pedido só (`HR 0..20`). |
+
+Os mesmos três botões podem ser acionados por script: grave `porta`, `superaquecer` ou `cair` no arquivo `sim/.comando` (o painel lê e apaga). É assim que o vídeo de apresentação aciona as falhas no tempo certo.
 
 ### 2.3. Ligar o app no simulador
 
@@ -93,3 +111,23 @@ Android 11 ou mais novo, celular e PC no mesmo Wi-Fi:
 ## 5. Testes automatizados
 
 `flutter test` sobe o escravo Dart (`lib/core/modbus/modbus_tcp_server.dart`) numa porta local e testa o cliente TCP de produção por socket de verdade — sem Python, em qualquer máquina. Ganchos: `responseDelay` (provoca timeout), `dropNextRequests` (ignora pedidos) e `closeAllClients` (derruba a conexão).
+
+## 6. Vídeo de apresentação (gerado)
+
+`tool/video/apresentacao.py` grava o app no emulador e o painel do simulador, narra com voz sintética e monta um vídeo 1920×1080 de ~2 min 40 s com 10 cenas. Nada é editado à mão: mudou o app, gera de novo.
+
+**Precisa:** emulador `IHM_Pixel` ligado com o app instalado; ffmpeg e edge-tts no PC; `tool/video/.trabalho/projeto-base.json` (o projeto de demonstração puxado do aparelho). O script monta o projeto do vídeo com `preparar_projeto.py` (acrescenta a "Cortadora (rede)" em `10.0.2.2:5020` e a tela "Cortadora na rede"), envia ao app, liga os toques visíveis e abre o painel.
+
+```
+python tool/video/apresentacao.py ensaio   # só roda as ações e tira fotos de conferência
+python tool/video/apresentacao.py          # grava, narra e monta
+```
+
+Saída em `tool/video/saida/` (fora do git): o `.mp4` e um `.txt` de capítulos. A narração dita a duração de cada cena.
+
+Armadilhas já resolvidas no script:
+
+- **Captura do painel com DPI alto.** O `gdigrab` por título não conhece a escala do Windows (250% neste notebook) e gravava a janela miúda num canto. A captura é pela área da tela (`ddagrab`), com o retângulo medido em pixels físicos e cortado na área útil do monitor (senão entra a barra de tarefas).
+- **Coordenadas de toque** são do Pixel 7 (1080×2400) e medidas nas fotos do ensaio; mudou layout, rode `ensaio` antes.
+- **Teclado numérico** fecha com a tecla voltar (`keyevent 4`), não com ESC.
+- **Capítulos** arredondam antes de dividir (119,6 s virava "01:00").

@@ -1,0 +1,275 @@
+// Variável: o nome de um dado do equipamento.
+//
+// É a "variável intermediária" pedida na reunião de 24/09/2026: os elementos
+// da tela nunca apontam para um endereço cru, apontam para uma variável. Isso
+// dá três coisas: (1) o mesmo dado pode aparecer em vários elementos com uma
+// leitura só; (2) mudar o endereço é mexer num lugar só; (3) o usuário lê
+// "Velocidade da faca", não "HR 40012".
+
+import '../core/modbus/modbus_memory.dart';
+
+/// Formato do dado dentro da memória.
+enum TagDataType {
+  /// Liga/desliga. Em coil/entrada discreta é o próprio bit; em registrador
+  /// é um bit escolhido ([Tag.bitIndex]) dentro da palavra de 16 bits.
+  bool,
+
+  /// Inteiro de 16 bits sem sinal (0..65535) — o registrador cru.
+  uint16,
+
+  /// Inteiro de 16 bits com sinal (-32768..32767).
+  int16,
+
+  /// Inteiro de 32 bits sem sinal, em 2 registradores seguidos.
+  uint32,
+
+  /// Inteiro de 32 bits com sinal, em 2 registradores seguidos.
+  int32,
+
+  /// Número com vírgula IEEE-754 (32 bits), em 2 registradores seguidos.
+  float32,
+}
+
+extension TagDataTypeMeta on TagDataType {
+  /// Quantos registradores de 16 bits um valor ocupa.
+  int get registerCount {
+    switch (this) {
+      case TagDataType.uint32:
+      case TagDataType.int32:
+      case TagDataType.float32:
+        return 2;
+      default:
+        return 1;
+    }
+  }
+
+  bool get isNumeric => this != TagDataType.bool;
+  bool get is32Bit => registerCount == 2;
+
+  /// Nome para leigo — o que aparece no botão de escolha.
+  String get label {
+    switch (this) {
+      case TagDataType.bool:
+        return 'Liga / desliga';
+      case TagDataType.uint16:
+        return 'Número inteiro';
+      case TagDataType.int16:
+        return 'Inteiro com sinal';
+      case TagDataType.uint32:
+        return 'Inteiro grande';
+      case TagDataType.int32:
+        return 'Inteiro grande c/ sinal';
+      case TagDataType.float32:
+        return 'Número com vírgula';
+    }
+  }
+
+  /// Nome técnico, mostrado ao lado para quem conhece.
+  String get technical {
+    switch (this) {
+      case TagDataType.bool:
+        return 'BOOL';
+      case TagDataType.uint16:
+        return 'UINT16';
+      case TagDataType.int16:
+        return 'INT16';
+      case TagDataType.uint32:
+        return 'UINT32';
+      case TagDataType.int32:
+        return 'INT32';
+      case TagDataType.float32:
+        return 'FLOAT32';
+    }
+  }
+
+  static TagDataType fromName(String? n) => TagDataType.values
+      .firstWhere((t) => t.name == n, orElse: () => TagDataType.uint16);
+}
+
+/// Ordem dos bytes dentro de um valor.
+///
+/// A norma Modbus só define a ordem **dentro** de um registrador (big-endian).
+/// Para 32 bits cada fabricante escolhe qual palavra vem primeiro — e alguns
+/// ainda trocam os bytes. As quatro combinações possíveis, com os bytes do
+/// valor numerados A (mais significativo) a D:
+///
+/// | ordem  | registrador 1 | registrador 2 | onde aparece                    |
+/// |--------|---------------|---------------|---------------------------------|
+/// | ABCD   | A B           | C D           | padrão "big-endian"             |
+/// | CDAB   | C D           | A B           | muito comum em CLP (word swap)  |
+/// | BADC   | B A           | D C           | byte swap                       |
+/// | DCBA   | D C           | B A           | little-endian completo          |
+///
+/// Para 16 bits só importa se os bytes estão trocados: ABCD/CDAB = normal,
+/// BADC/DCBA = trocado.
+enum ByteOrder { abcd, cdab, badc, dcba }
+
+extension ByteOrderMeta on ByteOrder {
+  bool get swapsBytes => this == ByteOrder.badc || this == ByteOrder.dcba;
+  bool get swapsWords => this == ByteOrder.cdab || this == ByteOrder.dcba;
+  String get label => name.toUpperCase();
+
+  String get hint {
+    switch (this) {
+      case ByteOrder.abcd:
+        return 'Padrão';
+      case ByteOrder.cdab:
+        return 'Palavras trocadas (comum em CLP)';
+      case ByteOrder.badc:
+        return 'Bytes trocados';
+      case ByteOrder.dcba:
+        return 'Tudo invertido';
+    }
+  }
+
+  static ByteOrder fromName(String? n) => ByteOrder.values
+      .firstWhere((o) => o.name == n, orElse: () => ByteOrder.abcd);
+}
+
+/// Uma variável cadastrada. Imutável.
+class Tag {
+  const Tag({
+    required this.id,
+    required this.name,
+    required this.deviceId,
+    this.area = ModbusArea.holdingRegister,
+    this.address = 0,
+    this.dataType = TagDataType.uint16,
+    this.byteOrder = ByteOrder.abcd,
+    this.bitIndex = 0,
+    this.length = 1,
+    this.writable = false,
+    this.unit = '',
+    this.decimals = 0,
+    this.description = '',
+  });
+
+  final String id;
+  final String name;
+  final String deviceId;
+  final ModbusArea area;
+
+  /// Endereço Modbus base 0 (o que vai no pedido).
+  final int address;
+
+  final TagDataType dataType;
+  final ByteOrder byteOrder;
+
+  /// Só para [TagDataType.bool] em registrador: qual bit (0..15) da palavra.
+  final int bitIndex;
+
+  /// Quantos valores seguidos (1 = valor único). Maior que 1 forma uma
+  /// **lista** — é o "memória inicial + tamanho" que o gráfico de barras usa
+  /// (ex.: produção de cada hora do turno em 8 registradores seguidos).
+  final int length;
+
+  /// Se o operador pode alterar o valor pela tela. Áreas só-leitura (entrada
+  /// discreta, input register) nunca são graváveis.
+  final bool writable;
+
+  /// Unidade exibida ao lado do número ("°C", "m/min", "pç").
+  final String unit;
+
+  /// Casas decimais exibidas. Não altera o valor, só a apresentação.
+  final int decimals;
+
+  final String description;
+
+  /// Variável lida de um bit dentro de um registrador.
+  bool get isBitOfRegister => dataType == TagDataType.bool && !area.isBit;
+
+  bool get isArray => length > 1;
+
+  /// Pode escrever de fato: marcado pelo usuário **e** a área permite.
+  bool get canWrite => writable && area.isWritable;
+
+  /// Quantas posições da área a variável ocupa (bits ou registradores).
+  int get span => area.isBit ? length : dataType.registerCount * length;
+
+  /// Endereço da última posição ocupada.
+  int get lastAddress => address + span - 1;
+
+  /// "HR 100" / "HR 100.3" / "COIL 5" / "HR 10..17".
+  String get addressLabel {
+    final base = '${area.shortLabel} $address';
+    if (isBitOfRegister) return '$base.$bitIndex';
+    if (span > 1) return '${area.shortLabel} $address..$lastAddress';
+    return base;
+  }
+
+  Tag copyWith({
+    String? name,
+    String? deviceId,
+    ModbusArea? area,
+    int? address,
+    TagDataType? dataType,
+    ByteOrder? byteOrder,
+    int? bitIndex,
+    int? length,
+    bool? writable,
+    String? unit,
+    int? decimals,
+    String? description,
+  }) =>
+      Tag(
+        id: id,
+        name: name ?? this.name,
+        deviceId: deviceId ?? this.deviceId,
+        area: area ?? this.area,
+        address: address ?? this.address,
+        dataType: dataType ?? this.dataType,
+        byteOrder: byteOrder ?? this.byteOrder,
+        bitIndex: bitIndex ?? this.bitIndex,
+        length: length ?? this.length,
+        writable: writable ?? this.writable,
+        unit: unit ?? this.unit,
+        decimals: decimals ?? this.decimals,
+        description: description ?? this.description,
+      );
+
+  /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
+  /// área de bit força tipo liga/desliga; área só-leitura tira a escrita.
+  Tag normalized() {
+    var t = this;
+    if (t.area.isBit && t.dataType != TagDataType.bool) {
+      t = t.copyWith(dataType: TagDataType.bool);
+    }
+    if (!t.area.isWritable && t.writable) t = t.copyWith(writable: false);
+    if (t.length < 1) t = t.copyWith(length: 1);
+    if (t.bitIndex < 0 || t.bitIndex > 15) t = t.copyWith(bitIndex: 0);
+    return t;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'deviceId': deviceId,
+        'area': area.name,
+        'address': address,
+        'dataType': dataType.name,
+        'byteOrder': byteOrder.name,
+        'bitIndex': bitIndex,
+        'length': length,
+        'writable': writable,
+        'unit': unit,
+        'decimals': decimals,
+        'description': description,
+      };
+
+  factory Tag.fromJson(Map<String, dynamic> j) => Tag(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        deviceId: j['deviceId'] as String,
+        area: ModbusArea.values.firstWhere((a) => a.name == j['area'],
+            orElse: () => ModbusArea.holdingRegister),
+        address: (j['address'] as int?) ?? 0,
+        dataType: TagDataTypeMeta.fromName(j['dataType'] as String?),
+        byteOrder: ByteOrderMeta.fromName(j['byteOrder'] as String?),
+        bitIndex: (j['bitIndex'] as int?) ?? 0,
+        length: (j['length'] as int?) ?? 1,
+        writable: (j['writable'] as bool?) ?? false,
+        unit: (j['unit'] as String?) ?? '',
+        decimals: (j['decimals'] as int?) ?? 0,
+        description: (j['description'] as String?) ?? '',
+      ).normalized();
+}

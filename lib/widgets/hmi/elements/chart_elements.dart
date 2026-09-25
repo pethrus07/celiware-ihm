@@ -1,0 +1,314 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../../../app/app_scope.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../models/hmi_screen.dart';
+import '../../../models/tag.dart';
+import '../../../services/runtime/tag_codec.dart';
+import '../../../services/runtime/tag_store.dart';
+import '../hmi_frame.dart';
+
+/// Cores das curvas, na ordem das variáveis. Fora da paleta de estado de
+/// propósito (curva azul não é "informação", é só a 1ª curva) — mas sem
+/// vermelho, para não parecer alarme.
+const _seriesColors = [Ind.info, Ind.accent, Color(0xFFB58CFF)];
+
+/// Gráfico de tendência: curva dos últimos [windowSec] segundos de até 3
+/// variáveis numéricas.
+///
+/// Usa o histórico curto do [TagStore] (que já vinha sendo gravado enquanto a
+/// variável estava em uso), então abrir a tela mostra a curva recente em vez
+/// de começar vazio. Redesenha 2× por segundo — o olho não pede mais que isso
+/// e poupa bateria.
+class TrendElement extends StatefulWidget {
+  const TrendElement({super.key, required this.element});
+  final HmiElement element;
+
+  @override
+  State<TrendElement> createState() => _TrendElementState();
+}
+
+class _TrendElementState extends State<TrendElement> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final e = widget.element;
+    final scope = AppScope.watch(context);
+    final project = scope.controller.project;
+    final ids = e.tagIds.take(3).toList();
+    final tags = [for (final id in ids) project.tag(id)];
+    final window = Duration(seconds: e.prop<num>('windowSec', 120).toInt().clamp(10, 600));
+    final now = DateTime.now();
+
+    final series = <_Series>[];
+    for (var i = 0; i < ids.length; i++) {
+      final t = tags[i];
+      if (t == null) continue;
+      series.add(_Series(
+        tag: t,
+        color: _seriesColors[i % _seriesColors.length],
+        samples: scope.runtime.store.history(ids[i]).where((s) => now.difference(s.at) <= window).toList(),
+        reading: scope.runtime.store.read(ids[i]),
+      ));
+    }
+
+    final lost = series.isNotEmpty && series.every((s) => s.reading.quality == TagQuality.commLost);
+
+    return HmiFrame(
+      label: e.prop<String>('label', ''),
+      tag: series.isEmpty ? null : series.first.tag,
+      reading: lost ? series.first.reading : const TagReading(quality: TagQuality.good),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 2,
+            children: [
+              // Nome longo encolhe com reticências em vez de transbordar
+              // (pego pelo teste de widget com "Temperatura do motor").
+              for (final s in series)
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 10, height: 3, color: s.color),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text.rich(
+                      TextSpan(children: [
+                        TextSpan(text: '${s.tag.name}: ', style: const TextStyle(color: Ind.textDim, fontSize: 12)),
+                        TextSpan(text: TagCodec.format(s.tag, s.reading.value), style: Ind.number(12.5, color: s.color)),
+                      ]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ]),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: CustomPaint(
+              painter: _TrendPainter(
+                series: series,
+                now: now,
+                window: window,
+                fixedMin: (e.props['min'] as num?)?.toDouble(),
+                fixedMax: (e.props['max'] as num?)?.toDouble(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Series {
+  _Series({required this.tag, required this.color, required this.samples, required this.reading});
+  final Tag tag;
+  final Color color;
+  final List<TrendSample> samples;
+  final TagReading reading;
+}
+
+class _TrendPainter extends CustomPainter {
+  _TrendPainter({required this.series, required this.now, required this.window, this.fixedMin, this.fixedMax});
+  final List<_Series> series;
+  final DateTime now;
+  final Duration window;
+  final double? fixedMin, fixedMax;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const left = 38.0, bottom = 16.0;
+    final plot = Rect.fromLTRB(left, 4, size.width - 4, size.height - bottom);
+    if (plot.width <= 10 || plot.height <= 10) return;
+
+    // Escala: fixa se configurada; senão automática, arredondada para números
+    // "redondos" (0, 25, 50...) — eixo com 87,2 e -6,46 ninguém lê de relance.
+    // Grandeza que nunca foi negativa não ganha eixo negativo.
+    var lo = fixedMin ?? double.infinity, hi = fixedMax ?? -double.infinity;
+    var dataMin = double.infinity;
+    for (final s in series) {
+      for (final p in s.samples) {
+        dataMin = math.min(dataMin, p.value);
+        if (fixedMin == null) lo = math.min(lo, p.value);
+        if (fixedMax == null) hi = math.max(hi, p.value);
+      }
+    }
+    if (!lo.isFinite || !hi.isFinite) {
+      lo = fixedMin ?? 0;
+      hi = fixedMax ?? 100;
+    }
+    if (hi - lo < 1e-9) {
+      hi += 1;
+      lo -= 1;
+    }
+    if (fixedMin == null || fixedMax == null) {
+      final step = _niceStep((hi - lo) / 4);
+      if (fixedMin == null) lo = (lo / step).floor() * step;
+      if (fixedMax == null) hi = (hi / step).ceil() * step;
+      if (fixedMin == null && dataMin >= 0 && lo < 0) lo = 0;
+      if (hi - lo < step) hi = lo + step;
+    }
+
+    final grid = Paint()
+      ..color = Ind.line
+      ..strokeWidth = 1;
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+    for (var i = 0; i <= 4; i++) {
+      final y = plot.top + plot.height * i / 4;
+      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
+      final v = hi - (hi - lo) * i / 4;
+      tp.text = TextSpan(text: _short(v), style: const TextStyle(fontFamily: Ind.mono, fontSize: 10, color: Ind.textMuted));
+      tp.layout();
+      tp.paint(canvas, Offset(left - tp.width - 5, y - tp.height / 2));
+    }
+    for (final (label, frac) in [('-${_dur(window)}', 0.0), ('agora', 1.0)]) {
+      tp.text = TextSpan(text: label, style: const TextStyle(fontSize: 10, color: Ind.textMuted));
+      tp.layout();
+      final x = plot.left + plot.width * frac - (frac == 1 ? tp.width : 0);
+      tp.paint(canvas, Offset(x, plot.bottom + 3));
+    }
+
+    final ms = window.inMilliseconds.toDouble();
+    for (final s in series) {
+      if (s.samples.length < 2) continue;
+      final path = Path();
+      var first = true;
+      for (final p in s.samples) {
+        final x = plot.right - plot.width * (now.difference(p.at).inMilliseconds / ms);
+        final y = plot.bottom - plot.height * ((p.value - lo) / (hi - lo));
+        if (first) {
+          path.moveTo(x, y);
+          first = false;
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+      canvas.save();
+      canvas.clipRect(plot);
+      canvas.drawPath(
+          path,
+          Paint()
+            ..color = s.color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..strokeJoin = StrokeJoin.round);
+      canvas.restore();
+    }
+  }
+
+  /// Passo "redondo" (1, 2, 2,5 ou 5 × 10ⁿ) mais próximo acima de [raw].
+  static double _niceStep(double raw) {
+    if (raw <= 0 || !raw.isFinite) return 1;
+    final exp = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
+    final f = raw / exp;
+    final nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+    return nice * exp;
+  }
+
+  static String _short(double v) {
+    // Marca redonda (os passos são 1·2·2,5·5×10ⁿ) sai sem casa decimal.
+    if (v == v.roundToDouble()) return v.round().toString();
+    final a = v.abs();
+    if (a >= 10000) return '${(v / 1000).toStringAsFixed(0)}k';
+    if (a >= 100) return v.toStringAsFixed(0);
+    if (a >= 10) return v.toStringAsFixed(1).replaceAll('.', ',');
+    return v.toStringAsFixed(2).replaceAll('.', ',');
+  }
+
+  static String _dur(Duration d) => d.inSeconds >= 60 ? '${d.inMinutes} min' : '${d.inSeconds} s';
+
+  @override
+  bool shouldRepaint(_TrendPainter old) => true;
+}
+
+/// Gráfico de barras: uma barra por posição de uma variável do tipo lista
+/// (ex.: 8 registradores seguidos com a produção de cada hora do turno).
+class BarChartElement extends StatelessWidget {
+  const BarChartElement({super.key, required this.element});
+  final HmiElement element;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = element;
+    return TagBuilder(
+      tagId: e.tagId,
+      builder: (context, tag, r) {
+        final values = [
+          for (final v in (r.value is List ? r.value as List : const []))
+            if (v is num) v.toDouble(),
+        ];
+        return HmiFrame(
+          label: e.prop<String>('label', tag?.name ?? ''),
+          tag: tag,
+          reading: r,
+          child: values.isEmpty
+              ? const Center(child: Text('---', style: TextStyle(color: Ind.textMuted)))
+              : CustomPaint(painter: _BarsPainter(values, tag)),
+        );
+      },
+    );
+  }
+}
+
+class _BarsPainter extends CustomPainter {
+  _BarsPainter(this.values, this.tag);
+  final List<double> values;
+  final Tag? tag;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const labelH = 14.0, valueH = 14.0;
+    final maxV = values.fold<double>(0, math.max);
+    final n = values.length;
+    final slot = size.width / n;
+    final barW = slot * 0.64;
+    final plotH = size.height - labelH - valueH;
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+    canvas.drawLine(Offset(0, size.height - labelH), Offset(size.width, size.height - labelH),
+        Paint()..color = Ind.line);
+
+    for (var i = 0; i < n; i++) {
+      final v = values[i];
+      final h = maxV <= 0 ? 0.0 : plotH * (v / maxV);
+      final x = slot * i + (slot - barW) / 2;
+      final last = i == n - 1;
+      final rect = Rect.fromLTWH(x, size.height - labelH - h, barW, h);
+      canvas.drawRRect(RRect.fromRectAndCorners(rect, topLeft: const Radius.circular(3), topRight: const Radius.circular(3)),
+          Paint()..color = last ? Ind.accent : Ind.info.withValues(alpha: 0.8));
+
+      if (slot >= 26) {
+        tp.text = TextSpan(text: _short(v), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: last ? Ind.accent : Ind.textDim));
+        tp.layout(maxWidth: slot);
+        tp.paint(canvas, Offset(slot * i + (slot - tp.width) / 2, rect.top - tp.height - 1));
+      }
+      tp.text = TextSpan(text: '${i + 1}', style: const TextStyle(fontSize: 10, color: Ind.textMuted));
+      tp.layout();
+      tp.paint(canvas, Offset(slot * i + (slot - tp.width) / 2, size.height - labelH + 2));
+    }
+  }
+
+  static String _short(double v) => v >= 10000 ? '${(v / 1000).toStringAsFixed(1).replaceAll('.', ',')}k' : v.round().toString();
+
+  @override
+  bool shouldRepaint(_BarsPainter o) => o.values != values;
+}

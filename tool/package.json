@@ -1,0 +1,1 @@
+{"name":"celiware-ihm-tools","private":true,"description":"Geradores da documentação (Word) a partir de docs/ARQUITETURA.md","dependencies":{"docx":"^9.7.2"}}

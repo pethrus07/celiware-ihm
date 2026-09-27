@@ -34,8 +34,10 @@ class LampElement extends StatelessWidget {
             return Row(
               children: [
                 if (!showText) const Spacer(),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
+                // Sem animação, como lâmpada de painel: acende e apaga na hora.
+                // O esmaecer de 150 ms num sinal que pisca a cada 400 ms (faca
+                // da cortadora) deixava a tela desenhando o tempo todo.
+                Container(
                   width: d,
                   height: d,
                   decoration: BoxDecoration(
@@ -91,8 +93,13 @@ class ValueElement extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
+                // Texto (nome da máquina, receita) na letra de título, não na
+                // mono dos números: a mono espaçava "CORTADORA  R1" e gritava.
                 child: FitText(tag == null ? '---' : TagCodec.format(tag, v, withUnit: false),
-                    alignment: Alignment.bottomLeft, style: Ind.number(44)),
+                    alignment: v is String ? Alignment.centerLeft : Alignment.bottomLeft,
+                    style: v is String
+                        ? const TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 30, color: Ind.text, letterSpacing: 0.3)
+                        : Ind.number(44)),
               ),
               if (tag != null && tag.unit.isNotEmpty && v is num)
                 Padding(
@@ -187,12 +194,7 @@ class BarElement extends StatelessWidget {
                       decoration: BoxDecoration(color: Ind.bg, borderRadius: BorderRadius.circular(h / 2), border: Border.all(color: Ind.line)),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: AnimatedFractionallySizedBox(
-                          duration: const Duration(milliseconds: 250),
-                          widthFactor: frac,
-                          heightFactor: 1,
-                          child: Container(decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(h / 2))),
-                        ),
+                        child: _BarFill(frac: frac, color: color, radius: h / 2),
                       ),
                     ),
                   );
@@ -209,6 +211,38 @@ class BarElement extends StatelessWidget {
       },
     );
   }
+}
+
+/// Preenchimento da barra. Anima só quando o valor **anda** (mais de 3% da
+/// faixa): a animação de 250 ms a cada leitura de 300 ms deixava a tela
+/// desenhando sem parar (38 quadros/s parada, medido) — bateria indo embora
+/// por causa da oscilação de ±1% que todo sinal real tem.
+class _BarFill extends StatefulWidget {
+  const _BarFill({required this.frac, required this.color, required this.radius});
+  final double frac;
+  final Color color;
+  final double radius;
+
+  @override
+  State<_BarFill> createState() => _BarFillState();
+}
+
+class _BarFillState extends State<_BarFill> {
+  Duration _duration = Duration.zero;
+
+  @override
+  void didUpdateWidget(_BarFill old) {
+    super.didUpdateWidget(old);
+    _duration = (widget.frac - old.frac).abs() > 0.03 ? const Duration(milliseconds: 250) : Duration.zero;
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedFractionallySizedBox(
+        duration: _duration,
+        widthFactor: widget.frac,
+        heightFactor: 1,
+        child: Container(decoration: BoxDecoration(color: widget.color, borderRadius: BorderRadius.circular(widget.radius))),
+      );
 }
 
 /// Medidor de ponteiro (arco de 240°) com faixas de atenção e alarme.

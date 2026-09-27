@@ -115,14 +115,20 @@ class _ScreenCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(screen.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                        // Tela vazia: a miniatura já diz "Tela vazia — toque
+                        // para montar"; "0 elementos" embaixo só repetia.
+                        if (screen.elements.isNotEmpty || screen.readOnly) ...[
                         const SizedBox(height: 4),
                         Row(children: [
                           if (screen.readOnly) ...[
                             const Tooltip(message: 'Só acompanhamento', child: Icon(Icons.visibility_outlined, size: 15, color: Ind.textMuted)),
                             const SizedBox(width: 6),
                           ],
-                          Text('${screen.elements.length} elementos', style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
+                          Text(
+                              switch (screen.elements.length) { 0 => 'Só acompanhamento', 1 => '1 elemento', final n => '$n elementos' },
+                              style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
                         ]),
+                        ],
                       ],
                     ),
                   ),

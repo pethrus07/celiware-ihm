@@ -203,9 +203,13 @@ class Ind {
         showDragHandle: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       ),
+      // Título das caixas na mesma letra dos títulos de tela (o padrão do
+      // Material era uma Plex fina, que destoava do resto).
       dialogTheme: DialogThemeData(
         backgroundColor: surfaceHigh,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+        titleTextStyle: const TextStyle(fontFamily: condensed, fontWeight: FontWeight.w700, fontSize: 24, color: Ind.text, height: 1.2),
+        contentTextStyle: const TextStyle(fontFamily: sans, fontSize: 15.5, color: Ind.textDim, height: 1.4),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,

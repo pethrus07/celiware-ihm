@@ -11,6 +11,7 @@ import 'package:ihm/services/demo/demo_process.dart';
 import 'package:ihm/services/demo/demo_project.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/storage/project_repository.dart';
+import 'package:ihm/widgets/hmi/hmi_canvas.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Fluxos de ponta a ponta da interface, com a máquina de demonstração.
@@ -163,6 +164,48 @@ void main() {
     expect(memory.bit(ModbusArea.coil, DemoMap.coilRun), isTrue); // o comando foi
     expect(memory.bit(ModbusArea.coil, DemoMap.coilInCycle), isFalse); // a máquina não partiu
     expect(find.byIcon(Icons.hourglass_top_rounded), findsOneWidget);
+    await shutdown(tester, c);
+  });
+
+  testWidgets('celular deitado / tablet: a célula tem teto e a grade fica centralizada', (tester) async {
+    final c = await boot(tester);
+    tester.view.physicalSize = const Size(2400, 1080); // Pixel 7 deitado
+    await live(tester, 300);
+    await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.operationScreenId}')));
+    await live(tester, 900);
+    final status = tester.getRect(find.byKey(const ValueKey('el-op_status')));
+    final screenW = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    // 3 células de no máximo 96 dp (menos o respiro): antes ocupava meia tela.
+    expect(status.width, lessThanOrEqualTo(3 * HmiCanvas.maxCell));
+    // Centralizada: sobra espaço dos dois lados, não só à direita.
+    expect(status.left, greaterThan(100));
+    expect(screenW - status.left, greaterThan(6 * HmiCanvas.maxCell - 20));
+    await shutdown(tester, c);
+  });
+
+  testWidgets('escolha de variável: busca por nome, sem acento', (tester) async {
+    final c = await boot(tester);
+    await tester.tap(find.text('Nova tela'));
+    await live(tester, 300);
+    await tester.enterText(find.byKey(const ValueKey('campo-nome')), 'Busca');
+    await tester.tap(find.byKey(const ValueKey('ok-nome')));
+    await live(tester, 700);
+    await tester.tap(find.text('Elemento'));
+    await live(tester, 500);
+    // Mostrador aceita qualquer valor único (18 na demo): a busca aparece a
+    // partir de 8 compatíveis — a lâmpada, com 7 liga/desliga, não mostra.
+    await tester.tap(find.byKey(const ValueKey('paleta-value')));
+    await live(tester, 700);
+    await tester.tap(find.byKey(const ValueKey('escolher-variavel')));
+    await live(tester, 600);
+
+    await tester.enterText(find.byKey(const ValueKey('buscar-variavel')), 'maquina'); // "Liga máquina"
+    await live(tester, 300);
+    expect(find.byKey(const ValueKey('escolher-demo_liga')), findsOneWidget);
+    expect(find.byKey(const ValueKey('escolher-demo_porta')), findsNothing);
+    await tester.enterText(find.byKey(const ValueKey('buscar-variavel')), 'xyz');
+    await live(tester, 300);
+    expect(find.textContaining('Nenhuma variável com'), findsOneWidget);
     await shutdown(tester, c);
   });
 

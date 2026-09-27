@@ -120,6 +120,10 @@ class _TrendElementState extends State<TrendElement> {
   }
 }
 
+/// Eixo da direita do gráfico de tendência — exposto só para os testes.
+@visibleForTesting
+(double, double) trendAlignedRange(double dataLo, double dataHi, int steps) => _TrendPainter.alignedRange(dataLo, dataHi, steps);
+
 class _Series {
   _Series({required this.tag, required this.color, required this.samples, required this.reading});
   final Tag tag;
@@ -135,24 +139,60 @@ class _TrendPainter extends CustomPainter {
   final Duration window;
   final double? fixedMin, fixedMax;
 
+  /// Faixa de dados de um grupo de curvas (min, max; infinitos se vazio).
+  static (double, double) _dataRange(List<_Series> group) {
+    var lo = double.infinity, hi = -double.infinity;
+    for (final s in group) {
+      for (final p in s.samples) {
+        lo = math.min(lo, p.value);
+        hi = math.max(hi, p.value);
+      }
+    }
+    return (lo, hi);
+  }
+
+  /// Eixo da direita com o MESMO número de passos do da esquerda, para as
+  /// marcas das duas escalas caírem nas mesmas linhas de grade — e ainda em
+  /// números redondos dos dois lados.
+  static (double, double) alignedRange(double dataLo, double dataHi, int steps) {
+    if (!dataLo.isFinite || !dataHi.isFinite) return (0, 100);
+    // Decidido ANTES de alargar a faixa: valor constante 0 virava -1..1 e
+    // ganhava eixo negativo.
+    final nonNegative = dataLo >= 0;
+    if (dataHi - dataLo < 1e-9) {
+      dataHi += 1;
+      dataLo -= 1;
+    }
+    var step = _niceStep((dataHi - dataLo) / steps);
+    var lo = (dataLo / step).floor() * step;
+    if (nonNegative && lo < 0) lo = 0;
+    while (lo + steps * step < dataHi - 1e-9) {
+      step = _niceStep(step * 1.0001);
+      lo = (dataLo / step).floor() * step;
+      if (nonNegative && lo < 0) lo = 0;
+    }
+    return (lo, lo + steps * step);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
+    // Unidades diferentes (m/min × °C) numa escala só achatavam uma das
+    // curvas numa linha reta. A 1ª unidade fica no eixo da esquerda; as
+    // demais, no da direita, com os números na cor da curva.
+    final leftGroup = [for (final s in series) if (s.tag.unit == series.first.tag.unit) s];
+    final rightGroup = [for (final s in series) if (!leftGroup.contains(s)) s];
+    final dual = rightGroup.isNotEmpty;
+
     const left = 38.0, bottom = 16.0;
-    final plot = Rect.fromLTRB(left, 4, size.width - 4, size.height - bottom);
+    final right = dual ? 40.0 : 4.0;
+    final plot = Rect.fromLTRB(left, 4, size.width - right, size.height - bottom);
     if (plot.width <= 10 || plot.height <= 10) return;
 
     // Escala: fixa se configurada; senão automática, arredondada para números
     // "redondos" (0, 25, 50...) — eixo com 87,2 e -6,46 ninguém lê de relance.
     // Grandeza que nunca foi negativa não ganha eixo negativo.
-    var lo = fixedMin ?? double.infinity, hi = fixedMax ?? -double.infinity;
-    var dataMin = double.infinity;
-    for (final s in series) {
-      for (final p in s.samples) {
-        dataMin = math.min(dataMin, p.value);
-        if (fixedMin == null) lo = math.min(lo, p.value);
-        if (fixedMax == null) hi = math.max(hi, p.value);
-      }
-    }
+    final (dataMin, dataMax) = _dataRange(leftGroup);
+    var lo = fixedMin ?? dataMin, hi = fixedMax ?? dataMax;
     if (!lo.isFinite || !hi.isFinite) {
       lo = fixedMin ?? 0;
       hi = fixedMax ?? 100;
@@ -176,12 +216,22 @@ class _TrendPainter extends CustomPainter {
     // Linhas nos múltiplos do passo redondo (0 · 50 · 100 · 150), não em
     // quartos da faixa — quartos de 0..150 davam "37,5 · 75 · 113".
     final step = _niceStep((hi - lo) / 4);
-    for (var v = (lo / step).ceil() * step; v <= hi + step * 1e-6; v += step) {
-      final y = plot.bottom - plot.height * ((v - lo) / (hi - lo));
+    final ticks = [for (var v = (lo / step).ceil() * step; v <= hi + step * 1e-6; v += step) v];
+    final (rLo, rHi) = dual ? alignedRange(_dataRange(rightGroup).$1, _dataRange(rightGroup).$2, ((hi - lo) / step).round().clamp(1, 12)) : (0.0, 1.0);
+    final leftColor = dual ? leftGroup.first.color : Ind.textMuted;
+    final rightColor = dual ? rightGroup.first.color : Ind.textMuted;
+    for (final v in ticks) {
+      final frac = (v - lo) / (hi - lo);
+      final y = plot.bottom - plot.height * frac;
       canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
-      tp.text = TextSpan(text: _short(v), style: const TextStyle(fontFamily: Ind.mono, fontSize: 10, color: Ind.textMuted));
+      tp.text = TextSpan(text: _short(v), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: leftColor));
       tp.layout();
       tp.paint(canvas, Offset(left - tp.width - 5, y - tp.height / 2));
+      if (dual) {
+        tp.text = TextSpan(text: _short(rLo + frac * (rHi - rLo)), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: rightColor));
+        tp.layout();
+        tp.paint(canvas, Offset(plot.right + 5, y - tp.height / 2));
+      }
     }
     for (final (label, frac) in [('-${_dur(window)}', 0.0), ('agora', 1.0)]) {
       tp.text = TextSpan(text: label, style: const TextStyle(fontSize: 10, color: Ind.textMuted));
@@ -193,11 +243,13 @@ class _TrendPainter extends CustomPainter {
     final ms = window.inMilliseconds.toDouble();
     for (final s in series) {
       if (s.samples.length < 2) continue;
+      final onRight = rightGroup.contains(s);
+      final sLo = onRight ? rLo : lo, sHi = onRight ? rHi : hi;
       final path = Path();
       var first = true;
       for (final p in s.samples) {
         final x = plot.right - plot.width * (now.difference(p.at).inMilliseconds / ms);
-        final y = plot.bottom - plot.height * ((p.value - lo) / (hi - lo));
+        final y = plot.bottom - plot.height * ((p.value - sLo) / (sHi - sLo));
         if (first) {
           path.moveTo(x, y);
           first = false;

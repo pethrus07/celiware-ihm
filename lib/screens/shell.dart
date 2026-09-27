@@ -66,16 +66,22 @@ class ShellState extends State<Shell> {
             for (var i = 0; i < pages.length; i++) _visited.contains(i) ? pages[i] : const SizedBox.shrink(),
           ],
         ),
-        bottomNavigationBar: NavigationBar(
-          key: navKey,
-          selectedIndex: _index,
-          onDestinationSelected: goTo,
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded), label: 'Telas'),
-            NavigationDestination(icon: Icon(Icons.router_outlined), selectedIcon: Icon(Icons.router_rounded), label: 'Equipamentos'),
-            NavigationDestination(icon: Icon(Icons.data_object_rounded), selectedIcon: Icon(Icons.data_object_rounded), label: 'Variáveis'),
-            NavigationDestination(icon: Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded), label: 'Mais'),
-          ],
+        // Fonte do sistema em 130%: "Equipamentos" quebrava em "Equipamento/s".
+        // A barra segura a escala em 115% (os ícones já identificam a aba); o
+        // resto do app segue a fonte que a pessoa escolheu.
+        bottomNavigationBar: MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 1.15,
+          child: NavigationBar(
+            key: navKey,
+            selectedIndex: _index,
+            onDestinationSelected: goTo,
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded), label: 'Telas'),
+              NavigationDestination(icon: Icon(Icons.router_outlined), selectedIcon: Icon(Icons.router_rounded), label: 'Equipamentos'),
+              NavigationDestination(icon: Icon(Icons.data_object_rounded), selectedIcon: Icon(Icons.data_object_rounded), label: 'Variáveis'),
+              NavigationDestination(icon: Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded), label: 'Mais'),
+            ],
+          ),
         ),
       ),
     );

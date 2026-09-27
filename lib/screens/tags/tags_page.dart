@@ -36,6 +36,8 @@ class _TagsPageState extends State<TagsPage> {
       tagIds: {for (final t in project.tags) t.id},
       child: TourHost(
         spec: Tours.variaveis(list: _listKey, add: _addKey),
+        // Só pelo "?" ou por Mais → Tutoriais (ver DevicesPage).
+        autoStart: false,
         forceStart: widget.startTour,
         child: Scaffold(
           appBar: AppBar(title: const Text('Variáveis'), actions: const [HelpButton()]),

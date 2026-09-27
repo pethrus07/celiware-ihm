@@ -28,6 +28,10 @@ class _DevicesPageState extends State<DevicesPage> {
 
     return TourHost(
       spec: Tours.equipamentos(list: _listKey, add: _addKey),
+      // Não abre sozinho: no QA o 1º minuto do app tinha cinco tutoriais
+      // seguidos. Ficam automáticos só início, operar e montar; este está no
+      // "?" e em Mais → Tutoriais.
+      autoStart: false,
       forceStart: widget.startTour,
       child: Scaffold(
         appBar: AppBar(title: const Text('Equipamentos'), actions: const [HelpButton()]),

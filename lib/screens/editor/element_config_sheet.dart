@@ -91,6 +91,8 @@ class ElementConfigSheet extends StatelessWidget {
     final tag = e.tagId == null ? null : project.tag(e.tagId!);
 
     final buttonMode = e.type == ElementType.button ? ButtonModeMeta.fromName(e.prop<String>('mode', 'toggle')) : null;
+    // Equipamentos que a tela já usa: vêm primeiro na lista de variáveis.
+    final screenDevices = {for (final id in project.screen(screenId)?.tagIds ?? const <String>{}) ?project.tag(id)?.deviceId};
 
     // ── Variável ── ("Ir para tela" não grava nada: não pede variável)
     if (info.fit != TagFit.none && buttonMode != ButtonMode.screen) {
@@ -107,6 +109,7 @@ class ElementConfigSheet extends StatelessWidget {
           fit: fit,
           selected: tag,
           needsWritable: info.writes,
+          preferDevices: screenDevices,
           onChanged: (t) {
             var next = e.withProp('tagId', t.id);
             // Rótulo vazio ou ainda igual ao nome da variável anterior → segue a nova.
@@ -243,7 +246,7 @@ class ElementConfigSheet extends StatelessWidget {
         ));
         if (byValue) {
           w.add(const SectionHeader('Variável da etapa', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
-          w.add(_TagPicker(project: project, fit: TagFit.scalar, selected: tag, onChanged: (t) => set('tagId', t.id)));
+          w.add(_TagPicker(project: project, fit: TagFit.scalar, selected: tag, preferDevices: screenDevices, onChanged: (t) => set('tagId', t.id)));
           w.add(const SectionHeader('Imagens', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
           w.add(const Text('Quando a variável vale o código, a tela mostra a imagem dele. Um PDF vira uma imagem por página: página 1 = código 1.',
               style: TextStyle(color: Ind.textDim, height: 1.35)));
@@ -332,11 +335,12 @@ class _Preview extends StatelessWidget {
 }
 
 class _TagPicker extends StatelessWidget {
-  const _TagPicker({required this.project, required this.fit, required this.selected, required this.onChanged, this.needsWritable = false});
+  const _TagPicker({required this.project, required this.fit, required this.selected, required this.onChanged, this.needsWritable = false, this.preferDevices = const {}});
   final Project project;
   final TagFit fit;
   final Tag? selected;
   final bool needsWritable;
+  final Set<String> preferDevices;
   final ValueChanged<Tag> onChanged;
 
   // Uma linha só com a variável escolhida; a lista completa abre numa folha
@@ -357,7 +361,7 @@ class _TagPicker extends StatelessWidget {
             key: const ValueKey('escolher-variavel'),
             borderRadius: BorderRadius.circular(Ind.radiusSmall),
             onTap: () async {
-              final picked = await _TagChooser.show(context, fit: fit, needsWritable: needsWritable, selectedId: t?.id);
+              final picked = await _TagChooser.show(context, fit: fit, needsWritable: needsWritable, selectedId: t?.id, preferDevices: preferDevices);
               if (picked != null) onChanged(picked);
             },
             child: Padding(
@@ -386,27 +390,63 @@ class _TagPicker extends StatelessWidget {
 
 /// Folha com a lista de variáveis compatíveis (valor ao vivo em cada uma) e
 /// o atalho "Criar variável". Devolve a escolhida.
-class _TagChooser extends StatelessWidget {
-  const _TagChooser({required this.fit, required this.needsWritable, this.selectedId});
+///
+/// Agrupada por equipamento — os da tela que está sendo montada primeiro — e
+/// com busca por nome ou endereço a partir de 8 variáveis: numa máquina de
+/// verdade são 100+, e uma lista corrida vira caça ao tesouro.
+class _TagChooser extends StatefulWidget {
+  const _TagChooser({required this.fit, required this.needsWritable, this.selectedId, this.preferDevices = const {}});
   final TagFit fit;
   final bool needsWritable;
   final String? selectedId;
+  final Set<String> preferDevices;
 
-  static Future<Tag?> show(BuildContext context, {required TagFit fit, required bool needsWritable, String? selectedId}) =>
+  static Future<Tag?> show(BuildContext context,
+          {required TagFit fit, required bool needsWritable, String? selectedId, Set<String> preferDevices = const {}}) =>
       showModalBottomSheet<Tag>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
-        builder: (_) => _TagChooser(fit: fit, needsWritable: needsWritable, selectedId: selectedId),
+        builder: (_) => _TagChooser(fit: fit, needsWritable: needsWritable, selectedId: selectedId, preferDevices: preferDevices),
       );
+
+  @override
+  State<_TagChooser> createState() => _TagChooserState();
+}
+
+class _TagChooserState extends State<_TagChooser> {
+  String _query = '';
+
+  static String _plain(String s) => s
+      .toLowerCase()
+      .replaceAll(RegExp('[áàâã]'), 'a')
+      .replaceAll(RegExp('[éê]'), 'e')
+      .replaceAll('í', 'i')
+      .replaceAll(RegExp('[óôõ]'), 'o')
+      .replaceAll('ú', 'u')
+      .replaceAll('ç', 'c');
+
+  bool _matches(Tag t) {
+    if (_query.isEmpty) return true;
+    final q = _plain(_query.trim());
+    return _plain(t.name).contains(q) || _plain(t.addressLabel).contains(q);
+  }
 
   @override
   Widget build(BuildContext context) {
     final project = AppScope.watch(context).controller.project;
-    final compatible = project.tags.where(fit.accepts).toList();
+    final compatible = project.tags.where(widget.fit.accepts).toList();
+    final shown = compatible.where(_matches).toList();
+    // Equipamentos da tela primeiro, depois os outros na ordem do projeto.
+    final devices = [
+      ...project.devices.where((d) => widget.preferDevices.contains(d.id)),
+      ...project.devices.where((d) => !widget.preferDevices.contains(d.id)),
+    ];
+    final grouped = devices.length > 1;
+
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.7,
+      initialChildSize: 0.75,
       maxChildSize: 0.95,
       builder: (context, scroll) => ListView(
         controller: scroll,
@@ -414,17 +454,36 @@ class _TagChooser extends StatelessWidget {
         children: [
           Text('Escolha a variável', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: Ind.space),
+          if (compatible.length >= 8) ...[
+            TextField(
+              key: const ValueKey('buscar-variavel'),
+              onChanged: (v) => setState(() => _query = v),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Buscar por nome ou endereço'),
+            ),
+            const SizedBox(height: Ind.space),
+          ],
           if (compatible.isEmpty)
-            _Hint(icon: Icons.info_outline_rounded, color: Ind.info, text: 'Nenhuma ${fit.requirement} ainda.'),
-          for (final t in compatible)
-            _TagRow(tag: t, project: project, selected: t.id == selectedId, warnReadOnly: needsWritable && !t.canWrite, onTap: () => Navigator.pop(context, t)),
+            _Hint(icon: Icons.info_outline_rounded, color: Ind.info, text: 'Nenhuma ${widget.fit.requirement} ainda.')
+          else if (shown.isEmpty)
+            _Hint(icon: Icons.search_off_rounded, color: Ind.info, text: 'Nenhuma variável com "$_query".'),
+          for (final d in devices) ...[
+            if (grouped && shown.any((t) => t.deviceId == d.id))
+              SectionHeader(d.name, padding: const EdgeInsets.fromLTRB(4, 12, 0, 10)),
+            for (final t in shown.where((t) => t.deviceId == d.id))
+              _TagRow(tag: t, project: project, selected: t.id == widget.selectedId, showDevice: !grouped,
+                  warnReadOnly: widget.needsWritable && !t.canWrite, onTap: () => Navigator.pop(context, t)),
+          ],
           const SizedBox(height: Ind.spaceSmall),
           OutlinedButton.icon(
             key: const ValueKey('criar-variavel-aqui'),
             onPressed: () async {
               final created = await Navigator.push<Tag>(
                 context,
-                MaterialPageRoute(builder: (_) => TagFormPage(fit: fit, preferWritable: needsWritable)),
+                MaterialPageRoute(builder: (_) => TagFormPage(
+                      fit: widget.fit,
+                      preferWritable: widget.needsWritable,
+                      preferDeviceId: widget.preferDevices.firstOrNull,
+                    )),
               );
               if (created != null && context.mounted) Navigator.pop(context, created);
             },
@@ -474,11 +533,14 @@ class _MultiTagPicker extends StatelessWidget {
 }
 
 class _TagRow extends StatelessWidget {
-  const _TagRow({required this.tag, required this.project, required this.selected, required this.onTap, this.warnReadOnly = false});
+  const _TagRow({required this.tag, required this.project, required this.selected, required this.onTap, this.warnReadOnly = false, this.showDevice = true});
   final Tag tag;
   final Project project;
   final bool selected;
   final bool warnReadOnly;
+
+  /// Lista agrupada por equipamento já diz de qual é: não repete na linha.
+  final bool showDevice;
   final VoidCallback onTap;
 
   @override
@@ -504,7 +566,7 @@ class _TagRow extends StatelessWidget {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tag.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text('${project.device(tag.deviceId)?.name ?? '?'} · ${tag.addressLabel}${warnReadOnly ? ' · só leitura' : ''}',
+                  Text('${showDevice ? '${project.device(tag.deviceId)?.name ?? '?'} · ' : ''}${tag.addressLabel}${warnReadOnly ? ' · só leitura' : ''}',
                       style: TextStyle(color: warnReadOnly ? Ind.warn : Ind.textMuted, fontSize: 12)),
                 ]),
               ),
@@ -726,7 +788,8 @@ class _FeedbackPick extends StatelessWidget {
           key: const ValueKey('escolher-retorno'),
           borderRadius: BorderRadius.circular(Ind.radiusSmall),
           onTap: () async {
-            final picked = await _TagChooser.show(context, fit: TagFit.boolean, needsWritable: false, selectedId: selectedId);
+            final picked = await _TagChooser.show(context, fit: TagFit.boolean, needsWritable: false, selectedId: selectedId,
+                preferDevices: {if (commandId != null) ?project.tag(commandId!)?.deviceId});
             if (picked != null) onChanged(picked.id == commandId ? null : picked.id);
           },
           child: Padding(

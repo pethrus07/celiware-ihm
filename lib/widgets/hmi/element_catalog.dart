@@ -201,7 +201,9 @@ class ElementCatalog {
     ElementInfo(
       type: ElementType.trend,
       name: 'Gráfico de tendência',
-      description: 'Curva dos últimos minutos.',
+      // Curta: o nome já ocupa 2 linhas no cartão da paleta e a frase longa
+      // aparecia cortada ("Curva dos últimos…").
+      description: 'Curva no tempo.',
       icon: Icons.show_chart_rounded,
       fit: TagFit.number,
       defaultW: 6,

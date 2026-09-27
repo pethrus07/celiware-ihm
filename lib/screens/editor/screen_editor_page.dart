@@ -139,15 +139,38 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
               ),
             ],
           ),
-          body: HmiCanvas(
-            screen: screen,
-            editMode: true,
-            selectedId: _selected,
-            onSelect: (id) => setState(() => _selected = id),
-            onChanged: (e) => _replace(screen, e),
-            onEmptyCellTap: (x, y) => _lastEmptyCell = (x, y),
-            keyFor: (e) => e.id == firstId ? _firstElementKey : null,
-          ),
+          body: Stack(children: [
+            Positioned.fill(
+              child: HmiCanvas(
+                screen: screen,
+                editMode: true,
+                selectedId: _selected,
+                onSelect: (id) => setState(() => _selected = id),
+                onChanged: (e) => _replace(screen, e),
+                onEmptyCellTap: (x, y) => _lastEmptyCell = (x, y),
+                keyFor: (e) => e.id == firstId ? _firstElementKey : null,
+              ),
+            ),
+            // Grade vazia só com pontinhos não dizia o que fazer. A dica não
+            // captura toque: tocar numa célula continua marcando o lugar.
+            if (screen.elements.isEmpty)
+              const IgnorePointer(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 40),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.touch_app_outlined, size: 40, color: Ind.textMuted),
+                      SizedBox(height: 14),
+                      Text('Toque em  + Elemento  para começar', textAlign: TextAlign.center,
+                          style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 20, color: Ind.textDim)),
+                      SizedBox(height: 8),
+                      Text('Quer escolher o lugar? Toque antes numa célula da grade.', textAlign: TextAlign.center,
+                          style: TextStyle(color: Ind.textMuted, height: 1.4)),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
           bottomNavigationBar: SafeArea(
             child: Container(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),

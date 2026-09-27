@@ -35,11 +35,15 @@ enum _Where { coil, discrete, bitInRegister, holding, input }
 /// Aberto pelo editor (folha de configuração), vem com [fit] — só os tipos
 /// que servem ao elemento — e devolve a variável criada para já ligar nele.
 class TagFormPage extends StatefulWidget {
-  const TagFormPage({super.key, this.tag, this.fit, this.preferWritable = false});
+  const TagFormPage({super.key, this.tag, this.fit, this.preferWritable = false, this.preferDeviceId});
 
   final Tag? tag;
   final TagFit? fit;
   final bool preferWritable;
+
+  /// Equipamento já marcado numa variável nova (o da tela que está sendo
+  /// montada). Sem ele, vale o último cadastrado.
+  final String? preferDeviceId;
 
   @override
   State<TagFormPage> createState() => _TagFormPageState();
@@ -47,6 +51,7 @@ class TagFormPage extends StatefulWidget {
 
 class _TagFormPageState extends State<TagFormPage> {
   final _form = GlobalKey<FormState>();
+  final _moreKey = GlobalKey();
   late final String _id = widget.tag?.id ?? newId('t');
 
   String? _deviceId;
@@ -113,7 +118,12 @@ class _TagFormPageState extends State<TagFormPage> {
     super.didChangeDependencies();
     _runtime = AppScope.of(context).runtime;
     final project = AppScope.of(context).controller.project;
-    _deviceId ??= widget.tag?.deviceId ?? (project.devices.length == 1 ? project.devices.first.id : project.devices.firstOrNull?.id);
+    // Variável nova: o equipamento da tela em montagem ou, fora do editor, o
+    // último cadastrado — quem acabou de cadastrar a Prensa quer criar as
+    // variáveis dela, não as da demonstração que vem primeiro na lista.
+    final preferred = widget.preferDeviceId;
+    _deviceId ??= widget.tag?.deviceId ??
+        (preferred != null && project.device(preferred) != null ? preferred : project.devices.lastOrNull?.id);
   }
 
   @override
@@ -331,10 +341,18 @@ class _TagFormPageState extends State<TagFormPage> {
               // Só o essencial à vista (equipamento, nome, tipo, onde, endereço,
               // permissão). Apresentação, lista, formatos raros e ordem de
               // bytes ficam em "Mais opções" — a maioria nunca precisa abrir.
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 32),
+              // "Lendo agora" preso no topo: é a resposta a cada campo mexido
+              // (endereço, formato, escala) — rolando junto, sumia justo quando
+              // se ajustava a escala lá embaixo.
+              child: Column(children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 8),
+                  child: _LivePanel(value: _liveValue, error: _liveError, tag: _current()),
+                ),
+                Expanded(
+                child: ListView(
+                padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 32),
                 children: [
-                  _LivePanel(value: _liveValue, error: _liveError, tag: _current()),
                   // Um equipamento só (o caso comum): nem pergunta.
                   if (project.devices.length > 1) ...[
                     const SectionHeader('Equipamento', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)),
@@ -465,7 +483,9 @@ class _TagFormPageState extends State<TagFormPage> {
                   Theme(
                     data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                     child: ExpansionTile(
+                      key: _moreKey,
                       tilePadding: EdgeInsets.zero,
+                      onExpansionChanged: (open) => revealAfterExpand(_moreKey, open),
                       childrenPadding: const EdgeInsets.only(bottom: 8),
                       // Formato raro escolhido: abre sozinho, para não esconder a escolha.
                       initiallyExpanded: !_isMainType(_type) || _order != ByteOrder.abcd,
@@ -582,6 +602,8 @@ class _TagFormPageState extends State<TagFormPage> {
                   ),
                 ],
               ),
+                ),
+              ]),
             ),
     );
   }
@@ -599,7 +621,7 @@ class _LivePanel extends StatelessWidget {
     final err = error;
     final color = err != null ? Ind.alarm : (value != null ? Ind.ok : Ind.textMuted);
     final t = tag;
-    final text = err ?? (t == null ? 'Complete equipamento e endereço' : value == null ? 'Lendo…' : _fmt(t, value));
+    final text = err != null ? capitalized(err) : (t == null ? 'Complete equipamento e endereço' : value == null ? 'Lendo…' : _fmt(t, value));
     // Com escala, mostrar o número cru ao lado é a prova de que a conta está
     // certa: "vem 752 do equipamento" → "75,2 °C" na tela.
     final v = value;

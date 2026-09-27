@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../app/app_info.dart';
 import '../app/app_scope.dart';
@@ -43,10 +47,19 @@ class MorePage extends StatelessWidget {
               if (name != null) c.rename(name);
             },
           ),
+          // Enviar é o caso comum (o projeto vai por WhatsApp para outro
+          // celular); salvar em arquivo fica para backup.
+          ListTile(
+            key: const ValueKey('enviar'),
+            leading: const Icon(Icons.share_rounded),
+            title: const Text('Enviar projeto'),
+            subtitle: const Text('WhatsApp, e-mail, Drive…'),
+            onTap: () => _share(context, p),
+          ),
           ListTile(
             key: const ValueKey('exportar'),
-            leading: const Icon(Icons.ios_share_rounded),
-            title: const Text('Exportar projeto'),
+            leading: const Icon(Icons.save_alt_rounded),
+            title: const Text('Salvar em arquivo'),
             onTap: () => _export(context, p),
           ),
           ListTile(
@@ -124,6 +137,23 @@ class MorePage extends StatelessWidget {
     Navigator.push(context, MaterialPageRoute(builder: (_) => page!));
   }
 
+  /// Grava o projeto num arquivo temporário e abre a folha de compartilhar do
+  /// Android. Quem recebe abre o arquivo em "Importar projeto".
+  static Future<void> _share(BuildContext context, Project p) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/${ProjectRepository.exportName(p)}');
+      await file.writeAsBytes(ProjectRepository.encode(p), flush: true);
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path, mimeType: 'application/json')],
+        subject: 'Projeto ${p.name} — ${AppInfo.name}',
+        text: 'Projeto "${p.name}" do ${AppInfo.name}. Para abrir: Mais → Importar projeto.',
+      ));
+    } catch (e) {
+      if (context.mounted) WriteActions.toast(context, 'Não consegui enviar: $e', error: true);
+    }
+  }
+
   static Future<void> _export(BuildContext context, Project p) async {
     try {
       final uri = await FilePicker.saveFile(
@@ -159,7 +189,7 @@ class MorePage extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.swap_horiz_rounded, color: Ind.accent),
         title: Text(question),
-        content: const Text('O projeto atual será substituído. Se quiser guardar uma cópia dele, exporte antes.', style: TextStyle(height: 1.4)),
+        content: const Text('O projeto atual será substituído. Se quiser guardar uma cópia dele, use "Salvar em arquivo" antes.', style: TextStyle(height: 1.4)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Substituir')),

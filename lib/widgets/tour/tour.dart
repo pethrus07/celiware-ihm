@@ -184,7 +184,9 @@ class TourHostState extends State<TourHost> {
       final topLeft = target.localToGlobal(Offset.zero, ancestor: host);
       final r = topLeft & target.size;
       final bounds = Offset.zero & host.size;
-      if (r.overlaps(bounds)) hole = r.intersect(bounds).inflate(6);
+      // Folga de 6 px em volta do alvo, mas sem sair da tela: o "?" colado
+      // na borda tinha o contorno âmbar cortado ao meio.
+      if (r.overlaps(bounds)) hole = r.intersect(bounds).inflate(6).intersect(bounds.deflate(3));
     }
     if (hole != _hole) setState(() => _hole = hole);
   }

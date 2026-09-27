@@ -83,7 +83,10 @@ class LinkChip extends StatelessWidget {
       builder: (context, h, _) {
         final (color, text, icon) = switch (h) {
           _ when h.online => (Ind.ok, compact ? device.name : 'Online${h.lastScanMs != null ? ' · ${h.lastScanMs} ms' : ''}', Icons.check_circle_rounded),
-          _ when h.message.isNotEmpty => (Ind.alarm, compact ? device.name : h.message, Icons.error_rounded),
+          // A mensagem vem em minúscula porque também entra no meio de frases
+          // ("Não gravou: sem conexão…"); sozinha no selo, começa maiúscula,
+          // como o "Online" ao lado.
+          _ when h.message.isNotEmpty => (Ind.alarm, compact ? device.name : capitalized(h.message), Icons.error_rounded),
           _ when h.link == ModbusLinkState.connecting => (Ind.warn, compact ? device.name : 'Conectando…', Icons.sync_rounded),
           _ => (Ind.textMuted, compact ? device.name : 'Ocioso', Icons.pause_circle_outline_rounded),
         };
@@ -105,6 +108,21 @@ class LinkChip extends StatelessWidget {
           Flexible(child: Text(text, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600))),
         ]),
       );
+}
+
+/// "sem conexão" → "Sem conexão".
+String capitalized(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+/// Depois de abrir um "Mais opções", rola a tela até ele: aberto no pé da
+/// tela, o conteúdo novo ficava escondido atrás do botão Salvar e parecia que
+/// nada tinha acontecido. Espera a animação de abrir antes de medir.
+void revealAfterExpand(GlobalKey tileKey, bool opened) {
+  if (!opened) return;
+  Future.delayed(const Duration(milliseconds: 260), () {
+    final ctx = tileKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    Scrollable.ensureVisible(ctx, alignment: 0.05, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+  });
 }
 
 /// Uma opção grande de escolha — ícone, título e explicação curta.

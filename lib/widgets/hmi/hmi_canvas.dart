@@ -97,6 +97,11 @@ class HmiCanvas extends StatelessWidget {
   /// cada elemento sem desperdiçar a célula.
   static const double gap = 12;
 
+  /// Maior célula aceita (dp). Sem teto, a célula cresce com a largura: no
+  /// celular deitado ou no tablet cabiam só dois elementos gigantes na tela.
+  /// 96 dp dá, num tablet, a mesma tela do celular 1,5× maior e centralizada.
+  static const double maxCell = 96;
+
   @override
   Widget build(BuildContext context) {
     return HmiScreenContext(
@@ -105,14 +110,21 @@ class HmiCanvas extends StatelessWidget {
       confirmWrites: screen.confirmWrites,
       onNavigate: editMode ? null : onNavigate,
       child: LayoutBuilder(builder: (context, box) {
-        final width = box.maxWidth - padding.horizontal;
-        final cell = width / screen.columns;
+        final available = box.maxWidth - padding.horizontal;
+        // Segundo teto, pela altura: celular deitado tem ~290 dp úteis, e com
+        // 96 dp por célula só apareciam duas linhas e meia. Pelo menos ~4,5
+        // linhas à vista; tablet e celular em pé nem chegam nesse limite.
+        final byHeight = box.maxHeight.isFinite ? math.max(56.0, box.maxHeight / 4.5) : maxCell;
+        final cell = math.min(math.min(available / screen.columns, maxCell), byHeight);
+        final width = cell * screen.columns;
         final rows = math.max(screen.rows + (editMode ? 4 : 0), editMode ? 8 : 1);
         final height = rows * cell;
 
         return SingleChildScrollView(
           padding: padding,
-          child: SizedBox(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
             width: width,
             height: height,
             child: Stack(
@@ -150,6 +162,7 @@ class HmiCanvas extends StatelessWidget {
                           child: KeyedSubtree(key: keyFor?.call(e), child: _Linked(element: e, onNavigate: onNavigate)),
                         ),
               ],
+            ),
             ),
           ),
         );

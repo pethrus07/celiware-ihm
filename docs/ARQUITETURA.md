@@ -297,7 +297,7 @@ Por que o toque segue o comando e não o retorno: se seguisse o retorno, com a m
 
 ### 5.3. Tela e elemento
 
-A tela é uma grade de **6 colunas de células quadradas**; a célula mede largura ÷ colunas, então a mesma tela fica proporcional em celular e tablet. Num aparelho de 390 dp a célula tem ~60 dp, acima do mínimo de toque de 48 dp. Cada elemento tem posição e tamanho em células e um mapa `props` com a configuração do tipo.
+A tela é uma grade de **6 colunas de células quadradas**; a célula mede largura ÷ colunas, então a mesma tela fica proporcional em celular e tablet. Num aparelho de 390 dp a célula tem ~60 dp, acima do mínimo de toque de 48 dp. A célula tem **dois tetos**: 96 dp e 1/4,5 da altura útil. Sem eles, no tablet e no celular deitado a célula crescia com a largura e só cabiam dois elementos gigantes (achado do QA de 27/09); agora a grade fica centralizada, do tamanho de um celular em pé 1,5× maior, e o celular deitado mostra ~4,5 linhas. Cada elemento tem posição e tamanho em células e um mapa `props` com a configuração do tipo.
 
 | Tipo | Propriedades |
 |---|---|
@@ -308,7 +308,7 @@ A tela é uma grade de **6 colunas de células quadradas**; a célula mede largu
 | multistate | tagId, label, states: lista de {value, text, color} |
 | bar | tagId, label, min, max, color |
 | gauge | tagId, label, min, max, warn, alarm |
-| trend | tagIds (até 3), label, windowSec, min, max (vazios = escala automática) |
+| trend | tagIds (até 3), label, windowSec, min, max (vazios = escala automática; valem para o eixo da esquerda). Unidades diferentes ganham eixo à direita, com o mesmo número de passos e números na cor da curva. |
 | barChart | tagId (variável lista), label |
 | label | text, size (s · m · l), align (left · center) |
 | image | data (PNG em base64, reduzido a 900 px), fit (contain · cover), source (fixed · byValue), tagId + images: lista de {value, data} (modo byValue, reduzidas a 1200 px) |
@@ -367,11 +367,13 @@ Botão: seis modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira 
 
 ### 6.5. Equipamentos
 
-Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à vista: onde está (rede ou demonstração), nome, IP e **Testar conexão**. Porta, ID, tempo-limite e ritmo ficam em "Mais opções" (o resumo "Porta 502 · ID 1" aparece fechado). O teste responde na hora; quando falha, mostra o que conferir, na ordem em que os problemas costumam acontecer (mesmo Wi-Fi, IP, Modbus ligado no equipamento, porta/ID).
+Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à vista: onde está (rede ou demonstração), nome, IP e **Testar conexão**. Porta, ID, tempo-limite e ritmo ficam em "Mais opções" (o resumo "Porta 502 · ID 1" aparece fechado). O teste responde na hora; quando falha, mostra o que conferir, na ordem em que os problemas costumam acontecer (mesmo Wi-Fi, IP, Modbus ligado no equipamento, porta/ID). Quando o equipamento **recusa** a conexão (o IP respondeu na hora, mas nada escuta na porta — errno 111 no Android, 10061 no Windows), a mensagem vira "o equipamento recusou a conexão nesta porta" e só sobram as duas conferências que fazem sentido: porta e Modbus ligado. "Mais opções" rola a tela sozinho ao abrir, nos dois formulários.
 
 ### 6.6. Variáveis
 
-Lista agrupada por equipamento: nome, endereço e o valor ao vivo. O cadastro cabe numa tela: equipamento (só aparece se houver mais de um), nome, o que é (liga/desliga, número inteiro, número com vírgula), onde fica (lê e grava / só leitura), endereço com − / + e "pode ser alterada pela tela". Escala, unidade, decimais, lista, formatos raros (INT16, 32 bits, texto), ordem de bytes e observação ficam em "Mais opções", que abre sozinho quando algum deles está em uso; fechado, o resumo mostra o que está valendo ("÷ 10 · °C · 1 decimais"). A escala tem atalhos — Sem escala, ÷ 10, ÷ 100, ÷ 1000, × 10 — e "Outra", que abre fator e soma. Escolher ÷ 100 já acerta as casas decimais para 2. Texto mostra à vista o tamanho em registradores ("8 = até 16 letras"). No topo, **Lendo agora do equipamento**: o endereço digitado é lido a cada segundo, pela mesma conexão da varredura.
+Lista agrupada por equipamento: nome, endereço e o valor ao vivo. O cadastro cabe numa tela: equipamento (só aparece se houver mais de um), nome, o que é (liga/desliga, número inteiro, número com vírgula), onde fica (lê e grava / só leitura), endereço com − / + e "pode ser alterada pela tela". Escala, unidade, decimais, lista, formatos raros (INT16, 32 bits, texto), ordem de bytes e observação ficam em "Mais opções", que abre sozinho quando algum deles está em uso; fechado, o resumo mostra o que está valendo ("÷ 10 · °C · 1 decimais"). A escala tem atalhos — Sem escala, ÷ 10, ÷ 100, ÷ 1000, × 10 — e "Outra", que abre fator e soma. Escolher ÷ 100 já acerta as casas decimais para 2. Texto mostra à vista o tamanho em registradores ("8 = até 16 letras"). No topo, **Lendo agora do equipamento**: o endereço digitado é lido a cada segundo, pela mesma conexão da varredura. O painel fica **preso no topo** enquanto o formulário rola — é a resposta de cada campo mexido, inclusive da escala lá embaixo. Variável nova já vem com o equipamento da tela em montagem ou, fora do editor, com o último cadastrado.
+
+Na escolha de variável do editor, a lista é **agrupada por equipamento** (os que a tela já usa primeiro) e ganha **busca** por nome ou endereço, sem acento, a partir de 8 variáveis compatíveis.
 
 ![Endereço inexistente + notação de manual](imagens/notacao-manual.png)
 ![Endereço corrigido, lendo ao vivo](imagens/variavel-lendo-agora.png)
@@ -379,7 +381,7 @@ Lista agrupada por equipamento: nome, endereço e o valor ao vivo. O cadastro ca
 
 ### 6.7. Mais
 
-Projeto: renomear, exportar, importar, restaurar a demonstração, começar do zero. Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças.
+Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças.
 
 ## 7. Tutoriais dentro do app
 
@@ -394,7 +396,7 @@ Método do onboarding da Retífica (`sinapse/07-FONTES/onboarding-dentro-do-sist
 | Ajuda sempre no topo | "?" no topo de toda página; a barra inferior tem só 4 abas. |
 | Testes dispensam o tour | Os testes de widget marcam as trilhas como vistas antes de montar o app. |
 
-Trilhas: primeiros passos, operar uma tela, montar uma tela, cadastrar equipamento, criar variável. Cada uma aparece sozinha na primeira visita da página e pelo "?" a qualquer momento. O balão se posiciona onde cabe (abaixo, acima ou sobre o rodapé) e nunca sob a barra de status; o passo de lista realça o primeiro item, não a lista inteira.
+Trilhas: primeiros passos, operar uma tela, montar uma tela, cadastrar equipamento, criar variável. As três do caminho principal (primeiros passos, operar, montar) aparecem sozinhas na primeira visita; equipamento e variável só pelo "?" ou por Mais → Tutoriais — no QA, com as cinco automáticas, o primeiro minuto do app era uma fila de tutoriais. O realce nunca passa da borda da tela (o "?" no canto tinha o contorno cortado). O balão se posiciona onde cabe (abaixo, acima ou sobre o rodapé) e nunca sob a barra de status; o passo de lista realça o primeiro item, não a lista inteira.
 
 ## 8. Identidade visual
 
@@ -411,7 +413,9 @@ Trilhas: primeiros passos, operar uma tela, montar uma tela, cadastrar equipamen
 
 Espaçamento por tokens (`Ind.space` 16, `Ind.spaceLarge` 28, `Ind.page` 20 de margem), cantos de 16 px, cartões e campos sem borda: a borda aparece só quando comunica algo (âmbar = falta configurar, vermelho = erro, âmbar grosso = selecionado no editor).
 
-Tipografia IBM Plex (licença OFL): Sans para texto, Sans Condensed para títulos e rótulos de elemento (estilo placa de painel), Mono para números — dígitos de largura fixa não "pulam" quando o valor muda. Tudo em `lib/core/theme/app_theme.dart`; a cor de estado é salva no projeto pelo nome, então o tom pode ser ajustado sem quebrar arquivos.
+Tipografia IBM Plex (licença OFL): Sans para texto, Sans Condensed para títulos, caixas de aviso, rótulos de elemento e textos lidos do equipamento (estilo placa de painel), Mono para números — dígitos de largura fixa não "pulam" quando o valor muda. Com a fonte do sistema grande (130%), a barra de abas segura a escala em 115% para "Equipamentos" não quebrar; o resto do app acompanha a fonte escolhida.
+
+**Desempenho medido** (emulador Pixel 7, SurfaceFlinger): rolagem a 60 quadros/s sem quadro lento; partida a frio 1,1–2 s; 72 MB de memória. Tela parada desenha só quando um valor muda: a barra anima apenas em mudança de mais de 3% e a lâmpada troca na hora, como luz de painel — a operação com a máquina em ciclo caiu de 38 para 12 quadros/s (bateria). Tudo em `lib/core/theme/app_theme.dart`; a cor de estado é salva no projeto pelo nome, então o tom pode ser ajustado sem quebrar arquivos.
 
 ## 9. Padrões de projeto
 
@@ -505,11 +509,12 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | Arquivo | O que cobre |
 |---|---|
 | `test/core/modbus_pdu_test.dart` | Montagem de pedidos, limites, respostas de exceção, lógica do escravo. |
-| `test/core/modbus_client_tcp_test.dart` | Cliente TCP real × escravo Dart por socket: leitura/escrita, endereço inexistente, 50 pedidos paralelos, timeout, queda e reconexão, desconexão manual, IP morto. |
+| `test/core/modbus_client_tcp_test.dart` | Cliente TCP real × escravo Dart por socket: leitura/escrita, endereço inexistente, 50 pedidos paralelos, timeout, queda e reconexão, desconexão manual, IP morto, porta fechada = "recusou nesta porta". |
 | `test/runtime/tag_codec_test.dart` | 4 ordens de 32 bits, float, sinal, bit em registrador, listas, faixa, vírgula brasileira, formatação; escala ida e volta (÷ 10, deslocamento 4–20 mA, lista), passo e faixa na unidade da tela, casas implícitas, JSON; texto ASCII (zero final, bytes trocados, caractere inválido, só leitura). |
 | `test/runtime/scan_planner_test.dart` | Agrupamento, buracos, limite de 125, áreas separadas, isolamento. |
 | `test/runtime/hmi_runtime_test.dart` | Inscrição, isolamento do endereço errado, escrita, queda com último valor, soltura insistente do pulso, variável apagada. |
-| `test/widgets/app_flow_test.dart` | Primeira abertura, valores ao vivo, botão com confirmação ligando a máquina, tela só acompanhamento, editor com paleta, escolha de variável e configuração; escala e texto na tela do líder, troca de tela pelo botão e pelo mostrador, botão com retorno aguardando com a porta aberta. |
+| `test/widgets/app_flow_test.dart` | Primeira abertura, valores ao vivo, botão com confirmação ligando a máquina, tela só acompanhamento, editor com paleta, escolha de variável e configuração; escala e texto na tela do líder, troca de tela pelo botão e pelo mostrador, botão com retorno aguardando com a porta aberta; celular deitado com célula no teto e grade centralizada; busca de variável sem acento. |
+| `test/widgets/trend_axis_test.dart` | Eixo da direita do gráfico de tendência: cobre os dados, mesmo número de passos, passo redondo, sem eixo negativo para grandeza positiva (inclusive valor constante 0). |
 | `test/widgets/tour_test.dart` | Tutorial aparece na primeira visita, "já vi" com versão na chave, rearme por versão nova, "voltar" fecha o tutorial e não a página. |
 
 Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstração e animações avançam por passos, sem depender da velocidade da máquina. Toque que não acerta o alvo é falha, não aviso (`hitTestWarningShouldBeFatal`). Eles já pegaram seis defeitos reais antes do aparelho: quatro transbordos de layout (cartão de tela, legenda do gráfico, lâmpada estreita em dois tamanhos), leitura publicando depois do encerramento e toque sem retorno em tela só acompanhamento.

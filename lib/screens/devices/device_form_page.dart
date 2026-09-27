@@ -80,6 +80,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   }
 
   final _probeKey = GlobalKey();
+  final _moreKey = GlobalKey();
   final _ipField = GlobalKey<FormFieldState<String>>();
 
   void _save() {
@@ -171,6 +172,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
               Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
+                  key: _moreKey,
+                  onExpansionChanged: (open) => revealAfterExpand(_moreKey, open),
                   tilePadding: EdgeInsets.zero,
                   childrenPadding: const EdgeInsets.only(bottom: 8),
                   title: const Text('Mais opções'),
@@ -226,14 +229,22 @@ class _ProbeCard extends StatelessWidget {
           ]),
           if (!ok && tcp) ...[
             const SizedBox(height: 10),
-            const Text('Confira, nesta ordem:', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text(result.refused ? 'O equipamento está na rede, mas não aceitou nesta porta:' : 'Confira, nesta ordem:',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            for (final t in const [
-              'O celular está no mesmo Wi-Fi da máquina?',
-              'O IP está certo? (um número trocado é o erro mais comum)',
-              'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
-              'A porta é 502? O ID é 1?',
-            ])
+            // Recusou = achou o aparelho; o problema é porta ou Modbus
+            // desligado. Nem vale mandar conferir Wi-Fi e IP.
+            for (final t in result.refused
+                ? const [
+                    'A porta está certa? Modbus TCP usa 502 — confira em "Mais opções".',
+                    'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
+                  ]
+                : const [
+                    'O celular está no mesmo Wi-Fi da máquina?',
+                    'O IP está certo? (um número trocado é o erro mais comum)',
+                    'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
+                    'A porta é 502? O ID é 1?',
+                  ])
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

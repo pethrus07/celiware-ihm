@@ -32,10 +32,14 @@ class TagSubscription {
 
 /// Resultado do botão "Testar conexão".
 class ProbeResult {
-  const ProbeResult({required this.ok, required this.message, this.elapsedMs, this.value});
+  const ProbeResult({required this.ok, required this.message, this.elapsedMs, this.value, this.refused = false});
   final bool ok;
   final String message;
   final int? elapsedMs;
+
+  /// O equipamento recusou a conexão: está na rede, mas a porta está errada
+  /// ou o Modbus TCP desligado (ver [ModbusConnectionError.refused]).
+  final bool refused;
 
   /// Valor lido, quando o teste inclui uma variável.
   final Object? value;
@@ -290,7 +294,8 @@ class HmiRuntime {
       }
       return ProbeResult(ok: true, message: 'Conectado', elapsedMs: sw.elapsedMilliseconds, value: value);
     } on ModbusError catch (e) {
-      return ProbeResult(ok: false, message: e.userMessage, elapsedMs: sw.elapsedMilliseconds);
+      return ProbeResult(ok: false, message: e.userMessage, elapsedMs: sw.elapsedMilliseconds,
+          refused: e is ModbusConnectionError && e.refused);
     } on TagValueError catch (e) {
       return ProbeResult(ok: false, message: e.message);
     } finally {

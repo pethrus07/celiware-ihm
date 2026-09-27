@@ -76,8 +76,17 @@ class ModbusClientTcp extends ModbusClient {
     } catch (e) {
       _socket = null;
       linkState = ModbusLinkState.lost;
-      throw ModbusConnectionError('Falha ao conectar em $_label: $e');
+      throw ModbusConnectionError('Falha ao conectar em $_label: $e', refused: _isRefused(e));
     }
+  }
+
+  /// "Conexão recusada": errno 111 no Linux/Android, 61 no macOS/iOS, 10061
+  /// no Windows. O texto cobre o caso de a plataforma não dar o código.
+  static bool _isRefused(Object e) {
+    if (e is! SocketException) return false;
+    final code = e.osError?.errorCode;
+    if (code == 111 || code == 61 || code == 10061) return true;
+    return '${e.osError?.message} ${e.message}'.toLowerCase().contains('refused');
   }
 
   @override

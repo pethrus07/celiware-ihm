@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ihm/core/modbus/modbus_client.dart';
 import 'package:ihm/core/modbus/modbus_client_tcp.dart';
@@ -88,5 +90,21 @@ void main() {
     final dead = ModbusClientTcp(host: '127.0.0.1', port: 1, connectionTimeout: const Duration(milliseconds: 500));
     await expectLater(dead.connect(), throwsA(isA<ModbusConnectionError>()));
     expect(dead.state.value, ModbusLinkState.lost);
+  });
+
+  test('porta fechada num IP que existe = "recusou nesta porta" (não "sem conexão")', () async {
+    // Porta livre de verdade: abre um servidor, anota a porta e fecha.
+    final probe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final closedPort = probe.port;
+    await probe.close();
+    // 5 s: o Windows insiste ~2 s antes de devolver "recusado" (10061) numa
+    // porta fechada do próprio PC; o Android responde na hora (111).
+    final c = ModbusClientTcp(host: '127.0.0.1', port: closedPort, connectionTimeout: const Duration(seconds: 5));
+    await expectLater(
+      c.connect(),
+      throwsA(isA<ModbusConnectionError>()
+          .having((e) => e.refused, 'refused', isTrue)
+          .having((e) => e.userMessage, 'userMessage', contains('recusou'))),
+    );
   });
 }

@@ -83,10 +83,16 @@ class ModbusTimeout extends ModbusError {
 /// Não foi possível abrir ou manter o socket (IP errado, rede fora, porta
 /// fechada, cabo/Wi-Fi caiu).
 class ModbusConnectionError extends ModbusError {
-  const ModbusConnectionError(super.message);
+  const ModbusConnectionError(super.message, {this.refused = false});
+
+  /// O IP respondeu na hora com "recusado": o aparelho existe e está na rede,
+  /// mas nada escuta naquela porta — porta errada ou Modbus TCP desligado.
+  /// Diferente de IP errado/rede fora, que só estoura o tempo. Separar os dois
+  /// casos poupa o técnico de conferir Wi-Fi e IP à toa.
+  final bool refused;
 
   @override
-  String get userMessage => 'sem conexão com o equipamento';
+  String get userMessage => refused ? 'o equipamento recusou a conexão nesta porta' : 'sem conexão com o equipamento';
 }
 
 /// A resposta chegou, mas não bate com o pedido (tamanho, função, protocolo).

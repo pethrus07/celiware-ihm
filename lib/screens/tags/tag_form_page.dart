@@ -219,7 +219,7 @@ class _TagFormPageState extends State<TagFormPage> {
     final parts = <String>[
       if (_scaleLabel() != null) _scaleLabel()!,
       if (_unit.text.trim().isNotEmpty) _unit.text.trim(),
-      if ((int.tryParse(_decimals.text) ?? 0) > 0) '${_decimals.text} decimais',
+      if ((int.tryParse(_decimals.text) ?? 0) > 0) _decimals.text == '1' ? '1 casa decimal' : '${_decimals.text} casas decimais',
       if (!_isMainType(_type)) _type.technical,
       if (_order != ByteOrder.abcd) _order.label,
       if ((int.tryParse(_length.text) ?? 1) > 1) 'lista de ${_length.text}',

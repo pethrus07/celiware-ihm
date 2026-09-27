@@ -120,13 +120,8 @@ class MorePage extends StatelessWidget {
               if (context.mounted) WriteActions.toast(context, 'Pronto: os tutoriais vão aparecer de novo.');
             },
           ),
-          const SectionHeader('Vídeos'),
-          const ListTile(
-            leading: Icon(Icons.ondemand_video_outlined),
-            title: Text('Vídeos'),
-            subtitle: Text('Em breve'),
-            enabled: AppInfo.videosUrl != null,
-          ),
+          // Sem seção "Vídeos · Em breve": numa demonstração, item que não
+          // faz nada parece coisa inacabada. Volta quando houver vídeo.
           const SectionHeader('Sobre'),
           ListTile(
             leading: const Icon(Icons.info_outline_rounded),

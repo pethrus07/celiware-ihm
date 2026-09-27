@@ -123,7 +123,9 @@ class _TagTile extends StatelessWidget {
           final (text, color) = switch (r.quality) {
             TagQuality.addressError || TagQuality.configError => ('erro', Ind.alarm),
             TagQuality.commLost => (TagCodec.format(tag, _scalar(r.value)), Ind.textMuted),
-            _ => (TagCodec.format(tag, _scalar(r.value)), r.value == true ? Ind.ok : Ind.text),
+            // Ligado não é "bom": "Alarme ativo · LIGADO" em verde dizia o
+            // contrário. Cor só para o que pede atenção (erro), como na tela.
+            _ => (TagCodec.format(tag, _scalar(r.value)), Ind.text),
           };
           return ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 140),

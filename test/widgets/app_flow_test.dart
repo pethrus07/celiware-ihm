@@ -14,6 +14,7 @@ import 'package:ihm/services/demo/demo_project.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/storage/project_repository.dart';
 import 'package:ihm/widgets/alarms/alarm_widgets.dart';
+import 'package:ihm/widgets/hmi/elements/control_elements.dart';
 import 'package:ihm/widgets/hmi/hmi_canvas.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -167,6 +168,21 @@ void main() {
     expect(memory.bit(ModbusArea.coil, DemoMap.coilRun), isTrue); // o comando foi
     expect(memory.bit(ModbusArea.coil, DemoMap.coilInCycle), isFalse); // a máquina não partiu
     expect(find.byIcon(Icons.hourglass_top_rounded), findsOneWidget);
+    expect(find.text('SEM RETORNO'), findsNothing);
+
+    // Passado o prazo, a espera vira aviso: ampulheta para sempre parecia travado.
+    await live(tester, ButtonElement.feedbackTimeout.inMilliseconds);
+    expect(find.byIcon(Icons.hourglass_top_rounded), findsNothing);
+    expect(find.text('SEM RETORNO'), findsOneWidget);
+
+    // Operador desligou o comando: acabou a espera, o aviso sai.
+    await tester.tap(find.text('LIGA'));
+    await live(tester, 300);
+    await tester.tap(find.byKey(const ValueKey('confirmar-escrita')));
+    await live(tester, 1500);
+    expect(memory.bit(ModbusArea.coil, DemoMap.coilRun), isFalse);
+    expect(find.text('SEM RETORNO'), findsNothing);
+    expect(find.byIcon(Icons.hourglass_top_rounded), findsNothing);
     await shutdown(tester, c);
   });
 

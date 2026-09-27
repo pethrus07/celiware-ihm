@@ -21,7 +21,11 @@ class AlarmsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final summary = alarms.isEmpty ? 'Nenhum · toque para criar' : alarms.map((r) => describe(tag, r)).join(' · ');
+    // Espaço inseparável dentro de cada alarme: a linha quebra entre eles,
+    // nunca no meio ("85,0" numa linha e "°C" sozinho na outra).
+    final summary = alarms.isEmpty
+        ? 'Nenhum · toque para criar'
+        : alarms.map((r) => describe(tag, r).replaceAll(' ', ' ')).join(' · ');
     return Material(
       color: Ind.surfaceHigh,
       borderRadius: BorderRadius.circular(Ind.radiusSmall),

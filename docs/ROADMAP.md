@@ -4,10 +4,10 @@ O que já está entregue, o que falta e o que ficou de fora de propósito.
 A documentação técnica do que existe está em `ARQUITETURA.md`; este arquivo é
 só a lista de trabalho.
 
-## Versão estável atual: 1.3.0
+## Versão estável atual: 1.3.1
 
-Tag `v1.3.0`. É a versão para apresentar e instalar
-(`celiware-ihm-1.3.0-arm64.apk`, celulares Android de 2017 para cá).
+Tag `v1.3.1`. É a versão para apresentar e instalar
+(`celiware-ihm-1.3.1-arm64.apk`, celulares Android de 2017 para cá).
 
 | Versão | O que trouxe |
 |---|---|
@@ -16,6 +16,7 @@ Tag `v1.3.0`. É a versão para apresentar e instalar
 | 1.1.1 | Correções do QA ponta a ponta: tablet/paisagem, bateria (quadros parados), acessibilidade, busca de variável, APK de 19 MB. |
 | 1.2.0 | Sistema visual novo pela pesquisa de UI/UX: tema Claro/Escuro/Auto, interação verde-água, lâmpada alto desempenho, elementos redesenhados. |
 | 1.3.0 | Alarmes ISA-18.2: prioridade por cor + forma + número, faixa no topo, marca no elemento, lista, histórico, editor na variável, falta de comunicação como alarme. |
+| 1.3.1 | QA do APK instalado: botão com retorno vira "SEM RETORNO" após 5 s; faixa sem valor congelado e em uma linha com o celular deitado; tutorial explica cores e alarmes; "ligado" sem verde na lista de variáveis; alarme "Máquina parada" (média) na demonstração; tirado o "Vídeos · Em breve"; textos. |
 
 ## Próximo — visual e operação
 
@@ -24,7 +25,10 @@ emulador antes de seguir.
 
 1. **Faixa de status na tela em operação.** Uma linha fixa no topo com o
    estado da máquina (rodando / parada / sem comunicação), o equipamento e
-   a hora da última leitura. Hoje essa informação está espalhada.
+   a hora da última leitura. Hoje essa informação está espalhada. Resolve
+   junto o **pulo da tela** quando a faixa de alarme aparece (tudo desce
+   ~70 dp e o toque seguinte cai no lugar errado — hoje amortecido porque
+   todo comando pede confirmação): o espaço da faixa passa a ser reservado.
 2. **Miniatura real das telas.** A lista de telas mostra um desenho genérico;
    passar a mostrar a tela em miniatura, para reconhecer de relance.
 3. **Tablet com barra lateral e duas colunas.** Foi a pior nota do QA (4).
@@ -33,6 +37,23 @@ emulador antes de seguir.
 4. **Comando em 3 fases visíveis.** Tocar → "enviando" → confirmado pelo
    equipamento (ou falhou, com o motivo). O botão com retorno já faz parte
    disso; falta estender a todo comando e deixar as três fases à vista.
+
+## Achados do QA de 27/09 que ficaram para depois
+
+Pequenos, nenhum atrapalha a apresentação.
+
+- Gráfico de tendência com série parada em 0 desenha eixo 0 – 1 com
+  decimais (0,25 · 0,50): ruído; eixo de série constante deveria ser só "0".
+- Gráfico de barras "Produção por hora" rotula o eixo com 1…8 (posição na
+  lista), não com a hora.
+- Alarme que voltou ao normal mostra "desde 20:07" — é a hora do disparo;
+  "disparou 20:07" leria melhor.
+- Tela em operação desenha ~14 quadros/s com a máquina parada (valores e
+  gráfico ao vivo). Aceitável; cabe revisar a cadência do gráfico quando
+  ninguém está olhando para ele.
+- Na demonstração, depois do RESET a máquina volta a rodar sozinha porque o
+  comando LIGA continuou ligado. É a lógica do CLP simulado, não do app —
+  máquina real decide isso no próprio CLP.
 
 ## Alarmes — o que falta
 

@@ -44,7 +44,11 @@ class Tours {
   static TourSpec operar({GlobalKey? status, GlobalKey? button, GlobalKey? input, GlobalKey? link, GlobalKey? edit}) =>
       TourSpec(id: 'operar', version: 1, title: 'Operar uma tela', steps: [
         TourStep(target: link, essential: true, title: 'Conexão', body: 'Verde: respondendo. Vermelho: sem conexão, com o último valor esmaecido.'),
-        TourStep(target: status, title: 'Cores', body: 'Verde é normal, amarelo atenção, vermelho alarme.'),
+        TourStep(
+            target: status,
+            title: 'Cores e alarmes',
+            body: 'Cor só aparece quando pede atenção. Alarme sobe numa faixa no topo, com forma e número: '
+                '◆1 alta, ▲2 média, ■3 baixa. Toque na faixa para reconhecer.'),
         TourStep(target: button, title: 'Botões', body: 'Acende quando o equipamento confirma. Botão de pulso: segure.'),
         TourStep(target: input, title: 'Ajustar', body: 'Toque, digite e confirme o novo valor.'),
         TourStep(target: edit, essential: true, title: 'Editar', body: 'O lápis abre o editor desta tela.'),

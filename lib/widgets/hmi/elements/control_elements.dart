@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -96,10 +97,15 @@ extension ButtonModeMeta on ButtonMode {
 /// Com retorno, o comando decide o que o toque faz (liga/desliga inverte o
 /// comando) e o retorno decide se acende. Comando ligado sem retorno aparece
 /// como **aguardando** (borda na cor + ampulheta): a máquina recebeu a ordem e
-/// ainda não confirmou — ou não vai confirmar (porta aberta, intertravamento).
+/// ainda não confirmou. Passados [ButtonElement.feedbackTimeout] sem retorno,
+/// vira **SEM RETORNO** (cor de atenção): a máquina não vai confirmar (porta
+/// aberta, intertravamento, desarme) — ampulheta para sempre parecia travado.
 class ButtonElement extends StatefulWidget {
   const ButtonElement({super.key, required this.element});
   final HmiElement element;
+
+  /// Quanto esperar a confirmação da máquina antes de avisar "sem retorno".
+  static const feedbackTimeout = Duration(seconds: 5);
 
   @override
   State<ButtonElement> createState() => _ButtonElementState();
@@ -111,6 +117,10 @@ class _ButtonElementState extends State<ButtonElement> {
   /// Dedo em cima do botão (visual de "afundar").
   bool _pressed = false;
   HmiRuntime? _runtime;
+
+  /// Desde quando o comando está ligado sem a máquina confirmar.
+  DateTime? _pendingSince;
+  Timer? _pendingTimer;
 
   HmiElement get e => widget.element;
   ButtonMode get mode => ButtonModeMeta.fromName(e.prop<String>('mode', 'toggle'));
@@ -127,7 +137,28 @@ class _ButtonElementState extends State<ButtonElement> {
     // Botão sumiu da tela com o dedo em cima (tela fechou, rolou, editou):
     // solta o comando.
     if (_holding && e.tagId != null) unawaited(_runtime?.release(e.tagId!));
+    _pendingTimer?.cancel();
     super.dispose();
+  }
+
+  /// Marca quando começou a espera e agenda um redesenho para o fim do prazo.
+  /// Devolve true quando a espera já passou do prazo (sem retorno).
+  bool _trackPending(bool pending) {
+    if (!pending) {
+      _pendingSince = null;
+      _pendingTimer?.cancel();
+      _pendingTimer = null;
+      return false;
+    }
+    final now = clock.now();
+    final since = _pendingSince ??= now;
+    final left = ButtonElement.feedbackTimeout - now.difference(since);
+    if (left <= Duration.zero) return true;
+    _pendingTimer ??= Timer(left, () {
+      _pendingTimer = null;
+      if (mounted) setState(() {});
+    });
+    return false;
   }
 
   Future<void> _tap(Tag tag, TagReading r) async {
@@ -320,9 +351,13 @@ class _ButtonElementState extends State<ButtonElement> {
     final hasFeedback = fbTag != null;
     final lit = mode == ButtonMode.value ? false : (hasFeedback ? fb.value == true : commanded);
     final pending = hasFeedback && commanded && fb.value != true && mode != ButtonMode.momentary;
+    final noFeedback = _trackPending(pending);
     final label = e.prop<String>('label', tag?.name ?? 'Botão');
 
-    final face = _face(label: label, color: color, lit: lit, pending: pending, tag: tag);
+    final face = noFeedback
+        ? _face(label: label, color: Ind.warn, lit: false, pending: true, tag: tag,
+            hint: Text('SEM RETORNO', style: TextStyle(color: Ind.textFor(Ind.warn), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.4)))
+        : _face(label: label, color: color, lit: lit, pending: pending, tag: tag);
 
     if (tag == null || r.quality == TagQuality.addressError || r.quality == TagQuality.configError) {
       return HmiFrame(label: '', tag: tag, reading: r, child: const SizedBox());

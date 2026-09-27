@@ -229,11 +229,11 @@ class _Banner extends StatelessWidget {
     // Grita só quando pede ação: tudo reconhecido = faixa discreta (continua
     // à vista enquanto a condição existir, como manda a ISA-18.2).
     final loud = unack > 0;
-    final sub = [
-      top.phase.label,
-      if (top.valueText.isNotEmpty && !returned) top.valueText,
-      'desde ${_hhmm(top.since)}',
-    ].join(' · ');
+    // Sem o valor do disparo: congelado na faixa, ele desmentia o elemento
+    // da tela, que mostra o valor de agora.
+    final sub = '${top.phase.label} · desde ${_hhmm(top.since)}';
+    // Deitado, a altura é o recurso escasso: faixa numa linha só.
+    final compact = MediaQuery.orientationOf(context) == Orientation.landscape;
     return Material(
       key: const ValueKey('faixa-alarme'),
       color: Color.alphaBlend(c.withValues(alpha: !loud || returned ? 0.07 : (Ind.isDark ? 0.18 : 0.14)), Ind.raised),
@@ -247,19 +247,28 @@ class _Banner extends StatelessWidget {
               // Mais alta que o necessário: o alto da tela é a área mais
               // difícil de acertar com o dedo (e o toque no alto demais cai
               // na barra de status do Android).
-              padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+              padding: EdgeInsets.fromLTRB(16, compact ? 8 : 14, 10, compact ? 8 : 14),
               child: Row(children: [
-                AlarmShape(priority: top.priority, size: 30, blinking: top.phase.unacked),
+                AlarmShape(priority: top.priority, size: compact ? 24 : 30, blinking: top.phase.unacked),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                    Text(top.message,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 18, color: returned ? Ind.textDim : Ind.text)),
-                    const SizedBox(height: 2),
-                    Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textDim, fontSize: 12.5)),
-                  ]),
+                  child: compact
+                      ? Text.rich(
+                          TextSpan(children: [
+                            TextSpan(text: top.message, style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 17, color: returned ? Ind.textDim : Ind.text)),
+                            TextSpan(text: '   $sub', style: TextStyle(color: Ind.textDim, fontSize: 12.5)),
+                          ]),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                          Text(top.message,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 18, color: returned ? Ind.textDim : Ind.text)),
+                          const SizedBox(height: 2),
+                          Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textDim, fontSize: 12.5)),
+                        ]),
                 ),
                 if (count > 1)
                   Container(

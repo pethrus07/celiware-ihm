@@ -60,7 +60,12 @@ class DemoProject {
       t('demo_liga', 'Liga máquina', coil, DemoMap.coilRun, writable: true, description: 'Comando de partida/parada'),
       t('demo_reset', 'Reset de alarme', coil, DemoMap.coilResetAlarm, writable: true, description: 'Pulso: limpa o alarme depois que a causa sumiu'),
       t('demo_faca', 'Faca acionada', coil, DemoMap.coilKnife),
-      t('demo_alarme', 'Alarme ativo', coil, DemoMap.coilAlarm),
+      // A máquina desarmou (ex.: superaquecimento): consequência da causa,
+      // por isso média — a causa já sobe como alta. Com isso a demonstração
+      // mostra as três prioridades.
+      t('demo_alarme', 'Alarme ativo', coil, DemoMap.coilAlarm, alarms: const [
+        AlarmRule(id: 'al_maquina', kind: AlarmKind.on, priority: AlarmPriority.medium, message: 'Máquina parada: dê Reset'),
+      ]),
       t('demo_porta', 'Porta fechada', di, DemoMap.diDoorClosed, alarms: const [
         AlarmRule(id: 'al_porta', kind: AlarmKind.off, priority: AlarmPriority.high, message: 'Porta aberta'),
       ]),

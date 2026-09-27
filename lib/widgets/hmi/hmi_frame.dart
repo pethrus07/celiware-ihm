@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/app_scope.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/tag.dart';
+import '../../services/alarms/alarm_engine.dart';
+import '../alarms/alarm_widgets.dart';
 import '../../services/runtime/tag_store.dart';
 
 /// Como a tela está sendo usada — os elementos leem daqui.
@@ -94,18 +96,42 @@ class HmiFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = tag;
+    if (t == null || t.alarms.isEmpty) return _build(context, null);
+    // Variável com alarme: o cartão ouve o motor de alarmes e se marca
+    // quando ele dispara — o alarme aparece onde o valor está.
+    final engine = AppScope.of(context).alarms;
+    return ListenableBuilder(
+      listenable: engine,
+      builder: (context, _) {
+        final a = engine.forTag(t.id);
+        final frame = _build(context, a);
+        if (a == null) return frame;
+        return Stack(clipBehavior: Clip.none, children: [
+          Positioned.fill(child: frame),
+          Positioned(top: 8, right: 8, child: ElementAlarmBadge(entry: a)),
+        ]);
+      },
+    );
+  }
+
+  Widget _build(BuildContext context, AlarmEntry? alarm) {
     final r = reading ?? TagReading.waiting;
     final missing = needsTag && tag == null;
     final broken = !missing && (r.quality == TagQuality.addressError || r.quality == TagQuality.configError);
     final lost = !missing && r.quality == TagQuality.commLost;
 
     // Sem borda no estado normal (o fundo já separa); borda só quando ela
-    // comunica algo: âmbar = falta configurar, vermelho = erro.
+    // comunica algo: cor de interação = falta configurar, vermelho = erro,
+    // cor da prioridade = alarme desta variável.
     final borderColor = missing
         ? Ind.accent
         : broken
             ? Ind.alarm
-            : border;
+            : alarm != null && alarm.phase.active
+                ? alarm.priority.color
+                : border;
+    final bw = missing || broken ? 1.6 : (alarm != null ? 2.0 : 1.2);
 
     Widget body = child;
     if (lost) body = Opacity(opacity: 0.38, child: body);
@@ -116,7 +142,7 @@ class HmiFrame extends StatelessWidget {
       if (box.maxHeight < 76 && label.isNotEmpty) {
         return _panel(
           borderColor: borderColor,
-          width: missing || broken ? 1.6 : 1.2,
+          width: bw,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(children: [
             ConstrainedBox(
@@ -135,7 +161,7 @@ class HmiFrame extends StatelessWidget {
           ]),
         );
       }
-      return _stacked(borderColor, lost, broken, missing, r, body);
+      return _stacked(borderColor, bw, lost, broken, missing, r, body);
     });
   }
 
@@ -151,10 +177,10 @@ class HmiFrame extends StatelessWidget {
         ),
       );
 
-  Widget _stacked(Color? borderColor, bool lost, bool broken, bool missing, TagReading r, Widget body) {
+  Widget _stacked(Color? borderColor, double bw, bool lost, bool broken, bool missing, TagReading r, Widget body) {
     return _panel(
       borderColor: borderColor,
-      width: missing || broken ? 1.6 : 1.2,
+      width: bw,
       padding: padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -22,7 +22,7 @@ const {
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'docs', 'ARQUITETURA.md');
 const OUT = path.join(ROOT, 'docs', 'Documentacao_Tecnica_Celiware_IHM.docx');
-const VERSION = '1.2';
+const VERSION = '1.3';
 
 // Identidade (lib/core/theme/app_theme.dart) — versão para papel.
 const C = {

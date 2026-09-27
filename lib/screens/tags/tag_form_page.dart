@@ -9,12 +9,14 @@ import '../../core/modbus/modbus_memory.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
+import '../../models/alarm.dart';
 import '../../models/tag.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/element_catalog.dart';
 import '../devices/device_form_page.dart';
+import 'alarm_editor.dart';
 
 /// Onde o dado mora, em palavras de quem opera — cada opção vira uma
 /// combinação área Modbus + tipo.
@@ -59,6 +61,9 @@ class _TagFormPageState extends State<TagFormPage> {
   late _Where _where;
   late ByteOrder _order;
   late bool _writable;
+
+  /// Alarmes da variável — gravados junto com ela em Salvar.
+  late List<AlarmRule> _alarms = widget.tag?.alarms ?? const [];
 
   late final _name = TextEditingController(text: widget.tag?.name ?? '');
   late final _address = TextEditingController(text: '${widget.tag?.address ?? 0}');
@@ -164,6 +169,7 @@ class _TagFormPageState extends State<TagFormPage> {
       scale: _scaleValue,
       offset: _offsetValue,
       description: _description.text.trim(),
+      alarms: _alarms,
     ).normalized();
   }
 
@@ -479,6 +485,12 @@ class _TagFormPageState extends State<TagFormPage> {
                             ? null
                             : const Text('Esta memória é só de leitura.'),
                   ),
+                  // Alarme: uma linha só, à vista (é segurança, não detalhe); o
+                  // editor abre numa folha. Texto e lista não alarmam.
+                  if (!isText && (int.tryParse(_length.text) ?? 1) <= 1 && _current() != null) ...[
+                    const SizedBox(height: Ind.spaceSmall),
+                    AlarmsRow(tag: _current()!, alarms: _alarms, onChanged: (a) => setState(() => _alarms = a)),
+                  ],
                   const SizedBox(height: Ind.spaceSmall),
                   Theme(
                     data: Theme.of(context).copyWith(dividerColor: Colors.transparent),

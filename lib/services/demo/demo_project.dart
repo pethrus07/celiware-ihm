@@ -1,4 +1,5 @@
 import '../../core/modbus/modbus_memory.dart';
+import '../../models/alarm.dart';
 import '../../models/device.dart';
 import '../../models/hmi_screen.dart';
 import '../../models/project.dart';
@@ -32,6 +33,7 @@ class DemoProject {
             int length = 1,
             int bit = 0,
             double scale = 1,
+            List<AlarmRule> alarms = const [],
             String description = ''}) =>
         Tag(
           id: id,
@@ -47,6 +49,7 @@ class DemoProject {
           bitIndex: bit,
           scale: scale,
           description: description,
+          alarms: alarms,
         );
 
     const hr = ModbusArea.holdingRegister;
@@ -58,15 +61,25 @@ class DemoProject {
       t('demo_reset', 'Reset de alarme', coil, DemoMap.coilResetAlarm, writable: true, description: 'Pulso: limpa o alarme depois que a causa sumiu'),
       t('demo_faca', 'Faca acionada', coil, DemoMap.coilKnife),
       t('demo_alarme', 'Alarme ativo', coil, DemoMap.coilAlarm),
-      t('demo_porta', 'Porta fechada', di, DemoMap.diDoorClosed),
+      t('demo_porta', 'Porta fechada', di, DemoMap.diDoorClosed, alarms: const [
+        AlarmRule(id: 'al_porta', kind: AlarmKind.off, priority: AlarmPriority.high, message: 'Porta aberta'),
+      ]),
       t('demo_papel', 'Papel presente', di, DemoMap.diPaperPresent),
       t('demo_status', 'Status da máquina', hr, DemoMap.hrStatus, description: '0 parada · 1 em ciclo · 2 alarme'),
       t('demo_sp', 'Velocidade desejada', hr, DemoMap.hrSpeedSetpoint, writable: true, unit: 'm/min'),
       t('demo_vel', 'Velocidade', hr, DemoMap.hrSpeed, unit: 'm/min'),
       t('demo_prod', 'Rótulos cortados', hr, DemoMap.hrProduction, type: TagDataType.uint32, unit: 'un'),
       t('demo_comp', 'Comprimento do rótulo', hr, DemoMap.hrLabelLength, writable: true, unit: 'mm'),
-      t('demo_temp', 'Temperatura do motor', hr, DemoMap.hrMotorTemp, type: TagDataType.float32, unit: '°C', decimals: 1),
-      t('demo_tensao', 'Tensão do papel', hr, DemoMap.hrTension, unit: '%'),
+      // Dois níveis na mesma variável (como H e HH de um CLP): primeiro avisa,
+      // em amarelo, como a faixa de atenção do medidor; depois grita, em
+      // vermelho, como a faixa de alarme. A 80 m/min o motor passa de 75 °C.
+      t('demo_temp', 'Temperatura do motor', hr, DemoMap.hrMotorTemp, type: TagDataType.float32, unit: '°C', decimals: 1, alarms: const [
+        AlarmRule(id: 'al_temp_h', kind: AlarmKind.above, limit: 75, priority: AlarmPriority.low, message: 'Motor esquentando'),
+        AlarmRule(id: 'al_temp_hh', kind: AlarmKind.above, limit: 85, priority: AlarmPriority.high, message: 'Motor superaquecido'),
+      ]),
+      t('demo_tensao', 'Tensão do papel', hr, DemoMap.hrTension, unit: '%', alarms: const [
+        AlarmRule(id: 'al_tensao_l', kind: AlarmKind.below, limit: 20, priority: AlarmPriority.low, message: 'Pouca tensão no papel'),
+      ]),
       t('demo_hora', 'Produção por hora', hr, DemoMap.hrHourly, length: DemoMap.hourlyBuckets, unit: 'un',
           description: 'Lista: 8 registradores seguidos, um por hora do turno'),
       t('demo_codalarme', 'Código do alarme', hr, DemoMap.hrAlarmCode),

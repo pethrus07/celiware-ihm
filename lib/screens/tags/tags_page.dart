@@ -5,6 +5,8 @@ import '../../core/theme/app_theme.dart';
 import '../../models/tag.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../services/runtime/tag_store.dart';
+import '../../services/alarms/alarm_engine.dart';
+import '../../widgets/alarms/alarm_widgets.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/hmi_frame.dart';
 import '../../widgets/hmi/live_tags.dart';
@@ -97,7 +99,23 @@ class _TagTile extends StatelessWidget {
       // importa é "qual memória" e "quanto vale agora".
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 3),
-        child: Text(tag.addressLabel, style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+        child: Row(children: [
+          Text(tag.addressLabel, style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+          // Tem alarme configurado: sino discreto; em alarme agora: a forma
+          // da prioridade (piscando se ninguém reconheceu).
+          if (tag.alarms.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            ListenableBuilder(
+              listenable: AppScope.of(context).alarms,
+              builder: (context, _) {
+                final a = AppScope.of(context).alarms.forTag(tag.id);
+                return a == null
+                    ? Icon(Icons.notifications_none_rounded, size: 15, color: Ind.textMuted)
+                    : AlarmShape(priority: a.priority, size: 16, blinking: a.phase.unacked);
+              },
+            ),
+          ],
+        ]),
       ),
       trailing: TagBuilder(
         tagId: tag.id,

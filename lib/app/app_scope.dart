@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../services/alarms/alarm_engine.dart';
 import '../services/runtime/hmi_runtime.dart';
 import 'project_controller.dart';
 
@@ -7,14 +8,15 @@ import 'project_controller.dart';
 /// machine_monitor, mas por árvore de widgets em vez de estático global
 /// (o que deixa os testes de widget montarem o app com um runtime simulado).
 ///
-/// Qualquer tela pega o controlador e o runtime com `AppScope.of(context)`.
-/// Ouvir mudanças do projeto: `AppScope.watch(context)` (reconstrói a tela
-/// quando o projeto muda).
+/// Qualquer tela pega o controlador, o runtime e os alarmes com
+/// `AppScope.of(context)`. Ouvir mudanças do projeto: `AppScope.watch(context)`
+/// (reconstrói a tela quando o projeto muda).
 class AppScope extends InheritedNotifier<ProjectController> {
-  const AppScope({super.key, required ProjectController controller, required this.runtime, required super.child})
+  const AppScope({super.key, required ProjectController controller, required this.runtime, required this.alarms, required super.child})
       : super(notifier: controller);
 
   final HmiRuntime runtime;
+  final AlarmEngine alarms;
 
   ProjectController get controller => notifier!;
 

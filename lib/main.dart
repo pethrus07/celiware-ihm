@@ -6,6 +6,8 @@ import 'package:logging/logging.dart';
 
 import 'app/app_scope.dart';
 import 'app/appearance.dart';
+import 'services/alarms/alarm_engine.dart';
+import 'widgets/alarms/alarm_widgets.dart';
 import 'app/project_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/shell.dart';
@@ -45,9 +47,19 @@ class CeliwareIhmApp extends StatefulWidget {
 }
 
 class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObserver {
+  late final AlarmEngine _alarms;
+
+  /// Navegação a partir da faixa de alarme (que fica acima do Navigator).
+  final _navigator = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
+    _alarms = AlarmEngine(
+      controller: widget.controller,
+      runtime: widget.runtime,
+      historyFile: () => widget.controller.repository.sidecar('historico-alarmes.json'),
+    );
     WidgetsBinding.instance.addObserver(this);
     AppearanceController.instance.addListener(_applyAppearance);
     _applySystemBars();
@@ -57,6 +69,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
   void dispose() {
     AppearanceController.instance.removeListener(_applyAppearance);
     WidgetsBinding.instance.removeObserver(this);
+    _alarms.dispose();
     super.dispose();
   }
 
@@ -97,6 +110,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
       case AppLifecycleState.hidden:
         unawaited(widget.runtime.pause());
         unawaited(widget.controller.flush());
+        unawaited(_alarms.flush());
       case AppLifecycleState.resumed:
         widget.runtime.resume();
       default:
@@ -109,10 +123,16 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
     return AppScope(
       controller: widget.controller,
       runtime: widget.runtime,
+      alarms: _alarms,
       child: MaterialApp(
         title: 'Celiware IHM',
         debugShowCheckedModeBanner: false,
         theme: Ind.theme,
+        navigatorKey: _navigator,
+        navigatorObservers: [AlarmBannerHost.observer],
+        // Faixa de alarme acima de TODAS as telas: alarme só na tela que
+        // ninguém está olhando não é alarme (ISA-18.2 §11.3.4).
+        builder: (context, child) => AlarmBannerHost(navigator: _navigator, child: child ?? const SizedBox()),
         home: const Shell(),
       ),
     );

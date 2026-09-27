@@ -38,6 +38,8 @@ class IndPalette {
     required this.alarmText,
     required this.warn,
     required this.warnText,
+    required this.alarmMid,
+    required this.alarmMidText,
     required this.info,
     required this.infoText,
     required this.off,
@@ -92,6 +94,9 @@ class IndPalette {
   final Color ok, okText;
   final Color alarm, alarmText;
   final Color warn, warnText;
+
+  /// Laranja da prioridade média de alarme — só alarme usa (ISA-18.2 §11.4.3).
+  final Color alarmMid, alarmMidText;
   final Color info, infoText;
 
   /// Desligado / inativo.
@@ -131,6 +136,8 @@ class IndPalette {
     alarmText: Color(0xFFFF8A8D),
     warn: Color(0xFFF5C518),
     warnText: Color(0xFFF7D154),
+    alarmMid: Color(0xFFF2994A),
+    alarmMidText: Color(0xFFF7B77E),
     info: Color(0xFF4C9EFF),
     infoText: Color(0xFF8CC0FF),
     off: Color(0xFF3A4049),
@@ -171,6 +178,8 @@ class IndPalette {
     alarmText: Color(0xFFB8262C),
     warn: Color(0xFFF2B705),
     warnText: Color(0xFF8A6400),
+    alarmMid: Color(0xFFE07A1F),
+    alarmMidText: Color(0xFFA5530C),
     info: Color(0xFF2F7FE0),
     infoText: Color(0xFF1C62B8),
     off: Color(0xFFC4C9D0),
@@ -238,6 +247,7 @@ class Ind {
   static Color get ok => palette.ok;
   static Color get alarm => palette.alarm;
   static Color get warn => palette.warn;
+  static Color get alarmMid => palette.alarmMid;
   static Color get info => palette.info;
   static Color get off => palette.off;
   static Color get lampOn => palette.lampOn;
@@ -251,6 +261,7 @@ class Ind {
     if (state == p.alarm) return p.alarmText;
     if (state == p.warn) return p.warnText;
     if (state == p.info) return p.infoText;
+    if (state == p.alarmMid) return p.alarmMidText;
     return state;
   }
 

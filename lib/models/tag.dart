@@ -7,6 +7,7 @@
 // "Velocidade da faca", não "HR 40012".
 
 import '../core/modbus/modbus_memory.dart';
+import 'alarm.dart';
 
 /// Formato do dado dentro da memória.
 enum TagDataType {
@@ -152,6 +153,7 @@ class Tag {
     this.scale = 1,
     this.offset = 0,
     this.description = '',
+    this.alarms = const [],
   });
 
   final String id;
@@ -193,6 +195,10 @@ class Tag {
   final double offset;
 
   final String description;
+
+  /// Alarmes desta variável (ver [AlarmRule]). Moram aqui para viajar com o
+  /// projeto e sumir junto quando a variável for apagada.
+  final List<AlarmRule> alarms;
 
   /// Variável lida de um bit dentro de um registrador.
   bool get isBitOfRegister => dataType == TagDataType.bool && !area.isBit;
@@ -250,6 +256,7 @@ class Tag {
     double? scale,
     double? offset,
     String? description,
+    List<AlarmRule>? alarms,
   }) =>
       Tag(
         id: id,
@@ -267,6 +274,7 @@ class Tag {
         scale: scale ?? this.scale,
         offset: offset ?? this.offset,
         description: description ?? this.description,
+        alarms: alarms ?? this.alarms,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -285,6 +293,10 @@ class Tag {
     if (t.scale == 0 || !t.scale.isFinite) t = t.copyWith(scale: 1);
     if (!t.offset.isFinite) t = t.copyWith(offset: 0);
     if (!t.dataType.isNumeric && (t.scale != 1 || t.offset != 0)) t = t.copyWith(scale: 1, offset: 0);
+    // Alarme tem que casar com o tipo: limite para número, ligar/desligar
+    // para liga/desliga; texto e lista não alarmam.
+    final fits = t.alarms.where((a) => !t.isArray && !t.isText && (t.dataType == TagDataType.bool ? !a.kind.isAnalog : a.kind.isAnalog)).toList();
+    if (fits.length != t.alarms.length) t = t.copyWith(alarms: fits);
     return t;
   }
 
@@ -305,6 +317,7 @@ class Tag {
         if (scale != 1) 'scale': scale,
         if (offset != 0) 'offset': offset,
         'description': description,
+        if (alarms.isNotEmpty) 'alarms': [for (final a in alarms) a.toJson()],
       };
 
   factory Tag.fromJson(Map<String, dynamic> j) => Tag(
@@ -324,5 +337,9 @@ class Tag {
         scale: (j['scale'] as num?)?.toDouble() ?? 1,
         offset: (j['offset'] as num?)?.toDouble() ?? 0,
         description: (j['description'] as String?) ?? '',
+        alarms: [
+          for (final a in (j['alarms'] as List? ?? const []))
+            if (a is Map) AlarmRule.fromJson(Map<String, dynamic>.from(a)),
+        ],
       ).normalized();
 }

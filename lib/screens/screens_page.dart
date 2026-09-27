@@ -7,6 +7,7 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/ids.dart';
 import '../models/hmi_screen.dart';
 import '../models/project.dart';
+import '../widgets/alarms/alarm_widgets.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/element_catalog.dart';
 import '../widgets/tour/tour.dart';
@@ -34,7 +35,7 @@ class ScreensPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Telas'),
-        actions: [KeyedSubtree(key: helpKey, child: const HelpButton())],
+        actions: [const AlarmBell(), KeyedSubtree(key: helpKey, child: const HelpButton())],
       ),
       floatingActionButton: FloatingActionButton.extended(
         key: addKey,

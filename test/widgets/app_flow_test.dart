@@ -13,6 +13,7 @@ import 'package:ihm/services/demo/demo_process.dart';
 import 'package:ihm/services/demo/demo_project.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/storage/project_repository.dart';
+import 'package:ihm/widgets/alarms/alarm_widgets.dart';
 import 'package:ihm/widgets/hmi/hmi_canvas.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -228,6 +229,58 @@ void main() {
     await live(tester, 300);
     expect(find.byKey(const ValueKey('confirmar-escrita')), findsOneWidget);
     await AppearanceController.instance.set(Appearance.auto);
+    await shutdown(tester, c);
+  });
+
+  testWidgets('alarme ponta a ponta: faixa no topo, marca no elemento, reconhecer, normalizar, histórico', (tester) async {
+    final c = await boot(tester);
+    final memory = DemoRegistry.forDevice(DemoProject.deviceId).memory;
+    await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.operationScreenId}')));
+    await live(tester, 900);
+    expect(find.byKey(const ValueKey('faixa-alarme')), findsNothing);
+
+    // Porta abre: depois de 1 s de condição, vira alarme de prioridade alta.
+    memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, false);
+    await live(tester, 600);
+    expect(find.byKey(const ValueKey('faixa-alarme')), findsNothing, reason: 'antes de 1 s não dispara');
+    await live(tester, 1200);
+    expect(find.byKey(const ValueKey('faixa-alarme')), findsOneWidget);
+    expect(find.text('Porta aberta'), findsOneWidget);
+    expect(find.byType(ElementAlarmBadge), findsOneWidget); // a lâmpada da porta se marca
+
+    // Toque na faixa abre a lista; reconhecer.
+    await tester.tap(find.byKey(const ValueKey('faixa-alarme')));
+    await live(tester, 600);
+    expect(find.text('Alarmes'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('reconhecer-regra:demo_porta:al_porta')));
+    await live(tester, 300);
+    expect(find.text('Alta · Reconhecido'), findsOneWidget);
+
+    // Porta fecha: reconhecido + normalizou = sai da lista e a faixa some.
+    memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, true);
+    await live(tester, 1200);
+    expect(find.byKey(const ValueKey('faixa-alarme')), findsNothing);
+    expect(find.text('Tudo normal'), findsOneWidget);
+
+    await tester.tap(find.text('Histórico'));
+    await live(tester, 600);
+    expect(find.textContaining('Ativou'), findsOneWidget);
+    expect(find.textContaining('Reconhecido'), findsOneWidget);
+    expect(find.textContaining('Normalizou'), findsOneWidget);
+    await shutdown(tester, c);
+  });
+
+  testWidgets('alarme que normaliza sem ninguém ver continua na faixa até ser reconhecido', (tester) async {
+    final c = await boot(tester);
+    final memory = DemoRegistry.forDevice(DemoProject.deviceId).memory;
+    memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, false);
+    await live(tester, 2000);
+    memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, true);
+    await live(tester, 1200);
+    // Vigiado mesmo sem nenhuma tela aberta (estamos na lista de telas).
+    expect(find.byKey(const ValueKey('faixa-alarme')), findsOneWidget);
+    expect(find.textContaining('Voltou ao normal'), findsOneWidget);
+    expect(c.runtime.store.read('demo_porta').value, isTrue);
     await shutdown(tester, c);
   });
 

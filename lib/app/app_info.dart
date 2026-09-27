@@ -6,7 +6,7 @@ class AppInfo {
   static const company = 'Celiware';
 
   /// Manter igual ao `version:` do pubspec.yaml (o build de loja lê de lá).
-  static const version = '1.2.0';
+  static const version = '1.3.0';
 
   /// Pasta dos vídeos tutoriais (Drive/YouTube). Vídeo não mora dentro do app
   /// — incharia o download da loja. Enquanto for nulo, a tela de tutoriais diz

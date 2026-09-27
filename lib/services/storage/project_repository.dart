@@ -32,9 +32,13 @@ class ProjectRepository {
 
   final Directory? _dirOverride;
 
-  Future<File> _file() async {
+  Future<File> _file() => sidecar(fileName);
+
+  /// Arquivo ao lado do projeto, na mesma pasta privada (ex.: histórico de
+  /// alarmes — que é do aparelho, não do projeto, e não vai na exportação).
+  Future<File> sidecar(String name) async {
     final dir = _dirOverride ?? await getApplicationDocumentsDirectory();
-    return File('${dir.path}${Platform.pathSeparator}$fileName');
+    return File('${dir.path}${Platform.pathSeparator}$name');
   }
 
   /// Projeto salvo, ou `null` na primeira abertura do app.

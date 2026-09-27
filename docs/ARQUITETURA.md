@@ -292,6 +292,7 @@ Por que o toque segue o comando e não o retorno: se seguisse o retorno, com a m
 | writable | Pode ser alterada pela tela (nunca em área só-leitura; nunca em texto nesta versão). |
 | unit, decimals | Apresentação: "°C", 1 casa decimal. |
 | scale, offset | Escala linear: valor = bruto × scale + offset (padrão 1 e 0; só vão para o arquivo quando diferentes). |
+| alarms | Alarmes da variável: lista de {id, kind (above · below · on · off), limit, priority (high · medium · low), message}. Só vai para o arquivo quando há algum; `normalized()` descarta o que não casa com o tipo. |
 
 `Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura e texto tiram a escrita; escala zero volta a 1).
 
@@ -382,6 +383,32 @@ Na escolha de variável do editor, a lista é **agrupada por equipamento** (os q
 ### 6.7. Mais
 
 Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças.
+
+### 6.8. Alarmes
+
+Seguem a ANSI/ISA-18.2 (resumo em `docs/PESQUISA-UI-UX.md` §1.2). O alarme **mora na variável** — configurado no cadastro dela, viaja no arquivo do projeto e some junto se a variável for apagada.
+
+**Configurar.** No cadastro de variável, a linha **Alarmes** (resumo "Acima de 85,0 °C · …" e as formas das prioridades) abre o editor: *Quando* (acima de / abaixo de para número; quando ligar / quando desligar para liga-desliga), *Limite* na unidade da tela (já com escala), *Prioridade* em três cartões com a forma de verdade e uma frase ("Agir agora", "Agir logo", "Ficar atento") e *Mensagem para o operador* (vazia = gerada: "Temperatura do motor acima de 85,0 °C"). Texto e lista não alarmam.
+
+**Prioridades — cor + forma + número** (cor sozinha falha para daltônico e para visão periférica):
+
+| Prioridade | Cor (reservada) | Forma | Uso |
+|---|---|---|---|
+| 1 · Alta | vermelho | losango | Agir agora. |
+| 2 · Média | laranja (só alarme usa) | triângulo | Agir logo. |
+| 3 · Baixa | amarelo | quadrado | Ficar atento. |
+
+**Estados** (ISA-18.2 §11.3.2): *não reconhecido* — a forma **pisca** a 1 Hz (nunca o texto); *reconhecido* — fixo; *voltou ao normal* — a condição sumiu antes de alguém ver, e o alarme fica na lista até ser reconhecido (senão passaria batido). Reconhecido + normalizado sai da lista.
+
+**Contra alarme tagarela** (EEMUA 191): a condição precisa durar **1 s** para disparar, e a volta tem **banda morta de 1% do limite** (acima de 85 só normaliza abaixo de 84,15).
+
+**Onde aparece.** (1) **Faixa fixa no topo do app**, acima de todas as telas, com o alarme que pede ação (o não reconhecido mais grave), o estado, o valor e a hora; o número "+2" de outros; toque abre a lista; o celular vibra quando um novo entra (som não funciona no chão de fábrica — ISA-18.2 §11.3.4). Tudo reconhecido, a faixa fica discreta, mas à vista enquanto a condição existir. (2) **No próprio elemento** da tela: borda na cor e a forma no canto — o alarme aparece onde o valor está. (3) Na **lista de variáveis**: sino (tem alarme) ou a forma (em alarme agora). (4) **Página Alarmes** (faixa ou sino da lista de telas): aba *Ativos* — o mais grave em cima; cada cartão com mensagem, valor de **agora** e limite, prioridade/estado, "desde 19:21 · há 3 min" e o botão **Reconhecer** (um a um; "Reconhecer todos" com confirmação quando há mais de um); aba *Histórico* — por dia, hora com segundos, Ativou / Reconhecido / Normalizou.
+
+**Sem comunicação** com um equipamento que tem alarmes vira alarme próprio (média): sem leitura, os outros alarmes não merecem confiança. Os alarmes da variável ficam como estão até a leitura voltar.
+
+**Vigiado em qualquer tela.** O `AlarmEngine` (`lib/services/alarms/`) mantém inscritas no runtime as variáveis com alarme enquanto o app está aberto — o equipamento continua sendo lido mesmo sem tela aberta. O histórico (últimos 300 eventos) fica em `historico-alarmes.json`, ao lado do projeto; é do aparelho, não vai na exportação. O piscar usa um timer de 500 ms que só corre com alarme não reconhecido (2 quadros/s, nunca animação contínua).
+
+**Limite desta versão:** com o app em segundo plano a leitura para (bateria), então **não há alarme com o app fechado** nem notificação do Android. Resolver isso pede um serviço em primeiro plano (notificação fixa "vigiando a cortadora") — fica como próximo passo, a decidir.
 
 ## 7. Tutoriais dentro do app
 
@@ -520,8 +547,9 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/core/modbus_client_tcp_test.dart` | Cliente TCP real × escravo Dart por socket: leitura/escrita, endereço inexistente, 50 pedidos paralelos, timeout, queda e reconexão, desconexão manual, IP morto, porta fechada = "recusou nesta porta". |
 | `test/runtime/tag_codec_test.dart` | 4 ordens de 32 bits, float, sinal, bit em registrador, listas, faixa, vírgula brasileira, formatação; escala ida e volta (÷ 10, deslocamento 4–20 mA, lista), passo e faixa na unidade da tela, casas implícitas, JSON; texto ASCII (zero final, bytes trocados, caractere inválido, só leitura). |
 | `test/runtime/scan_planner_test.dart` | Agrupamento, buracos, limite de 125, áreas separadas, isolamento. |
+| `test/runtime/alarm_logic_test.dart` | Condição com banda morta (acima/abaixo), liga/desliga, valor inválido, mensagem padrão com unidade, alarmes no JSON, descarte de alarme incompatível com o tipo, prioridades. |
 | `test/runtime/hmi_runtime_test.dart` | Inscrição, isolamento do endereço errado, escrita, queda com último valor, soltura insistente do pulso, variável apagada. |
-| `test/widgets/app_flow_test.dart` | Primeira abertura, valores ao vivo, botão com confirmação ligando a máquina, tela só acompanhamento, editor com paleta, escolha de variável e configuração; escala e texto na tela do líder, troca de tela pelo botão e pelo mostrador, botão com retorno aguardando com a porta aberta; celular deitado com célula no teto e grade centralizada; busca de variável sem acento. |
+| `test/widgets/app_flow_test.dart` | Primeira abertura, valores ao vivo, botão com confirmação ligando a máquina, tela só acompanhamento, editor com paleta, escolha de variável e configuração; escala e texto na tela do líder, troca de tela pelo botão e pelo mostrador, botão com retorno aguardando com a porta aberta; celular deitado com célula no teto e grade centralizada; busca de variável sem acento; troca de aparência no meio do uso; alarme ponta a ponta (não dispara antes de 1 s, faixa no topo, marca no elemento, reconhecer, normalizar, histórico) e alarme que normaliza sem ninguém ver continuando na faixa. |
 | `test/widgets/trend_axis_test.dart` | Eixo da direita do gráfico de tendência: cobre os dados, mesmo número de passos, passo redondo, sem eixo negativo para grandeza positiva (inclusive valor constante 0). |
 | `test/widgets/tour_test.dart` | Tutorial aparece na primeira visita, "já vi" com versão na chave, rearme por versão nova, "voltar" fecha o tutorial e não a página. |
 
@@ -534,3 +562,5 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
 - **Ideias registradas:** variável calculada/script (só se aparecer caso que a escala linear não cobre), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.
+- **Alarme com o app fechado:** serviço em primeiro plano + notificação do Android (hoje os alarmes só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.
+- **Próximas fases do visual:** faixa de status no topo da operação, miniatura real das telas, tablet com barra lateral, comando em 3 fases visíveis.

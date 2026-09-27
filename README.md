@@ -10,6 +10,8 @@ lâmpadas, mostradores e gráficos — sem programar.
   o mesmo dado aparece em vários lugares com uma leitura só.
 - **Telas salvas no aparelho**, exportáveis como arquivo para outro celular.
 - **Máquina de demonstração embutida**: o app funciona completo sem nada na rede.
+- **Alarmes** no padrão ISA-18.2: prioridade por cor, forma e número, faixa no topo, histórico.
+- **Tema claro e escuro** (ou automático, pelo celular).
 - **Tutorial em cada tela** (botão "?").
 
 ## Como rodar
@@ -51,6 +53,8 @@ tool/             Gerador de ícone, da documentação em Word e do vídeo de ap
 | `docs/Documentacao_Tecnica_Celiware_IHM.docx` | O mesmo documento em Word (gerado de `ARQUITETURA.md` por `node tool/gerar_docx.js`). |
 | `docs/SIMULACAO.md` | Como testar sem equipamento: demonstração, simulador Python, Modbus Slave, celular por Wi-Fi. |
 | `docs/PUBLICACAO.md` | Roteiro da Play Store (conta, chave, pacote, ficha). |
+| `docs/ROADMAP.md` | Versões entregues e tudo o que ainda falta fazer. |
+| `docs/PESQUISA-UI-UX.md` | Pesquisa que embasou o visual (ISA-101, ISA-18.2, mercado). |
 
 Cada arquivo de código abre com um comentário explicando o que a classe faz e por quê.
 

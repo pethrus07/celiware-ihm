@@ -102,9 +102,9 @@ class _ScreenRunPageState extends State<ScreenRunPage> {
                       scrollDirection: Axis.horizontal,
                       child: Row(children: [
                         if (screen.readOnly) ...[
-                          const Icon(Icons.visibility_outlined, size: 16, color: Ind.textDim),
+                          Icon(Icons.visibility_outlined, size: 16, color: Ind.textDim),
                           const SizedBox(width: 4),
-                          const Text('Só acompanhamento', style: TextStyle(color: Ind.textDim, fontSize: 12)),
+                          Text('Só acompanhamento', style: TextStyle(color: Ind.textDim, fontSize: 12)),
                           const SizedBox(width: 10),
                         ],
                         for (final d in devices) Padding(padding: const EdgeInsets.only(right: 6), child: LinkChip(device: d)),

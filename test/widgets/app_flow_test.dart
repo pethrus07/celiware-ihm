@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ihm/app/appearance.dart';
 import 'package:ihm/app/project_controller.dart';
+import 'package:ihm/core/theme/app_theme.dart';
 import 'package:ihm/core/modbus/modbus_memory.dart';
 import 'package:ihm/main.dart';
 import 'package:ihm/models/hmi_screen.dart';
@@ -206,6 +208,26 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('buscar-variavel')), 'xyz');
     await live(tester, 300);
     expect(find.textContaining('Nenhuma variável com'), findsOneWidget);
+    await shutdown(tester, c);
+  });
+
+  testWidgets('trocar a aparência no meio do uso: continua na mesma tela e tudo responde', (tester) async {
+    final c = await boot(tester);
+    await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.operationScreenId}')));
+    await live(tester, 900);
+    final before = Ind.palette;
+    await AppearanceController.instance.set(before.dark ? Appearance.claro : Appearance.escuro);
+    await live(tester, 300);
+    expect(Ind.palette, isNot(same(before)));
+    // Continua na operação (não voltou para o início) e com a cor nova.
+    expect(find.text('Cortadora — operação'), findsOneWidget);
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).last);
+    expect(Theme.of(tester.element(find.byWidget(scaffold))).scaffoldBackgroundColor, Ind.bg);
+    // E segue operável: o botão Liga pede confirmação.
+    await tester.tap(find.text('LIGA'));
+    await live(tester, 300);
+    expect(find.byKey(const ValueKey('confirmar-escrita')), findsOneWidget);
+    await AppearanceController.instance.set(Appearance.auto);
     await shutdown(tester, c);
   });
 

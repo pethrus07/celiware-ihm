@@ -93,7 +93,7 @@ class _DeviceCard extends StatelessWidget {
                   children: [
                     Text(device.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
                     const SizedBox(height: 4),
-                    Text(device.addressLabel, style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
+                    Text(device.addressLabel, style: TextStyle(color: Ind.textMuted, fontSize: 13)),
                     const SizedBox(height: 10),
                     LinkChip(device: device),
                   ],

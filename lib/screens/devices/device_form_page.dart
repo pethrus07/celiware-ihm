@@ -110,7 +110,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
       appBar: AppBar(
         title: Text(_editing ? 'Equipamento' : 'Novo equipamento'),
         actions: [
-          if (_editing) IconButton(tooltip: 'Apagar', icon: const Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
+          if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -177,7 +177,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   tilePadding: EdgeInsets.zero,
                   childrenPadding: const EdgeInsets.only(bottom: 8),
                   title: const Text('Mais opções'),
-                  subtitle: Text('Porta ${_port.text} · ID ${_unit.text}', style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
+                  subtitle: Text('Porta ${_port.text} · ID ${_unit.text}', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
                   children: [
                     StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: 'Modbus TCP usa 502.', onChanged: () => setState(() {})),
                     const SizedBox(height: Ind.space),
@@ -248,8 +248,8 @@ class _ProbeCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('•  ', style: TextStyle(color: Ind.textDim)),
-                  Expanded(child: Text(t, style: const TextStyle(color: Ind.textDim, height: 1.35))),
+                  Text('•  ', style: TextStyle(color: Ind.textDim)),
+                  Expanded(child: Text(t, style: TextStyle(color: Ind.textDim, height: 1.35))),
                 ]),
               ),
           ],

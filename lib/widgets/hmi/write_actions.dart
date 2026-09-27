@@ -58,7 +58,7 @@ class WriteActions {
     final r = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.edit_note_rounded, color: Ind.accent),
+        icon: Icon(Icons.edit_note_rounded, color: Ind.accent),
         title: Text(title),
         content: Text(message, style: const TextStyle(fontSize: 16, height: 1.4)),
         actions: [
@@ -170,7 +170,7 @@ class _NumberPadState extends State<NumberPad> {
             Text(t.name, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
             Text('Atual: ${TagCodec.format(t, widget.current)}${limits.isEmpty ? '' : '  ·  $limits'}',
-                style: const TextStyle(color: Ind.textDim)),
+                style: TextStyle(color: Ind.textDim)),
             const SizedBox(height: 14),
             Container(
               key: const ValueKey('numpad-visor'),
@@ -185,13 +185,13 @@ class _NumberPadState extends State<NumberPad> {
                   Expanded(
                     child: Text(_text.isEmpty ? ' ' : _text, textAlign: TextAlign.right, style: Ind.number(36)),
                   ),
-                  if (t.unit.isNotEmpty) Padding(padding: const EdgeInsets.only(left: 8), child: Text(t.unit, style: const TextStyle(color: Ind.textDim, fontSize: 18))),
+                  if (t.unit.isNotEmpty) Padding(padding: const EdgeInsets.only(left: 8), child: Text(t.unit, style: TextStyle(color: Ind.textDim, fontSize: 18))),
                 ],
               ),
             ),
             SizedBox(
               height: 28,
-              child: _error == null ? null : Padding(padding: const EdgeInsets.only(top: 6), child: Text(_error!, style: const TextStyle(color: Ind.alarm, fontWeight: FontWeight.w600))),
+              child: _error == null ? null : Padding(padding: const EdgeInsets.only(top: 6), child: Text(_error!, style: TextStyle(color: Ind.alarm, fontWeight: FontWeight.w600))),
             ),
             GridView.count(
               shrinkWrap: true,

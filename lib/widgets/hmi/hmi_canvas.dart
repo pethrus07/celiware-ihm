@@ -159,7 +159,9 @@ class HmiCanvas extends StatelessWidget {
                           top: e.y * cell + gap / 2,
                           width: e.w * cell - gap,
                           height: e.h * cell - gap,
-                          child: KeyedSubtree(key: keyFor?.call(e), child: _Linked(element: e, onNavigate: onNavigate)),
+                          // Uma camada por elemento: o valor que muda redesenha só
+                          // o próprio cartão, não a tela (sombras e bordas saem de cache).
+                          child: RepaintBoundary(child: KeyedSubtree(key: keyFor?.call(e), child: _Linked(element: e, onNavigate: onNavigate))),
                         ),
               ],
             ),
@@ -196,7 +198,7 @@ class _Linked extends StatelessWidget {
       onTap: () => nav(target),
       child: Stack(children: [
         Positioned.fill(child: view),
-        const Positioned(top: 6, right: 6, child: Icon(Icons.arrow_outward_rounded, size: 16, color: Ind.textMuted)),
+        Positioned(top: 6, right: 6, child: Icon(Icons.arrow_outward_rounded, size: 16, color: Ind.textMuted)),
       ]),
     );
   }
@@ -320,7 +322,7 @@ class _EditableElementState extends State<_EditableElement> {
                       shape: BoxShape.circle,
                       border: Border.all(color: Ind.bg, width: 2),
                     ),
-                    child: const Icon(Icons.open_in_full_rounded, size: 13, color: Ind.onAccent),
+                    child: Icon(Icons.open_in_full_rounded, size: 13, color: Ind.onAccent),
                   ),
                 ),
               ),
@@ -332,6 +334,9 @@ class _EditableElementState extends State<_EditableElement> {
 }
 
 class _GridPainter extends CustomPainter {
+  /// Paleta com que foi criado: troca de tema força redesenho.
+  final int rev = Ind.revision;
+
   _GridPainter({required this.cell, required this.columns, required this.rows});
   final double cell;
   final int columns;
@@ -348,5 +353,5 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GridPainter o) => o.cell != cell || o.columns != columns || o.rows != rows;
+  bool shouldRepaint(_GridPainter o) => o.cell != cell || o.columns != columns || o.rows != rows || o.rev != rev;
 }

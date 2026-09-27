@@ -14,6 +14,7 @@ import '../../services/runtime/tag_codec.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/element_catalog.dart';
 import '../../widgets/hmi/elements/control_elements.dart';
+import '../../widgets/hmi/elements/indicator_elements.dart';
 import '../../widgets/hmi/hmi_canvas.dart';
 import '../../widgets/hmi/hmi_frame.dart';
 import '../../widgets/hmi/live_tags.dart';
@@ -189,10 +190,24 @@ class ElementConfigSheet extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(child: _TextProp(label: 'Texto desligado', value: e.prop<String>('offText', 'DESLIGADO'), onChanged: (v) => set('offText', v))),
         ]));
-        w.add(_ColorProp(label: 'Cor acesa', value: e.prop<String>('color', 'green'), onChanged: (v) => set('color', v)));
+        final lampStyle = LampStyleMeta.fromName(e.props['style'] as String?);
+        w.add(const SectionHeader('Como acende', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+        w.add(ChoiceCards<LampStyle>(
+          options: const [
+            ChoiceOption(value: LampStyle.hp, title: 'Alto desempenho', subtitle: 'Brilho e palavra; cor só no anormal', icon: Icons.brightness_high_outlined),
+            ChoiceOption(value: LampStyle.classic, title: 'Painel clássico', subtitle: 'Acende na cor escolhida', icon: Icons.circle),
+          ],
+          selected: lampStyle,
+          onChanged: (s) => set('style', s == LampStyle.classic ? 'classic' : null),
+        ));
+        w.add(_ColorProp(
+          label: lampStyle == LampStyle.hp ? 'Cor (vermelho e amarelo acendem na cor)' : 'Cor acesa',
+          value: e.prop<String>('color', 'green'),
+          onChanged: (v) => set('color', v),
+        ));
       case ElementType.input:
         w.add(const SectionHeader('Limites de segurança', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
-        w.add(const Text('O operador não consegue digitar fora desta faixa.', style: TextStyle(color: Ind.textDim)));
+        w.add(Text('O operador não consegue digitar fora desta faixa.', style: TextStyle(color: Ind.textDim)));
         w.add(const SizedBox(height: 10));
         w.add(_MinMax(e: e, set: set));
       case ElementType.bar:
@@ -210,7 +225,7 @@ class ElementConfigSheet extends StatelessWidget {
         ]));
       case ElementType.multistate:
         w.add(const SectionHeader('Estados', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
-        w.add(const Text('Para cada código que o equipamento manda, o texto e a cor que aparecem.', style: TextStyle(color: Ind.textDim)));
+        w.add(Text('Para cada código que o equipamento manda, o texto e a cor que aparecem.', style: TextStyle(color: Ind.textDim)));
         w.add(const SizedBox(height: 10));
         w.add(_StatesEditor(states: [for (final s in (e.props['states'] as List? ?? const [])) if (s is Map) Map<String, dynamic>.from(s)], onChanged: (v) => set('states', v)));
       case ElementType.trend:
@@ -248,7 +263,7 @@ class ElementConfigSheet extends StatelessWidget {
           w.add(const SectionHeader('Variável da etapa', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
           w.add(_TagPicker(project: project, fit: TagFit.scalar, selected: tag, preferDevices: screenDevices, onChanged: (t) => set('tagId', t.id)));
           w.add(const SectionHeader('Imagens', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
-          w.add(const Text('Quando a variável vale o código, a tela mostra a imagem dele. Um PDF vira uma imagem por página: página 1 = código 1.',
+          w.add(Text('Quando a variável vale o código, a tela mostra a imagem dele. Um PDF vira uma imagem por página: página 1 = código 1.',
               style: TextStyle(color: Ind.textDim, height: 1.35)));
           w.add(const SizedBox(height: 12));
           w.add(_ImagesEditor(
@@ -371,14 +386,14 @@ class _TagPicker extends StatelessWidget {
                 const SizedBox(width: 14),
                 Expanded(
                   child: t == null
-                      ? const Text('Escolher variável', style: TextStyle(color: Ind.accent, fontWeight: FontWeight.w700, fontSize: 16))
+                      ? Text('Escolher variável', style: TextStyle(color: Ind.accent, fontWeight: FontWeight.w700, fontSize: 16))
                       : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(t.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                           const SizedBox(height: 2),
-                          Text(t.addressLabel, style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
+                          Text(t.addressLabel, style: TextStyle(color: Ind.textMuted, fontSize: 13)),
                         ]),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: Ind.textMuted),
+                Icon(Icons.chevron_right_rounded, color: Ind.textMuted),
               ]),
             ),
           ),
@@ -526,7 +541,7 @@ class _MultiTagPicker extends StatelessWidget {
               onChanged(next);
             },
           ),
-        if (compatible.isEmpty) const _Hint(icon: Icons.info_outline_rounded, color: Ind.info, text: 'Nenhuma variável numérica ainda.'),
+        if (compatible.isEmpty) _Hint(icon: Icons.info_outline_rounded, color: Ind.info, text: 'Nenhuma variável numérica ainda.'),
       ],
     );
   }
@@ -656,13 +671,13 @@ class _ColorProp extends StatelessWidget {
                   color: c.color,
                   border: Border.all(color: value == c.name ? Ind.text : Colors.transparent, width: 3),
                 ),
-                child: value == c.name ? const Icon(Icons.check_rounded, color: Ind.bg) : null,
+                child: value == c.name ? Icon(Icons.check_rounded, color: Ind.bg) : null,
               ),
             ),
           ),
       ]),
       const SizedBox(height: 6),
-      Text(StateColorMeta.fromName(value).label, style: const TextStyle(color: Ind.textDim, fontSize: 12.5)),
+      Text(StateColorMeta.fromName(value).label, style: TextStyle(color: Ind.textDim, fontSize: 12.5)),
     ]);
   }
 }
@@ -719,7 +734,7 @@ class _StatesEditor extends StatelessWidget {
             IconButton(
               tooltip: 'Tirar estado',
               onPressed: () => onChanged([...states]..removeAt(i)),
-              icon: const Icon(Icons.close_rounded, color: Ind.textMuted),
+              icon: Icon(Icons.close_rounded, color: Ind.textMuted),
             ),
           ]),
         ),
@@ -751,7 +766,7 @@ class _ScreenPick extends StatelessWidget {
   Widget build(BuildContext context) {
     final others = project.screens.where((s) => s.id != currentScreenId).toList();
     if (others.isEmpty) {
-      return const _Hint(icon: Icons.info_outline_rounded, color: Ind.info, text: 'Crie outra tela para este botão abrir.');
+      return _Hint(icon: Icons.info_outline_rounded, color: Ind.info, text: 'Crie outra tela para este botão abrir.');
     }
     return Wrap(spacing: 8, runSpacing: 8, children: [
       if (allowNone) ChoiceChip(label: const Text('Nada'), selected: selected == null, onSelected: (_) => onChanged(null)),
@@ -778,7 +793,7 @@ class _FeedbackPick extends StatelessWidget {
         t == null
             ? 'O botão acende pela própria variável do comando.'
             : 'O botão grava no comando e só acende quando "${t.name}" confirmar. Comando sem confirmação aparece como aguardando.',
-        style: const TextStyle(color: Ind.textDim, height: 1.35),
+        style: TextStyle(color: Ind.textDim, height: 1.35),
       ),
       const SizedBox(height: 10),
       Material(
@@ -795,16 +810,16 @@ class _FeedbackPick extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             child: Row(children: [
-              const Icon(Icons.keyboard_return_rounded, color: Ind.textDim),
+              Icon(Icons.keyboard_return_rounded, color: Ind.textDim),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(t == null ? 'Mesma variável do comando' : t.name,
                     style: TextStyle(fontWeight: FontWeight.w600, color: t == null ? Ind.textDim : Ind.text)),
               ),
               if (t != null)
-                IconButton(tooltip: 'Usar a mesma do comando', onPressed: () => onChanged(null), icon: const Icon(Icons.close_rounded, color: Ind.textMuted))
+                IconButton(tooltip: 'Usar a mesma do comando', onPressed: () => onChanged(null), icon: Icon(Icons.close_rounded, color: Ind.textMuted))
               else
-                const Icon(Icons.chevron_right_rounded, color: Ind.textMuted),
+                Icon(Icons.chevron_right_rounded, color: Ind.textMuted),
             ]),
           ),
         ),
@@ -915,7 +930,7 @@ class _ImagesEditorState extends State<_ImagesEditor> {
                 color: Ind.bg,
                 child: _images[i]['data'] is String
                     ? Image.memory(base64Decode(_images[i]['data'] as String), fit: BoxFit.cover, gaplessPlayback: true)
-                    : const Icon(Icons.image_not_supported_outlined, color: Ind.textMuted),
+                    : Icon(Icons.image_not_supported_outlined, color: Ind.textMuted),
               ),
             ),
             const SizedBox(width: 12),
@@ -933,7 +948,7 @@ class _ImagesEditorState extends State<_ImagesEditor> {
             IconButton(
               tooltip: 'Tirar imagem',
               onPressed: () => widget.onChanged([..._images]..removeAt(i)),
-              icon: const Icon(Icons.close_rounded, color: Ind.textMuted),
+              icon: Icon(Icons.close_rounded, color: Ind.textMuted),
             ),
           ]),
         ),
@@ -943,7 +958,7 @@ class _ImagesEditorState extends State<_ImagesEditor> {
           child: Row(children: [
             const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4)),
             const SizedBox(width: 12),
-            Text(_progress, style: const TextStyle(color: Ind.textDim)),
+            Text(_progress, style: TextStyle(color: Ind.textDim)),
           ]),
         )
       else
@@ -954,7 +969,7 @@ class _ImagesEditorState extends State<_ImagesEditor> {
       if (_images.isNotEmpty) ...[
         const SizedBox(height: 8),
         Text('${_images.length} ${_images.length == 1 ? 'imagem' : 'imagens'} · ${(bytes * 0.75 / 1048576).toStringAsFixed(1).replaceAll('.', ',')} MB no projeto',
-            style: const TextStyle(color: Ind.textMuted, fontSize: 12.5)),
+            style: TextStyle(color: Ind.textMuted, fontSize: 12.5)),
       ],
     ]);
   }

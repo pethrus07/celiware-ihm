@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
 
 import 'app/app_scope.dart';
+import 'app/appearance.dart';
 import 'app/project_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/shell.dart';
@@ -16,11 +17,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _setupLogging();
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Ind.surface,
-  ));
+  await AppearanceController.instance.load();
+  Ind.use(AppearanceController.instance.resolve());
 
   final runtime = HmiRuntime();
   final controller = ProjectController(repository: ProjectRepository(), runtime: runtime);
@@ -51,12 +49,45 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    AppearanceController.instance.addListener(_applyAppearance);
+    _applySystemBars();
   }
 
   @override
   void dispose() {
+    AppearanceController.instance.removeListener(_applyAppearance);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// Modo automático: o celular trocou de claro para escuro (fim do dia).
+  @override
+  void didChangePlatformBrightness() => _applyAppearance();
+
+  /// Troca a paleta e redesenha **a árvore inteira** sem recriar nada: as
+  /// cores são lidas no build, então basta marcar tudo para reconstruir. A
+  /// pessoa continua na mesma tela (recriar o MaterialApp a jogaria de volta
+  /// para o início — no meio da operação, se o automático virasse sozinho).
+  void _applyAppearance() {
+    final before = Ind.revision;
+    Ind.use(AppearanceController.instance.resolve());
+    if (Ind.revision == before || !mounted) return;
+    _applySystemBars();
+    setState(() {});
+    void rebuild(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(rebuild);
+    }
+    (context as Element).visitChildren(rebuild);
+  }
+
+  void _applySystemBars() {
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Ind.isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: Ind.surface,
+      systemNavigationBarIconBrightness: Ind.isDark ? Brightness.light : Brightness.dark,
+    ));
   }
 
   @override

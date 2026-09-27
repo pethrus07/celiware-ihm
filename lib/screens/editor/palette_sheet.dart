@@ -59,14 +59,14 @@ class PaletteSheet extends StatelessWidget {
                             Row(children: [
                               Icon(info.icon, color: Ind.accent, size: 26),
                               const Spacer(),
-                              if (info.writes) const Tooltip(message: 'Grava no equipamento', child: Icon(Icons.edit_outlined, size: 16, color: Ind.textMuted)),
+                              if (info.writes) Tooltip(message: 'Grava no equipamento', child: Icon(Icons.edit_outlined, size: 16, color: Ind.textMuted)),
                             ]),
                             const SizedBox(height: 8),
                             Text(info.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                             const SizedBox(height: 3),
                             Expanded(
                               child: Text(info.description,
-                                  maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Ind.textMuted, fontSize: 12.5, height: 1.3)),
+                                  maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textMuted, fontSize: 12.5, height: 1.3)),
                             ),
                           ],
                         ),

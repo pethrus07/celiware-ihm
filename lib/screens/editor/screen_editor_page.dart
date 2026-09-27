@@ -154,7 +154,7 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
             // Grade vazia só com pontinhos não dizia o que fazer. A dica não
             // captura toque: tocar numa célula continua marcando o lugar.
             if (screen.elements.isEmpty)
-              const IgnorePointer(
+              IgnorePointer(
                 child: Center(
                   child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 40),
@@ -174,7 +174,7 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
           bottomNavigationBar: SafeArea(
             child: Container(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              decoration: const BoxDecoration(color: Ind.surface, border: Border(top: BorderSide(color: Ind.line))),
+              decoration: BoxDecoration(color: Ind.surface, border: Border(top: BorderSide(color: Ind.line))),
               child: selected == null
                   ? Row(children: [
                       Expanded(
@@ -281,7 +281,7 @@ class _ScreenSettingsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(foregroundColor: Ind.alarm, side: const BorderSide(color: Ind.alarm)),
+              style: OutlinedButton.styleFrom(foregroundColor: Ind.alarm, side: BorderSide(color: Ind.alarm)),
               onPressed: () async {
                 if (!await confirmDelete(context, title: 'Apagar "${s.name}"?', body: 'A tela e seus ${s.elements.length} elementos somem. Equipamentos e variáveis continuam.')) return;
                 c.deleteScreen(s.id);

@@ -311,7 +311,7 @@ class _TagFormPageState extends State<TagFormPage> {
       appBar: AppBar(
         title: Text(_editing ? 'Variável' : 'Nova variável'),
         actions: [
-          if (_editing) IconButton(tooltip: 'Apagar', icon: const Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
+          if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -433,7 +433,7 @@ class _TagFormPageState extends State<TagFormPage> {
                           child: Padding(
                             padding: const EdgeInsets.all(12),
                             child: Row(children: [
-                              const Icon(Icons.auto_fix_high_rounded, color: Ind.info),
+                              Icon(Icons.auto_fix_high_rounded, color: Ind.info),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text('Parece a notação de manual (${_address.text}). No Modbus isso é o endereço $suggestion. Toque para usar.',
@@ -490,14 +490,14 @@ class _TagFormPageState extends State<TagFormPage> {
                       // Formato raro escolhido: abre sozinho, para não esconder a escolha.
                       initiallyExpanded: !_isMainType(_type) || _order != ByteOrder.abcd,
                       title: const Text('Mais opções'),
-                      subtitle: Text(_moreSummary(), style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
+                      subtitle: Text(_moreSummary(), style: TextStyle(color: Ind.textMuted, fontSize: 13)),
                       expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (_type.isNumeric) ...[
                           // Escala primeiro: é o que mais se usa aqui ("o
                           // manual diz para dividir por 10").
                           const SectionHeader('Escala do equipamento', padding: EdgeInsets.fromLTRB(0, 8, 0, 6)),
-                          const Text('O equipamento manda sem vírgula? Ex.: vem 752 e é 75,2 °C → ÷ 10.',
+                          Text('O equipamento manda sem vírgula? Ex.: vem 752 e é 75,2 °C → ÷ 10.',
                               style: TextStyle(color: Ind.textDim, height: 1.35)),
                           const SizedBox(height: 10),
                           Wrap(spacing: 8, runSpacing: 8, children: [
@@ -543,7 +543,7 @@ class _TagFormPageState extends State<TagFormPage> {
                               ),
                             ]),
                             const SizedBox(height: 6),
-                            const Text('Valor na tela = valor do equipamento × fator + soma. Ao gravar, o app faz a conta ao contrário.',
+                            Text('Valor na tela = valor do equipamento × fator + soma. Ao gravar, o app faz a conta ao contrário.',
                                 style: TextStyle(color: Ind.textMuted, fontSize: 12.5, height: 1.35)),
                           ],
                           const SizedBox(height: Ind.space),
@@ -647,7 +647,7 @@ class _LivePanel extends StatelessWidget {
                     : Ind.number(24, color: Ind.text)),
             if (raw != null) ...[
               const SizedBox(height: 2),
-              Text('vem ${_rawText(t!, raw)} do equipamento', key: const ValueKey('valor-bruto'), style: const TextStyle(color: Ind.textMuted, fontSize: 12.5)),
+              Text('vem ${_rawText(t!, raw)} do equipamento', key: const ValueKey('valor-bruto'), style: TextStyle(color: Ind.textMuted, fontSize: 12.5)),
             ],
           ]),
         ),

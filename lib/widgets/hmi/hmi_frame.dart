@@ -77,7 +77,7 @@ class HmiFrame extends StatelessWidget {
     this.reading,
     this.needsTag = true,
     this.padding = const EdgeInsets.fromLTRB(14, 12, 14, 12),
-    this.color = Ind.surface,
+    this.color,
     this.border,
   });
 
@@ -87,7 +87,9 @@ class HmiFrame extends StatelessWidget {
   final TagReading? reading;
   final bool needsTag;
   final EdgeInsets padding;
-  final Color color;
+
+  /// Cor do cartão (nulo = cartão padrão da paleta).
+  final Color? color;
   final Color? border;
 
   @override
@@ -112,27 +114,24 @@ class HmiFrame extends StatelessWidget {
     // célula baixa espremia tudo.
     return LayoutBuilder(builder: (context, box) {
       if (box.maxHeight < 76 && label.isNotEmpty) {
-        return Container(
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(Ind.radius),
-            border: borderColor == null ? null : Border.all(color: borderColor, width: missing || broken ? 1.6 : 1.2),
-          ),
+        return _panel(
+          borderColor: borderColor,
+          width: missing || broken ? 1.6 : 1.2,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(children: [
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: box.maxWidth * 0.34),
-              child: Text(label.toUpperCase(), maxLines: 2, overflow: TextOverflow.ellipsis, style: Ind.tag(size: 11, color: Ind.textMuted)),
+              child: Text(label.toUpperCase(), maxLines: 2, overflow: TextOverflow.ellipsis, style: Ind.tag(size: 11)),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: missing
-                  ? const _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent)
+                  ? _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent)
                   : broken
                       ? _Notice(icon: Icons.report_gmailerrorred_rounded, text: r.message, color: Ind.alarm)
                       : body,
             ),
-            if (lost) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.wifi_off_rounded, size: 14, color: Ind.warn)),
+            if (lost) Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.wifi_off_rounded, size: 14, color: Ind.warn)),
           ]),
         );
       }
@@ -140,13 +139,22 @@ class HmiFrame extends StatelessWidget {
     });
   }
 
+  /// Cartão com o acabamento do sistema visual: camada, borda de 1 px,
+  /// sombra em duas camadas e brilho no topo ([CardEdge]). A borda de
+  /// estado (falta configurar / erro) substitui a borda neutra.
+  Widget _panel({required EdgeInsets padding, required Widget child, Color? borderColor, double width = 1}) => CustomPaint(
+        foregroundPainter: CardEdge(rev: Ind.revision),
+        child: Container(
+          decoration: Ind.card(color: color, border: borderColor, width: borderColor == null ? 1 : width),
+          padding: padding,
+          child: child,
+        ),
+      );
+
   Widget _stacked(Color? borderColor, bool lost, bool broken, bool missing, TagReading r, Widget body) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(Ind.radius),
-        border: borderColor == null ? null : Border.all(color: borderColor, width: missing || broken ? 1.6 : 1.2),
-      ),
+    return _panel(
+      borderColor: borderColor,
+      width: missing || broken ? 1.6 : 1.2,
       padding: padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,15 +163,15 @@ class HmiFrame extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(label.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: Ind.tag(size: 11, color: Ind.textMuted)),
+                  child: Text(label.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: Ind.tag(size: 11)),
                 ),
-                if (lost) const Tooltip(message: 'Sem comunicação — mostrando o último valor', child: Icon(Icons.wifi_off_rounded, size: 14, color: Ind.warn)),
-                if (broken) const Icon(Icons.error_outline_rounded, size: 14, color: Ind.alarm),
+                if (lost) Tooltip(message: 'Sem comunicação — mostrando o último valor', child: Icon(Icons.wifi_off_rounded, size: 14, color: Ind.warn)),
+                if (broken) Icon(Icons.error_outline_rounded, size: 14, color: Ind.alarm),
               ],
             ),
           Expanded(
             child: missing
-                ? const _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent)
+                ? _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent)
                 : broken
                     ? _Notice(icon: Icons.report_gmailerrorred_rounded, text: r.message, color: Ind.alarm)
                     : body,

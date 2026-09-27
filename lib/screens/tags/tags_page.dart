@@ -97,7 +97,7 @@ class _TagTile extends StatelessWidget {
       // importa é "qual memória" e "quanto vale agora".
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 3),
-        child: Text(tag.addressLabel, style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
+        child: Text(tag.addressLabel, style: TextStyle(color: Ind.textMuted, fontSize: 13)),
       ),
       trailing: TagBuilder(
         tagId: tag.id,

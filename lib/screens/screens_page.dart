@@ -121,12 +121,12 @@ class _ScreenCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(children: [
                           if (screen.readOnly) ...[
-                            const Tooltip(message: 'Só acompanhamento', child: Icon(Icons.visibility_outlined, size: 15, color: Ind.textMuted)),
+                            Tooltip(message: 'Só acompanhamento', child: Icon(Icons.visibility_outlined, size: 15, color: Ind.textMuted)),
                             const SizedBox(width: 6),
                           ],
                           Text(
                               switch (screen.elements.length) { 0 => 'Só acompanhamento', 1 => '1 elemento', final n => '$n elementos' },
-                              style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
+                              style: TextStyle(color: Ind.textMuted, fontSize: 13)),
                         ]),
                         ],
                       ],
@@ -177,7 +177,7 @@ class _ScreenMenu extends StatelessWidget {
             }
         }
       },
-      itemBuilder: (_) => const [
+      itemBuilder: (_) => [
         PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Editar'))),
         PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.drive_file_rename_outline), title: Text('Renomear'))),
         PopupMenuItem(value: 'duplicate', child: ListTile(leading: Icon(Icons.copy_all_outlined), title: Text('Duplicar'))),
@@ -195,7 +195,7 @@ class _ScreenThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (screen.elements.isEmpty) {
-      return const Center(child: Text('Tela vazia — toque para montar', style: TextStyle(color: Ind.textMuted, fontSize: 12)));
+      return Center(child: Text('Tela vazia — toque para montar', style: TextStyle(color: Ind.textMuted, fontSize: 12)));
     }
     // Mostra o topo da tela (~5 linhas), centralizado e cortando embaixo.
     // Encolher a tela inteira deixava a planta minúscula num canto; usar a

@@ -69,9 +69,9 @@ class ImageElement extends StatelessWidget {
         if (images.isEmpty) {
           body = _picture(null, placeholder: 'Acrescente as imagens');
         } else if (code == null) {
-          body = const Center(child: Text('---', style: TextStyle(color: Ind.textMuted)));
+          body = Center(child: Text('---', style: TextStyle(color: Ind.textMuted)));
         } else if (data == null) {
-          body = Center(child: Text('SEM IMAGEM PARA O CÓDIGO $code', textAlign: TextAlign.center, style: const TextStyle(color: Ind.warn, fontWeight: FontWeight.w700, fontSize: 12)));
+          body = Center(child: Text('SEM IMAGEM PARA O CÓDIGO $code', textAlign: TextAlign.center, style: TextStyle(color: Ind.warn, fontWeight: FontWeight.w700, fontSize: 12)));
         } else {
           body = _picture(data);
         }
@@ -86,9 +86,9 @@ class ImageElement extends StatelessWidget {
         decoration: BoxDecoration(border: Border.all(color: Ind.accent, width: 1.6), borderRadius: BorderRadius.circular(Ind.radius)),
         child: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.add_photo_alternate_outlined, color: Ind.accent),
+            Icon(Icons.add_photo_alternate_outlined, color: Ind.accent),
             const SizedBox(height: 4),
-            Text(placeholder, style: const TextStyle(color: Ind.accent, fontWeight: FontWeight.w600, fontSize: 12)),
+            Text(placeholder, style: TextStyle(color: Ind.accent, fontWeight: FontWeight.w600, fontSize: 12)),
           ]),
         ),
       );
@@ -99,7 +99,7 @@ class ImageElement extends StatelessWidget {
         _decoded(data),
         fit: element.prop<String>('fit', 'contain') == 'cover' ? BoxFit.cover : BoxFit.contain,
         gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined, color: Ind.alarm)),
+        errorBuilder: (_, _, _) => Center(child: Icon(Icons.broken_image_outlined, color: Ind.alarm)),
       ),
     );
   }

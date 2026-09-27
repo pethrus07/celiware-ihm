@@ -32,7 +32,7 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: 16),
             Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text(body, textAlign: TextAlign.center, style: const TextStyle(color: Ind.textDim, height: 1.45)),
+            Text(body, textAlign: TextAlign.center, style: TextStyle(color: Ind.textDim, height: 1.45)),
             if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),
@@ -197,7 +197,7 @@ class _ChoiceCard<T> extends StatelessWidget {
                   children: [
                     Text(option.title, style: TextStyle(fontWeight: FontWeight.w700, color: selected ? Ind.text : Ind.text)),
                     if (option.subtitle != null)
-                      Padding(padding: const EdgeInsets.only(top: 2), child: Text(option.subtitle!, style: const TextStyle(color: Ind.textMuted, fontSize: 12.5, height: 1.3))),
+                      Padding(padding: const EdgeInsets.only(top: 2), child: Text(option.subtitle!, style: TextStyle(color: Ind.textMuted, fontSize: 12.5, height: 1.3))),
                   ],
                 ),
               ),
@@ -290,7 +290,7 @@ Future<bool> confirmDelete(BuildContext context, {required String title, require
   final r = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      icon: const Icon(Icons.delete_outline_rounded, color: Ind.alarm),
+      icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm),
       title: Text(title),
       content: Text(body, style: const TextStyle(height: 1.4)),
       actions: [

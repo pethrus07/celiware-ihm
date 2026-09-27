@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../app/app_info.dart';
 import '../app/app_scope.dart';
+import '../app/appearance.dart';
 import '../core/theme/app_theme.dart';
 import '../models/project.dart';
 import '../services/demo/demo_project.dart';
@@ -38,7 +39,7 @@ class MorePage extends StatelessWidget {
         children: [
           const SectionHeader('Projeto'),
           ListTile(
-            leading: const Icon(Icons.folder_open_outlined, color: Ind.accent),
+            leading: Icon(Icons.folder_open_outlined, color: Ind.accent),
             title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text('${p.screens.length} telas · ${p.tags.length} variáveis'),
             trailing: const Icon(Icons.edit_outlined, size: 20),
@@ -78,13 +79,37 @@ class MorePage extends StatelessWidget {
             title: const Text('Começar do zero'),
             onTap: () => _replace(context, const Project(name: 'Meu projeto'), 'Começar um projeto vazio?'),
           ),
+          const SectionHeader('Aparência'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 4),
+            child: ValueListenableBuilder<Appearance>(
+              valueListenable: AppearanceController.instance,
+              builder: (context, a, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ChoiceCards<Appearance>(
+                  options: const [
+                    ChoiceOption(value: Appearance.auto, title: 'Auto', icon: Icons.brightness_auto_outlined),
+                    ChoiceOption(value: Appearance.claro, title: 'Claro', icon: Icons.light_mode_outlined),
+                    ChoiceOption(value: Appearance.escuro, title: 'Escuro', icon: Icons.dark_mode_outlined),
+                  ],
+                  selected: a,
+                  columns: 3,
+                  onChanged: AppearanceController.instance.set,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Claro lê melhor de dia e no sol; escuro, à noite e em sala fechada. Auto segue o claro/escuro do celular. Vale só para este aparelho.',
+                  style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.4),
+                ),
+              ]),
+            ),
+          ),
           const SectionHeader('Tutoriais'),
           for (final (id, title, _) in Tours.catalog)
             ListTile(
               key: ValueKey('tutorial-$id'),
               leading: const Icon(Icons.school_outlined),
               title: Text(title),
-              trailing: const Icon(Icons.play_circle_outline_rounded, color: Ind.accent),
+              trailing: Icon(Icons.play_circle_outline_rounded, color: Ind.accent),
               onTap: () => _openTour(context, id),
             ),
           ListTile(
@@ -187,7 +212,7 @@ class MorePage extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.swap_horiz_rounded, color: Ind.accent),
+        icon: Icon(Icons.swap_horiz_rounded, color: Ind.accent),
         title: Text(question),
         content: const Text('O projeto atual será substituído. Se quiser guardar uma cópia dele, use "Salvar em arquivo" antes.', style: TextStyle(height: 1.4)),
         actions: [

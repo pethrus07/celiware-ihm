@@ -11,11 +11,6 @@ import '../../../services/runtime/tag_codec.dart';
 import '../../../services/runtime/tag_store.dart';
 import '../hmi_frame.dart';
 
-/// Cores das curvas, na ordem das variáveis. Fora da paleta de estado de
-/// propósito (curva azul não é "informação", é só a 1ª curva) — mas sem
-/// vermelho, para não parecer alarme.
-const _seriesColors = [Ind.info, Ind.accent, Color(0xFFB58CFF)];
-
 /// Gráfico de tendência: curva dos últimos [windowSec] segundos de até 3
 /// variáveis numéricas.
 ///
@@ -64,7 +59,8 @@ class _TrendElementState extends State<TrendElement> {
       if (t == null) continue;
       series.add(_Series(
         tag: t,
-        color: _seriesColors[i % _seriesColors.length],
+        // Cores de dados da paleta, nunca de estado: curva verde parecia "ok" e amarela, alarme.
+        color: Ind.series[i % Ind.series.length],
         samples: scope.runtime.store.history(ids[i]).where((s) => now.difference(s.at) <= window).toList(),
         reading: scope.runtime.store.read(ids[i]),
       ));
@@ -87,12 +83,12 @@ class _TrendElementState extends State<TrendElement> {
               // (pego pelo teste de widget com "Temperatura do motor").
               for (final s in series)
                 Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(width: 10, height: 3, color: s.color),
+                  Container(width: 12, height: 3, decoration: BoxDecoration(color: s.color, borderRadius: BorderRadius.circular(2))),
                   const SizedBox(width: 5),
                   Flexible(
                     child: Text.rich(
                       TextSpan(children: [
-                        TextSpan(text: '${s.tag.name}: ', style: const TextStyle(color: Ind.textDim, fontSize: 12)),
+                        TextSpan(text: '${s.tag.name}: ', style: TextStyle(color: Ind.textMuted, fontSize: 12)),
                         TextSpan(text: TagCodec.format(s.tag, s.reading.value), style: Ind.number(12.5, color: s.color)),
                       ]),
                       maxLines: 1,
@@ -209,9 +205,12 @@ class _TrendPainter extends CustomPainter {
       if (hi - lo < step) hi = lo + step;
     }
 
+    // Grade discreta: serve de régua, não compete com a curva.
     final grid = Paint()
-      ..color = Ind.line
+      ..color = Ind.line.withValues(alpha: 0.7)
       ..strokeWidth = 1;
+    // Fundo do gráfico rebaixado, como a face de um instrumento.
+    canvas.drawRRect(RRect.fromRectAndRadius(plot.inflate(2), const Radius.circular(6)), Paint()..color = Ind.well.withValues(alpha: Ind.isDark ? 0.55 : 0.45));
     final tp = TextPainter(textDirection: TextDirection.ltr);
     // Linhas nos múltiplos do passo redondo (0 · 50 · 100 · 150), não em
     // quartos da faixa — quartos de 0..150 davam "37,5 · 75 · 113".
@@ -234,7 +233,7 @@ class _TrendPainter extends CustomPainter {
       }
     }
     for (final (label, frac) in [('-${_dur(window)}', 0.0), ('agora', 1.0)]) {
-      tp.text = TextSpan(text: label, style: const TextStyle(fontSize: 10, color: Ind.textMuted));
+      tp.text = TextSpan(text: label, style: TextStyle(fontSize: 10, color: Ind.textMuted));
       tp.layout();
       final x = plot.left + plot.width * frac - (frac == 1 ? tp.width : 0);
       tp.paint(canvas, Offset(x, plot.bottom + 3));
@@ -247,18 +246,38 @@ class _TrendPainter extends CustomPainter {
       final sLo = onRight ? rLo : lo, sHi = onRight ? rHi : hi;
       final path = Path();
       var first = true;
+      var firstX = 0.0;
+      var last = Offset.zero;
       for (final p in s.samples) {
         final x = plot.right - plot.width * (now.difference(p.at).inMilliseconds / ms);
         final y = plot.bottom - plot.height * ((p.value - sLo) / (sHi - sLo));
         if (first) {
           path.moveTo(x, y);
+          firstX = x;
           first = false;
         } else {
           path.lineTo(x, y);
         }
+        last = Offset(x, y);
       }
       canvas.save();
       canvas.clipRect(plot);
+      // Área em degradê só sob a 1ª curva: dá corpo ao gráfico sem virar
+      // mancha quando há três curvas.
+      if (identical(s, series.first)) {
+        final area = Path.from(path)
+          ..lineTo(last.dx, plot.bottom)
+          ..lineTo(firstX, plot.bottom)
+          ..close();
+        canvas.drawPath(
+            area,
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [s.color.withValues(alpha: 0.26), s.color.withValues(alpha: 0)],
+              ).createShader(plot));
+      }
       canvas.drawPath(
           path,
           Paint()
@@ -267,6 +286,9 @@ class _TrendPainter extends CustomPainter {
             ..strokeWidth = 2
             ..strokeJoin = StrokeJoin.round);
       canvas.restore();
+      // Ponto no valor atual: diz "é aqui agora" sem precisar ler o eixo.
+      canvas.drawCircle(last, 4.5, Paint()..color = Ind.surface);
+      canvas.drawCircle(last, 3, Paint()..color = s.color);
     }
   }
 
@@ -316,7 +338,7 @@ class BarChartElement extends StatelessWidget {
           tag: tag,
           reading: r,
           child: values.isEmpty
-              ? const Center(child: Text('---', style: TextStyle(color: Ind.textMuted)))
+              ? Center(child: Text('---', style: TextStyle(color: Ind.textMuted)))
               : CustomPaint(painter: _BarsPainter(values, tag)),
         );
       },
@@ -325,6 +347,9 @@ class BarChartElement extends StatelessWidget {
 }
 
 class _BarsPainter extends CustomPainter {
+  /// Paleta com que foi criado: troca de tema força redesenho.
+  final int rev = Ind.revision;
+
   _BarsPainter(this.values, this.tag);
   final List<double> values;
   final Tag? tag;
@@ -341,21 +366,26 @@ class _BarsPainter extends CustomPainter {
     canvas.drawLine(Offset(0, size.height - labelH), Offset(size.width, size.height - labelH),
         Paint()..color = Ind.line);
 
+    // Cor de dado (não de estado nem de interação); a última posição — a
+    // hora em curso — em cor cheia, as anteriores esmaecidas.
+    final c = Ind.series.first;
     for (var i = 0; i < n; i++) {
       final v = values[i];
       final h = maxV <= 0 ? 0.0 : plotH * (v / maxV);
       final x = slot * i + (slot - barW) / 2;
       final last = i == n - 1;
       final rect = Rect.fromLTWH(x, size.height - labelH - h, barW, h);
-      canvas.drawRRect(RRect.fromRectAndCorners(rect, topLeft: const Radius.circular(3), topRight: const Radius.circular(3)),
-          Paint()..color = last ? Ind.accent : Ind.info.withValues(alpha: 0.8));
+      canvas.drawRRect(RRect.fromRectAndCorners(rect, topLeft: const Radius.circular(4), topRight: const Radius.circular(4)),
+          Paint()..color = last ? c : c.withValues(alpha: 0.42));
 
       if (slot >= 26) {
-        tp.text = TextSpan(text: _short(v), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: last ? Ind.accent : Ind.textDim));
+        tp.text = TextSpan(
+            text: _short(v),
+            style: TextStyle(fontFamily: Ind.condensed, fontWeight: last ? FontWeight.w700 : FontWeight.w600, fontSize: 11, color: last ? Ind.text : Ind.textMuted, fontFeatures: const [FontFeature.tabularFigures()]));
         tp.layout(maxWidth: slot);
         tp.paint(canvas, Offset(slot * i + (slot - tp.width) / 2, rect.top - tp.height - 1));
       }
-      tp.text = TextSpan(text: '${i + 1}', style: const TextStyle(fontSize: 10, color: Ind.textMuted));
+      tp.text = TextSpan(text: '${i + 1}', style: TextStyle(fontSize: 10, color: Ind.textMuted));
       tp.layout();
       tp.paint(canvas, Offset(slot * i + (slot - tp.width) / 2, size.height - labelH + 2));
     }
@@ -364,5 +394,5 @@ class _BarsPainter extends CustomPainter {
   static String _short(double v) => v >= 10000 ? '${(v / 1000).toStringAsFixed(1).replaceAll('.', ',')}k' : v.round().toString();
 
   @override
-  bool shouldRepaint(_BarsPainter o) => o.values != values;
+  bool shouldRepaint(_BarsPainter o) => o.values != values || o.rev != rev;
 }

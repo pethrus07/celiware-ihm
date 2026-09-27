@@ -400,22 +400,30 @@ Trilhas: primeiros passos, operar uma tela, montar uma tela, cadastrar equipamen
 
 ## 8. Identidade visual
 
-"Pegada industrial", seguindo a filosofia da ISA-101 (IHM de alto desempenho): **fundo neutro, cor só quando comunica estado**. O que tem cor é o que merece o olhar do operador.
+"Pegada industrial", seguindo a ISA-101 (IHM de alto desempenho) e a pesquisa de 27/09/2026 (`docs/PESQUISA-UI-UX.md`): **fundo neutro, cor só quando comunica estado ou interação**. O que tem cor é o que merece o olhar do operador.
 
-| Token | Uso |
-|---|---|
-| Grafite (bg, surface) | Fundo e cartões. |
-| Âmbar #FFB020 | Marca: ação principal, seleção no editor, foco, tutorial. |
-| Verde #2FBF71 | Normal / ligado. |
-| Vermelho #E5484D | Alarme / parada / erro. |
-| Amarelo #F5C518 | Atenção. |
-| Azul #3E9BFF | Informação, barras e curvas. |
+**Dois temas, os mesmos nomes de cor** (`IndPalette.escuro` e `IndPalette.claro` em `lib/core/theme/app_theme.dart`). O código pede "cartão", "texto secundário", "alarme" — nunca um hex — e cada tema decide o tom. Em Mais → Aparência: **Auto** (segue o claro/escuro do celular; padrão), **Claro** ou **Escuro**, guardado por aparelho (o tablet preso na máquina quer luz fixa). Claro lê melhor de dia e no sol (NN/g, FAA HFDS §5.3.8); escuro serve para noite e sala fechada. A troca redesenha a árvore inteira no lugar — a pessoa continua na mesma tela; pintores de gráfico comparam `Ind.revision`.
 
-Espaçamento por tokens (`Ind.space` 16, `Ind.spaceLarge` 28, `Ind.page` 20 de margem), cantos de 16 px, cartões e campos sem borda: a borda aparece só quando comunica algo (âmbar = falta configurar, vermelho = erro, âmbar grosso = selecionado no editor).
+| Token | Escuro | Claro | Uso |
+|---|---|---|---|
+| `well` | #0A0C0F | #DADDE2 | Face rebaixada do instrumento: arco do medidor, trilho da barra, poço da lâmpada, fundo do gráfico. |
+| `bg` | #0E1014 | #E4E6EA | Fundo da tela. |
+| `surface` | #171A1F | #F7F8FA | Cartão. |
+| `surfaceHigh` / `surfaceHigher` | #20242B / #2A2F37 | #EBEDF0 / #DDE0E5 | Controle sobre o cartão / pressionado. |
+| `raised` | #1C2026 | #FFFFFF | Folha, diálogo. |
+| `accent` | #2EC4D0 | #00808C | **Interação**: ação principal, seleção, foco, tutorial. Verde-água — o âmbar antigo colidia com amarelo/laranja de alarme. |
+| `ok` · `alarm` · `warn` · `info` | #2FBF71 · #F2555A · #F5C518 · #4C9EFF | #1F9D57 · #D9363C · #F2B705 · #2F7FE0 | Estado. Cada um tem **versão de texto** (`Ind.textFor`): amarelo de preencher não se lê como texto no claro. |
+| `series` | #78A9FF · #A56EFF · #FF7EB6 | #2F6FE0 · #8A4FE0 · #D9468C | Curvas e barras de gráfico — nunca cor de estado (curva verde parecia "ok"). |
 
-Tipografia IBM Plex (licença OFL): Sans para texto, Sans Condensed para títulos, caixas de aviso, rótulos de elemento e textos lidos do equipamento (estilo placa de painel), Mono para números — dígitos de largura fixa não "pulam" quando o valor muda. Com a fonte do sistema grande (130%), a barra de abas segura a escala em 115% para "Equipamentos" não quebrar; o resto do app acompanha a fonte escolhida.
+**Relevo sem enfeite.** No escuro, profundidade vem de luminosidade em camadas, não de sombra (Material dark, Linear, Grafana). Todo cartão tem borda de 1 px quase invisível, sombra em duas camadas e **brilho de 1 px no topo** que some até 40% da altura (`CardEdge`) — "luz vindo de cima". Nada de vidro/desfoque (custa 7–47 ms por quadro no Android), degradê de fundo ou 3D.
 
-**Desempenho medido** (emulador Pixel 7, SurfaceFlinger): rolagem a 60 quadros/s sem quadro lento; partida a frio 1,1–2 s; 72 MB de memória. Tela parada desenha só quando um valor muda: a barra anima apenas em mudança de mais de 3% e a lâmpada troca na hora, como luz de painel — a operação com a máquina em ciclo caiu de 38 para 12 quadros/s (bateria). Tudo em `lib/core/theme/app_theme.dart`; a cor de estado é salva no projeto pelo nome, então o tom pode ser ajustado sem quebrar arquivos.
+**Elementos.** Lâmpada é LED num poço: apagada = poço vazio; acesa = núcleo com reflexo de lente e halo. Estilo **alto desempenho** (padrão): ligado = brilho + palavra, cor só no anormal (vermelho/amarelo continuam coloridos); estilo **painel clássico** (IEC 60073): acende na cor escolhida. Botão é tátil: degradê leve, faixa de LED no alto (apagada na cor a 35%, acesa quando ligado), afunda 1,5 px ao tocar, texto legível sobre qualquer cor. Medidor: arco rebaixado, régua de marcas, faixas de atenção/alarme **por fora** do arco, preenchimento neutro que só ganha cor dentro de uma faixa. Barra: trilho rebaixado, régua e **ponteiro** na ponta (a ISA-101 prefere ponteiro a barra). Indicador de estado: ícone por cor (marcha, alarme, atenção, informação, parado) + tinta de 14% no cartão. Tendência: área em degradê sob a 1ª curva e ponto no valor atual. Gráfico de barras: hora em curso cheia, anteriores esmaecidas.
+
+Espaçamento por tokens (`Ind.space` 16, `Ind.spaceLarge` 28, `Ind.page` 20 de margem), cantos de 16 px (peça interna 10, concêntrica). A borda de estado aparece só quando comunica algo (cor de interação = falta configurar, vermelho = erro).
+
+Tipografia IBM Plex (licença OFL): Sans para texto e rótulos (caixa alta com espaçamento), Sans Condensed SemiBold com **dígitos tabulares** para números (não "dançam" quando o valor muda e cabem mais dígitos que na mono), Condensed para títulos e textos lidos do equipamento, Mono só em eixos. Com a fonte do sistema grande (130%), a barra de abas segura a escala em 115%; o resto do app acompanha.
+
+**Desempenho medido** (emulador Pixel 7, SurfaceFlinger): rolagem a 60 quadros/s sem quadro lento; partida a frio 1,1–2 s; 72 MB de memória. Tela parada desenha só quando um valor muda: a barra anima apenas em mudança de mais de 3%, a lâmpada troca na hora e cada elemento tem a própria camada (`RepaintBoundary`) — a operação com a máquina em ciclo caiu de 38 para 12 quadros/s. A cor de estado é salva no projeto pelo nome, então o tom pode ser ajustado sem quebrar arquivos.
 
 ## 9. Padrões de projeto
 

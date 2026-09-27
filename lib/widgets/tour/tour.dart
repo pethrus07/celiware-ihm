@@ -288,7 +288,7 @@ class _TourLayer extends StatelessWidget {
             const SizedBox(height: 6),
             Text(step.title, style: const TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 20)),
             const SizedBox(height: 6),
-            Text(step.body, style: const TextStyle(color: Ind.textDim, height: 1.4, fontSize: 15)),
+            Text(step.body, style: TextStyle(color: Ind.textDim, height: 1.4, fontSize: 15)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -344,6 +344,9 @@ class _TourLayer extends StatelessWidget {
 }
 
 class _HolePainter extends CustomPainter {
+  /// Paleta com que foi criado: troca de tema força redesenho.
+  final int rev = Ind.revision;
+
   _HolePainter(this.hole);
   final Rect? hole;
 
@@ -368,7 +371,7 @@ class _HolePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_HolePainter old) => old.hole != hole;
+  bool shouldRepaint(_HolePainter old) => old.hole != hole || old.rev != rev;
 }
 
 /// Botão "?" padrão — mora no topo de toda página, sempre visível (lição da

@@ -32,9 +32,13 @@ class DemoMap {
   static const hrLabelLength = 5; // mm (gravável)
   static const hrMotorTemp = 6; // FLOAT32 (6..7), °C
   static const hrTension = 8; // % tensão do papel
+  static const hrMotorTempX10 = 9; // UINT16, °C × 10 (352 = 35,2 °C) — exemplo de escala
   static const hrHourly = 10; // 8 registradores (10..17), produção por hora
   static const hrAlarmCode = 20; // 0 nenhum · 1 sobretemperatura · 2 porta aberta
   static const hrStatusWord = 30; // bits: 0 em ciclo · 1 alarme · 2 porta fechada
+  static const hrName = 40; // texto ASCII (40..47, 16 letras), nome da máquina
+  static const machineName = 'CORTADORA R1';
+  static const nameRegisters = 8;
 
   // Input registers
   static const irUptimeMinutes = 0;
@@ -85,6 +89,12 @@ class DemoProcess {
     memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, true);
     memory.pokeBit(ModbusArea.discreteInput, DemoMap.diEmergencyOk, true);
     memory.pokeBit(ModbusArea.discreteInput, DemoMap.diPaperPresent, true);
+    // Nome em ASCII, 2 letras por registrador, resto zerado — como um CLP grava string.
+    final name = DemoMap.machineName.codeUnits;
+    memory.pokeRegisters(ModbusArea.holdingRegister, DemoMap.hrName, [
+      for (var i = 0; i < DemoMap.nameRegisters; i++)
+        ((2 * i < name.length ? name[2 * i] : 0) << 8) | (2 * i + 1 < name.length ? name[2 * i + 1] : 0),
+    ]);
     _production = 18240;
     for (var i = 0; i < DemoMap.hourlyBuckets - 1; i++) {
       memory.pokeRegister(ModbusArea.holdingRegister, DemoMap.hrHourly + i,
@@ -162,6 +172,7 @@ class DemoProcess {
     final f = ByteData(4)..setFloat32(0, _temp);
     m.pokeRegisters(ModbusArea.holdingRegister, DemoMap.hrMotorTemp, [f.getUint16(0), f.getUint16(2)]);
     m.pokeRegister(ModbusArea.holdingRegister, DemoMap.hrTension, _tension.round().clamp(0, 100));
+    m.pokeRegister(ModbusArea.holdingRegister, DemoMap.hrMotorTempX10, (_temp * 10).round().clamp(0, 0xFFFF));
     m.pokeRegister(ModbusArea.holdingRegister, DemoMap.hrStatusWord,
         (inCycle ? 1 : 0) | (alarm ? 2 : 0) | (doorClosed ? 4 : 0));
     m.pokeRegister(ModbusArea.inputRegister, DemoMap.irUptimeMinutes, (_uptimeSeconds / 60).floor());

@@ -90,9 +90,11 @@ No celular, o Windows pergunta se libera o Python no firewall na primeira conex�
 | Holding | 5 | Comprimento do rótulo (mm) | UINT16, grava |
 | Holding | 6–7 | Temperatura do motor (°C) | FLOAT32 ABCD |
 | Holding | 8 | Tensão do papel (%) | UINT16 |
+| Holding | 9 | Temperatura do motor × 10 (352 = 35,2 °C) | UINT16 — exemplo de escala ÷ 10 |
 | Holding | 10–17 | Produção por hora (8 valores) | UINT16, lista |
 | Holding | 20 | Código do alarme (0 · 1 sobretemperatura · 2 porta) | UINT16 |
 | Holding | 30 | Palavra de status: bit 0 em ciclo · bit 1 alarme · bit 2 porta | bits |
+| Holding | 40–47 | Nome da máquina, "CORTADORA R1" | texto ASCII, 8 registradores |
 | Input | 0 | Minutos em ciclo | UINT16 |
 
 ## 3. Modbus Slave, Modbus Poll e ModbusTool

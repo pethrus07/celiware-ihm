@@ -111,11 +111,16 @@ class _NumberPadState extends State<NumberPad> {
   String _text = '';
   String? _error;
 
-  bool get _allowsDecimal => widget.tag.dataType == TagDataType.float32;
+  // Com escala (÷10), um inteiro do equipamento vira 75,2 na tela: a vírgula
+  // tem que existir no teclado. Deslocamento ou fator negativo permitem valor
+  // negativo mesmo em registrador sem sinal.
+  bool get _allowsDecimal => widget.tag.dataType == TagDataType.float32 || widget.tag.displayDecimals > 0;
   bool get _allowsNegative =>
       widget.tag.dataType == TagDataType.int16 ||
       widget.tag.dataType == TagDataType.int32 ||
-      widget.tag.dataType == TagDataType.float32;
+      widget.tag.dataType == TagDataType.float32 ||
+      widget.tag.offset < 0 ||
+      widget.tag.scale < 0;
 
   void _key(String k) {
     setState(() {

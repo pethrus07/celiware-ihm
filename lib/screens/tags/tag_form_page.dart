@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -61,6 +62,19 @@ class _TagFormPageState extends State<TagFormPage> {
   late final _unit = TextEditingController(text: widget.tag?.unit ?? '');
   late final _decimals = TextEditingController(text: '${widget.tag?.decimals ?? 0}');
   late final _description = TextEditingController(text: widget.tag?.description ?? '');
+  late final _scale = TextEditingController(text: _numText(widget.tag?.scale ?? 1));
+  late final _offset = TextEditingController(text: _numText(widget.tag?.offset ?? 0));
+
+  /// Atalhos de escala: o caso comum é "o manual manda dividir por 10/100".
+  static const _scalePresets = [(1.0, 'Sem escala'), (0.1, '÷ 10'), (0.01, '÷ 100'), (0.001, '÷ 1000'), (10.0, '× 10')];
+
+  /// Escala fora dos atalhos (ou com deslocamento): mostra os dois campos.
+  late bool _customScale = (widget.tag?.offset ?? 0) != 0 || !_scalePresets.any((p) => p.$1 == (widget.tag?.scale ?? 1));
+
+  static String _numText(double v) => (v == v.roundToDouble() ? v.round().toString() : v.toString()).replaceAll('.', ',');
+  static double? _parseNum(String t) => double.tryParse(t.trim().replaceAll(',', '.'));
+  double get _scaleValue => _parseNum(_scale.text) ?? 1;
+  double get _offsetValue => _parseNum(_offset.text) ?? 0;
 
   HmiRuntime? _runtime;
   Timer? _liveTimer;
@@ -106,7 +120,7 @@ class _TagFormPageState extends State<TagFormPage> {
   void dispose() {
     _liveTimer?.cancel();
     _runtime?.releaseIdle();
-    for (final c in [_name, _address, _bit, _length, _unit, _decimals, _description]) {
+    for (final c in [_name, _address, _bit, _length, _unit, _decimals, _description, _scale, _offset]) {
       c.dispose();
     }
     super.dispose();
@@ -137,6 +151,8 @@ class _TagFormPageState extends State<TagFormPage> {
       writable: _writable,
       unit: _unit.text.trim(),
       decimals: (int.tryParse(_decimals.text) ?? 0).clamp(0, 6),
+      scale: _scaleValue,
+      offset: _offsetValue,
       description: _description.text.trim(),
     ).normalized();
   }
@@ -170,6 +186,9 @@ class _TagFormPageState extends State<TagFormPage> {
       t == TagDataType.bool || t == TagDataType.uint16 || t == TagDataType.float32;
 
   void _setType(TagDataType t) {
+    // Texto de 1 registrador (2 letras) quase nunca é o que se quer.
+    if (t == TagDataType.string && (int.tryParse(_length.text) ?? 1) <= 1) _length.text = '10';
+    if (t == TagDataType.string) _writable = false;
     _type = t;
     if (t == TagDataType.bool && (_where == _Where.holding || _where == _Where.input)) _where = _Where.coil;
     if (t != TagDataType.bool && (_where == _Where.coil || _where == _Where.discrete || _where == _Where.bitInRegister)) _where = _Where.holding;
@@ -180,14 +199,35 @@ class _TagFormPageState extends State<TagFormPage> {
   /// para conferir.
   String _moreSummary() {
     if (_type == TagDataType.bool) return 'Observação';
+    if (_type == TagDataType.string) return _order == ByteOrder.abcd ? 'Texto · STRING' : 'Texto · bytes trocados';
     final parts = <String>[
+      if (_scaleLabel() != null) _scaleLabel()!,
       if (_unit.text.trim().isNotEmpty) _unit.text.trim(),
       if ((int.tryParse(_decimals.text) ?? 0) > 0) '${_decimals.text} decimais',
       if (!_isMainType(_type)) _type.technical,
       if (_order != ByteOrder.abcd) _order.label,
       if ((int.tryParse(_length.text) ?? 1) > 1) 'lista de ${_length.text}',
     ];
-    return parts.isEmpty ? 'Unidade, decimais, formato' : parts.join(' · ');
+    return parts.isEmpty ? 'Escala, unidade, decimais, formato' : parts.join(' · ');
+  }
+
+  /// "÷ 10", "× 0,5 + 3"... ou nulo sem escala.
+  String? _scaleLabel() {
+    final s = _scaleValue, o = _offsetValue;
+    if (s == 1 && o == 0) return null;
+    final preset = _scalePresets.where((p) => p.$1 == s && o == 0).firstOrNull;
+    if (preset != null) return preset.$2;
+    return '× ${_numText(s)}${o == 0 ? '' : ' ${o < 0 ? '−' : '+'} ${_numText(o.abs())}'}';
+  }
+
+  /// Escolheu um atalho: fator certo, deslocamento zero e, se ninguém tinha
+  /// pedido casas decimais, as que a divisão cria (÷ 100 → 2 casas).
+  void _pickScale(double f) {
+    _scale.text = _numText(f);
+    _offset.text = '0';
+    final implied = f >= 1 ? 0 : (-math.log(f) / math.ln10).round();
+    if ((int.tryParse(_decimals.text) ?? 0) < implied) _decimals.text = '$implied';
+    _onFieldChanged();
   }
 
   void _onFieldChanged() => setState(() {
@@ -250,9 +290,11 @@ class _TagFormPageState extends State<TagFormPage> {
     final allowArray = fit == null || fit == TagFit.numberList;
     final typeOptions = TagDataType.values.where((t) {
       if (fit == TagFit.boolean) return t == TagDataType.bool;
-      if (fit == TagFit.number || fit == TagFit.numberList) return t != TagDataType.bool;
+      if (fit == TagFit.number || fit == TagFit.numberList) return t.isNumeric;
+      if (fit == TagFit.scalar) return t != TagDataType.string;
       return true;
     }).toList();
+    final isText = _type == TagDataType.string;
     final suggestion = _manualNotation();
 
     return Scaffold(
@@ -393,14 +435,31 @@ class _TagFormPageState extends State<TagFormPage> {
                     const SizedBox(height: Ind.space),
                     StepperField(label: 'Quantos valores seguidos', controller: _length, min: 1, max: 120, onChanged: _onFieldChanged),
                   ],
+                  // Texto: o tamanho é o essencial (quantos registradores ler).
+                  if (isText) ...[
+                    const SizedBox(height: Ind.space),
+                    StepperField(
+                      fieldKey: const ValueKey('campo-tamanho-texto'),
+                      label: 'Tamanho em registradores',
+                      controller: _length,
+                      min: 1,
+                      max: 120,
+                      helper: '2 letras por registrador: ${_length.text} = até ${(int.tryParse(_length.text) ?? 1) * 2} letras.',
+                      onChanged: _onFieldChanged,
+                    ),
+                  ],
                   const SizedBox(height: Ind.spaceSmall),
                   SwitchListTile(
                     key: const ValueKey('pode-gravar'),
                     contentPadding: EdgeInsets.zero,
-                    value: _writable && _area.isWritable,
-                    onChanged: _area.isWritable ? (v) => setState(() => _writable = v) : null,
+                    value: _writable && _area.isWritable && !isText,
+                    onChanged: _area.isWritable && !isText ? (v) => setState(() => _writable = v) : null,
                     title: const Text('Pode ser alterada pela tela'),
-                    subtitle: _area.isWritable ? null : const Text('Esta memória é só de leitura.'),
+                    subtitle: isText
+                        ? const Text('Texto é só leitura nesta versão.')
+                        : _area.isWritable
+                            ? null
+                            : const Text('Esta memória é só de leitura.'),
                   ),
                   const SizedBox(height: Ind.spaceSmall),
                   Theme(
@@ -414,8 +473,63 @@ class _TagFormPageState extends State<TagFormPage> {
                       subtitle: Text(_moreSummary(), style: const TextStyle(color: Ind.textMuted, fontSize: 13)),
                       expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (_type.isNumeric) ...[
+                          // Escala primeiro: é o que mais se usa aqui ("o
+                          // manual diz para dividir por 10").
+                          const SectionHeader('Escala do equipamento', padding: EdgeInsets.fromLTRB(0, 8, 0, 6)),
+                          const Text('O equipamento manda sem vírgula? Ex.: vem 752 e é 75,2 °C → ÷ 10.',
+                              style: TextStyle(color: Ind.textDim, height: 1.35)),
+                          const SizedBox(height: 10),
+                          Wrap(spacing: 8, runSpacing: 8, children: [
+                            for (final (f, label) in _scalePresets)
+                              ChoiceChip(
+                                key: ValueKey('escala-$label'),
+                                label: Text(label),
+                                selected: !_customScale && _scaleValue == f && _offsetValue == 0,
+                                onSelected: (_) {
+                                  _customScale = false;
+                                  _pickScale(f);
+                                },
+                              ),
+                            ChoiceChip(
+                              key: const ValueKey('escala-outra'),
+                              label: const Text('Outra'),
+                              selected: _customScale,
+                              onSelected: (_) => setState(() => _customScale = true),
+                            ),
+                          ]),
+                          if (_customScale) ...[
+                            const SizedBox(height: 12),
+                            Row(children: [
+                              Expanded(
+                                child: TextFormField(
+                                  key: const ValueKey('campo-fator'),
+                                  controller: _scale,
+                                  keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
+                                  decoration: const InputDecoration(labelText: 'Multiplica por'),
+                                  validator: (t) => (_parseNum(t ?? '') ?? 0) == 0 ? 'Não pode ser zero' : null,
+                                  onChanged: (_) => _onFieldChanged(),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  key: const ValueKey('campo-deslocamento'),
+                                  controller: _offset,
+                                  keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
+                                  decoration: const InputDecoration(labelText: 'Depois soma'),
+                                  onChanged: (_) => _onFieldChanged(),
+                                ),
+                              ),
+                            ]),
+                            const SizedBox(height: 6),
+                            const Text('Valor na tela = valor do equipamento × fator + soma. Ao gravar, o app faz a conta ao contrário.',
+                                style: TextStyle(color: Ind.textMuted, fontSize: 12.5, height: 1.35)),
+                          ],
+                          const SizedBox(height: Ind.space),
+                        ],
                         if (_type != TagDataType.bool) ...[
-                          Row(children: [
+                          if (!isText) Row(children: [
                             Expanded(
                               child: TextFormField(
                                 controller: _unit,
@@ -434,7 +548,7 @@ class _TagFormPageState extends State<TagFormPage> {
                               ),
                             ),
                           ]),
-                          if (allowArray && fit != TagFit.numberList) ...[
+                          if (allowArray && fit != TagFit.numberList && !isText) ...[
                             const SizedBox(height: Ind.space),
                             StepperField(label: 'Quantos valores seguidos', controller: _length, min: 1, max: 120, helper: 'Mais que 1 forma uma lista (gráfico de barras).', onChanged: _onFieldChanged),
                           ],
@@ -486,6 +600,10 @@ class _LivePanel extends StatelessWidget {
     final color = err != null ? Ind.alarm : (value != null ? Ind.ok : Ind.textMuted);
     final t = tag;
     final text = err ?? (t == null ? 'Complete equipamento e endereço' : value == null ? 'Lendo…' : _fmt(t, value));
+    // Com escala, mostrar o número cru ao lado é a prova de que a conta está
+    // certa: "vem 752 do equipamento" → "75,2 °C" na tela.
+    final v = value;
+    final raw = err == null && t != null && t.hasScale && v is num ? (v - t.offset) / t.scale : null;
     return Container(
       key: const ValueKey('lendo-agora'),
       padding: const EdgeInsets.all(14),
@@ -505,12 +623,20 @@ class _LivePanel extends StatelessWidget {
                 style: err != null || value == null
                     ? TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 15)
                     : Ind.number(24, color: Ind.text)),
+            if (raw != null) ...[
+              const SizedBox(height: 2),
+              Text('vem ${_rawText(t!, raw)} do equipamento', key: const ValueKey('valor-bruto'), style: const TextStyle(color: Ind.textMuted, fontSize: 12.5)),
+            ],
           ]),
         ),
         if (t != null) Text(t.addressLabel, style: Ind.number(12, color: Ind.textMuted)),
       ]),
     );
   }
+
+  static String _rawText(Tag t, double raw) => t.dataType == TagDataType.float32
+      ? raw.toStringAsFixed(2).replaceAll('.', ',')
+      : raw.round().toString();
 
   static String _fmt(Tag t, Object? v) {
     if (v is List) return v.map((x) => TagCodec.format(t, x, withUnit: false)).join(' · ');

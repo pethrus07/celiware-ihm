@@ -33,6 +33,9 @@ enum ButtonMode {
 
   /// Grava um número fixo (ex.: receita 3, modo 2).
   value,
+
+  /// Não grava nada: abre outra tela do projeto (`goTo`).
+  screen,
 }
 
 extension ButtonModeMeta on ButtonMode {
@@ -48,6 +51,8 @@ extension ButtonModeMeta on ButtonMode {
         return 'Só desliga';
       case ButtonMode.value:
         return 'Grava um valor';
+      case ButtonMode.screen:
+        return 'Ir para tela';
     }
   }
 
@@ -63,10 +68,18 @@ extension ButtonModeMeta on ButtonMode {
         return 'DESLIGA';
       case ButtonMode.value:
         return 'VALOR';
+      case ButtonMode.screen:
+        return 'TELA';
     }
   }
 
   bool get needsNumber => this == ButtonMode.value;
+
+  /// Modo que grava numa variável (todos menos "Ir para tela").
+  bool get needsTag => this != ButtonMode.screen;
+
+  /// Modo de liga/desliga, em que o retorno da máquina faz sentido.
+  bool get isBit => needsTag && !needsNumber;
 
   static ButtonMode fromName(String? n) =>
       ButtonMode.values.firstWhere((m) => m.name == n, orElse: () => ButtonMode.toggle);
@@ -77,6 +90,13 @@ extension ButtonModeMeta on ButtonMode {
 /// Aceso (preenchido na cor escolhida) quando a variável está ligada — o
 /// operador vê o **estado real** lido do equipamento, não um estado que o
 /// celular imagina. Se o comando não pegar, o botão continua apagado.
+///
+/// **Retorno** (`feedbackTagId`, opcional): grava numa memória e acende pela
+/// outra — o padrão de IHM de mercado para "comando liga" × "motor ligado".
+/// Com retorno, o comando decide o que o toque faz (liga/desliga inverte o
+/// comando) e o retorno decide se acende. Comando ligado sem retorno aparece
+/// como **aguardando** (borda na cor + ampulheta): a máquina recebeu a ordem e
+/// ainda não confirmou — ou não vai confirmar (porta aberta, intertravamento).
 class ButtonElement extends StatefulWidget {
   const ButtonElement({super.key, required this.element});
   final HmiElement element;
@@ -121,6 +141,7 @@ class _ButtonElementState extends State<ButtonElement> {
         await WriteActions.write(context, tag: tag, value: v,
             description: 'Gravar ${TagCodec.format(tag, v)}? (atual: ${TagCodec.format(tag, r.value)})');
       case ButtonMode.momentary:
+      case ButtonMode.screen:
         break;
     }
   }
@@ -146,82 +167,140 @@ class _ButtonElementState extends State<ButtonElement> {
     await AppScope.of(context).runtime.release(tag.id);
   }
 
+  /// Rosto do botão. [pending] = comando ligado que a máquina ainda não
+  /// confirmou (só com retorno configurado).
+  Widget _face({required String label, required Color color, required bool lit, bool pending = false, Tag? tag, Widget? hint}) {
+    final fg = lit ? Ind.bg.withValues(alpha: 0.7) : Ind.textMuted;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      decoration: BoxDecoration(
+        color: lit ? color : Ind.surfaceHigher,
+        borderRadius: BorderRadius.circular(Ind.radius),
+        border: Border.all(color: lit || pending ? color : color.withValues(alpha: 0.4), width: pending ? 3 : 1.5),
+        boxShadow: lit ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 14)] : null,
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: FitText(label.toUpperCase(),
+                style: TextStyle(
+                  fontFamily: Ind.condensed,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                  letterSpacing: 0.5,
+                  color: lit ? Ind.bg : Ind.text,
+                )),
+          ),
+          // Só o essencial: o nome. O modo aparece apenas onde muda o
+          // gesto — pulso (segurar) ganha um ícone; "grava valor", o valor;
+          // "ir para tela", a seta; aguardando retorno, a ampulheta.
+          if (hint != null) ...[
+            const SizedBox(height: 4),
+            hint,
+          ] else if (pending) ...[
+            const SizedBox(height: 4),
+            Icon(Icons.hourglass_top_rounded, size: 16, color: color),
+          ] else if (mode == ButtonMode.momentary) ...[
+            const SizedBox(height: 4),
+            Icon(Icons.touch_app_outlined, size: 16, color: fg),
+          ] else if (mode == ButtonMode.value) ...[
+            const SizedBox(height: 4),
+            Text('= ${TagCodec.format(tag ?? _dummy, e.prop<num>('value', 0))}', style: Ind.tag(size: 11, color: fg)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// "Ir para tela": não depende de variável nem de comunicação, e funciona
+  /// também em tela só de acompanhamento (navegar não grava nada).
+  Widget _screenButton(BuildContext context, HmiScreenContext screen) {
+    final project = AppScope.watch(context).controller.project;
+    final target = e.props['goTo'] as String?;
+    final dest = target == null ? null : project.screen(target);
+    final color = StateColorMeta.fromName(e.prop<String>('color', 'blue'), StateColor.blue).color;
+    final label = e.prop<String>('label', dest?.name ?? 'Botão');
+    // Seta AO LADO do nome, não embaixo: botão de navegação costuma ser uma
+    // faixa de 1 linha, e empilhar os dois deixava o nome minúsculo.
+    final face = dest == null
+        ? _face(label: label, color: color, lit: false,
+            hint: const Text('ESCOLHA A TELA', style: TextStyle(color: Ind.accent, fontSize: 11, fontWeight: FontWeight.w700)))
+        : Container(
+            decoration: BoxDecoration(
+              color: Ind.surfaceHigher,
+              borderRadius: BorderRadius.circular(Ind.radius),
+              border: Border.all(color: color.withValues(alpha: 0.55), width: 1.5),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Flexible(
+                child: FitText(label.toUpperCase(),
+                    style: const TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 20, letterSpacing: 0.5, color: Ind.text)),
+              ),
+              const SizedBox(width: 10),
+              Icon(Icons.arrow_forward_rounded, size: 22, color: color),
+            ]),
+          );
+    final nav = screen.onNavigate;
+    if (screen.editMode || nav == null || target == null) return face;
+    return Semantics(button: true, child: GestureDetector(key: ValueKey('ir-${e.id}'), onTap: () => nav(target), child: face));
+  }
+
   @override
   Widget build(BuildContext context) {
     final screen = HmiScreenContext.of(context);
+    if (mode == ButtonMode.screen) return _screenButton(context, screen);
+    final feedbackId = mode.isBit ? e.props['feedbackTagId'] as String? : null;
     return TagBuilder(
       tagId: e.tagId,
-      builder: (context, tag, r) {
-        final color = StateColorMeta.fromName(e.prop<String>('color', 'green')).color;
-        final lit = mode == ButtonMode.value ? false : (r.value == true || _holding);
-        final label = e.prop<String>('label', tag?.name ?? 'Botão');
+      builder: (context, tag, r) => TagBuilder(
+        tagId: feedbackId,
+        builder: (context, fbTag, fb) => _build(context, screen, tag, r, fbTag, fb),
+      ),
+    );
+  }
 
-        final face = AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          decoration: BoxDecoration(
-            color: lit ? color : Ind.surfaceHigher,
-            borderRadius: BorderRadius.circular(Ind.radius),
-            border: Border.all(color: lit ? color : color.withValues(alpha: 0.4), width: 1.5),
-            boxShadow: lit ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 14)] : null,
-          ),
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: FitText(label.toUpperCase(),
-                    style: TextStyle(
-                      fontFamily: Ind.condensed,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20,
-                      letterSpacing: 0.5,
-                      color: lit ? Ind.bg : Ind.text,
-                    )),
-              ),
-              // Só o essencial: o nome. O modo aparece apenas onde muda o
-              // gesto — pulso (segurar) ganha um ícone; "grava valor", o valor.
-              if (mode == ButtonMode.momentary) ...[
-                const SizedBox(height: 4),
-                Icon(Icons.touch_app_outlined, size: 16, color: lit ? Ind.bg.withValues(alpha: 0.7) : Ind.textMuted),
-              ] else if (mode == ButtonMode.value) ...[
-                const SizedBox(height: 4),
-                Text('= ${TagCodec.format(tag ?? _dummy, e.prop<num>('value', 0))}',
-                    style: Ind.tag(size: 11, color: lit ? Ind.bg.withValues(alpha: 0.7) : Ind.textMuted)),
-              ],
-            ],
-          ),
-        );
+  Widget _build(BuildContext context, HmiScreenContext screen, Tag? tag, TagReading r, Tag? fbTag, TagReading fb) {
+    final color = StateColorMeta.fromName(e.prop<String>('color', 'green')).color;
+    final commanded = r.value == true || _holding;
+    // Com retorno, acende pelo que a máquina confirma; sem, pelo comando.
+    final hasFeedback = fbTag != null;
+    final lit = mode == ButtonMode.value ? false : (hasFeedback ? fb.value == true : commanded);
+    final pending = hasFeedback && commanded && fb.value != true && mode != ButtonMode.momentary;
+    final label = e.prop<String>('label', tag?.name ?? 'Botão');
 
-        if (tag == null || r.quality == TagQuality.addressError || r.quality == TagQuality.configError) {
-          return HmiFrame(label: '', tag: tag, reading: r, child: const SizedBox());
-        }
+    final face = _face(label: label, color: color, lit: lit, pending: pending, tag: tag);
 
-        Widget interactive;
-        if (screen.editMode) {
-          interactive = face;
-        } else if (screen.readOnly) {
-          // Toque numa tela só de acompanhamento explica por que nada
-          // aconteceu — silêncio parece defeito para quem opera.
-          interactive = GestureDetector(
-            onTap: () => WriteActions.toast(context, 'Esta tela é só de acompanhamento.'),
-            child: face,
-          );
-        } else if (mode == ButtonMode.momentary) {
-          interactive = Listener(
-            onPointerDown: (_) => _down(tag),
-            onPointerUp: (_) => _up(tag),
-            onPointerCancel: (_) => _up(tag),
-            child: face,
-          );
-        } else {
-          interactive = GestureDetector(onTap: () => _tap(tag, r), child: face);
-        }
+    if (tag == null || r.quality == TagQuality.addressError || r.quality == TagQuality.configError) {
+      return HmiFrame(label: '', tag: tag, reading: r, child: const SizedBox());
+    }
 
-        return Opacity(
-          opacity: r.quality == TagQuality.commLost ? 0.45 : 1,
-          child: Semantics(button: true, label: label, child: interactive),
-        );
-      },
+    Widget interactive;
+    if (screen.editMode) {
+      interactive = face;
+    } else if (screen.readOnly) {
+      // Toque numa tela só de acompanhamento explica por que nada
+      // aconteceu — silêncio parece defeito para quem opera.
+      interactive = GestureDetector(
+        onTap: () => WriteActions.toast(context, 'Esta tela é só de acompanhamento.'),
+        child: face,
+      );
+    } else if (mode == ButtonMode.momentary) {
+      interactive = Listener(
+        onPointerDown: (_) => _down(tag),
+        onPointerUp: (_) => _up(tag),
+        onPointerCancel: (_) => _up(tag),
+        child: face,
+      );
+    } else {
+      interactive = GestureDetector(onTap: () => _tap(tag, r), child: face);
+    }
+
+    return Opacity(
+      opacity: r.quality == TagQuality.commLost ? 0.45 : 1,
+      child: Semantics(button: true, label: label, child: interactive),
     );
   }
 

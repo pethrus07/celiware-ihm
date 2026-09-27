@@ -31,6 +31,7 @@ class DemoProject {
             int decimals = 0,
             int length = 1,
             int bit = 0,
+            double scale = 1,
             String description = ''}) =>
         Tag(
           id: id,
@@ -44,6 +45,7 @@ class DemoProject {
           decimals: decimals,
           length: length,
           bitIndex: bit,
+          scale: scale,
           description: description,
         );
 
@@ -70,6 +72,10 @@ class DemoProject {
       t('demo_codalarme', 'Código do alarme', hr, DemoMap.hrAlarmCode),
       t('demo_bit_ciclo', 'Em ciclo (bit da palavra)', hr, DemoMap.hrStatusWord, type: TagDataType.bool, bit: 0,
           description: 'Exemplo de bit dentro de registrador: HR 30, bit 0'),
+      t('demo_temp10', 'Temperatura (inteiro ÷ 10)', hr, DemoMap.hrMotorTempX10, unit: '°C', scale: 0.1, decimals: 1,
+          description: 'Exemplo de escala: o equipamento manda 352, a tela mostra 35,2 °C'),
+      t('demo_nome', 'Nome da máquina', hr, DemoMap.hrName, type: TagDataType.string, length: DemoMap.nameRegisters,
+          description: 'Exemplo de texto: 8 registradores, 2 letras em cada'),
     ];
 
     const statusStates = [
@@ -90,11 +96,13 @@ class DemoProject {
       elements: [
         e('op_status', ElementType.multistate, 0, 0, 3, 2, {'tagId': 'demo_status', 'label': 'Status', 'states': statusStates}),
         e('op_vel', ElementType.value, 3, 0, 3, 2, {'tagId': 'demo_vel', 'label': 'Velocidade'}),
-        e('op_liga', ElementType.button, 0, 2, 2, 2, {'tagId': 'demo_liga', 'label': 'Liga', 'mode': 'toggle', 'color': 'green'}),
+        // Retorno: grava em "Liga máquina" e acende por "Em ciclo" — com a
+        // porta aberta o botão fica aguardando, porque a máquina não partiu.
+        e('op_liga', ElementType.button, 0, 2, 2, 2, {'tagId': 'demo_liga', 'feedbackTagId': 'demo_bit_ciclo', 'label': 'Liga', 'mode': 'toggle', 'color': 'green'}),
         e('op_reset', ElementType.button, 2, 2, 2, 2, {'tagId': 'demo_reset', 'label': 'Reset', 'mode': 'momentary', 'color': 'amber'}),
         e('op_alarme', ElementType.lamp, 4, 2, 2, 2, {'tagId': 'demo_alarme', 'label': 'Alarme', 'onText': 'ATIVO', 'offText': 'OK', 'color': 'red'}),
         e('op_sp', ElementType.input, 0, 4, 3, 2, {'tagId': 'demo_sp', 'label': 'Ajuste de velocidade', 'min': 0, 'max': 150}),
-        e('op_prod', ElementType.value, 3, 4, 3, 2, {'tagId': 'demo_prod', 'label': 'Produção'}),
+        e('op_prod', ElementType.value, 3, 4, 3, 2, {'tagId': 'demo_prod', 'label': 'Produção', 'goTo': leaderScreenId}),
         e('op_temp', ElementType.gauge, 0, 6, 3, 3, {'tagId': 'demo_temp', 'label': 'Motor', 'min': 0, 'max': 100, 'warn': 75, 'alarm': 85}),
         e('op_porta', ElementType.lamp, 3, 6, 3, 1, {'tagId': 'demo_porta', 'label': 'Porta', 'onText': 'FECHADA', 'offText': 'ABERTA', 'color': 'green'}),
         e('op_faca', ElementType.lamp, 3, 7, 3, 1, {'tagId': 'demo_faca', 'label': 'Faca', 'onText': 'CORTANDO', 'offText': 'PARADA', 'color': 'green'}),
@@ -114,9 +122,11 @@ class DemoProject {
         e('li_status', ElementType.multistate, 0, 0, 3, 2, {'tagId': 'demo_status', 'label': 'Cortadora', 'states': statusStates}),
         e('li_vel', ElementType.value, 3, 0, 3, 2, {'tagId': 'demo_vel', 'label': 'Velocidade'}),
         e('li_prod', ElementType.value, 0, 2, 3, 2, {'tagId': 'demo_prod', 'label': 'Produção'}),
-        e('li_temp', ElementType.value, 3, 2, 3, 2, {'tagId': 'demo_temp', 'label': 'Motor'}),
+        e('li_temp', ElementType.value, 3, 2, 3, 2, {'tagId': 'demo_temp10', 'label': 'Motor'}),
         e('li_alarme', ElementType.lamp, 0, 4, 3, 1, {'tagId': 'demo_alarme', 'label': 'Alarme', 'onText': 'ATIVO', 'offText': 'OK', 'color': 'red'}),
         e('li_ciclo', ElementType.lamp, 3, 4, 3, 1, {'tagId': 'demo_bit_ciclo', 'label': 'Ciclo', 'onText': 'SIM', 'offText': 'NÃO', 'color': 'green'}),
+        e('li_nome', ElementType.value, 0, 5, 6, 1, {'tagId': 'demo_nome', 'label': 'Máquina'}),
+        e('li_ir', ElementType.button, 0, 6, 6, 1, {'label': 'Abrir a operação', 'mode': 'screen', 'goTo': operationScreenId, 'color': 'blue'}),
       ],
     );
 

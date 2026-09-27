@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/theme/app_theme.dart';
@@ -87,8 +90,10 @@ class ElementConfigSheet extends StatelessWidget {
     final w = <Widget>[];
     final tag = e.tagId == null ? null : project.tag(e.tagId!);
 
-    // ── Variável ──
-    if (info.fit != TagFit.none) {
+    final buttonMode = e.type == ElementType.button ? ButtonModeMeta.fromName(e.prop<String>('mode', 'toggle')) : null;
+
+    // ── Variável ── ("Ir para tela" não grava nada: não pede variável)
+    if (info.fit != TagFit.none && buttonMode != ButtonMode.screen) {
       if (info.multiTag) {
         w.add(const SectionHeader('Variáveis (até 3)', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
         w.add(_MultiTagPicker(project: project, selected: e.tagIds.toList(), onChanged: (ids) => set('tagIds', ids)));
@@ -125,7 +130,7 @@ class ElementConfigSheet extends StatelessWidget {
 
     switch (e.type) {
       case ElementType.button:
-        final mode = ButtonModeMeta.fromName(e.prop<String>('mode', 'toggle'));
+        final mode = buttonMode!;
         w.add(const SectionHeader('Como o botão age', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
         w.add(ChoiceCards<ButtonMode>(
           options: const [
@@ -134,16 +139,41 @@ class ElementConfigSheet extends StatelessWidget {
             ChoiceOption(value: ButtonMode.set, title: 'Só liga', icon: Icons.power_settings_new_rounded),
             ChoiceOption(value: ButtonMode.reset, title: 'Só desliga', icon: Icons.power_off_outlined),
             ChoiceOption(value: ButtonMode.value, title: 'Grava valor', icon: Icons.onetwothree_rounded),
+            ChoiceOption(value: ButtonMode.screen, title: 'Ir para tela', icon: Icons.arrow_forward_rounded),
           ],
           selected: mode,
           onChanged: (m) {
             var next = e.withProp('mode', m.name);
-            // Trocou entre modo de bit e modo numérico: a variável atual pode
-            // não servir mais — solta para o usuário escolher de novo.
-            if (tag != null && (m.needsNumber != mode.needsNumber)) next = next.withProp('tagId', null);
+            // Trocou entre modo de bit, numérico e "ir para tela": a variável
+            // atual pode não servir mais — solta para escolher de novo.
+            if (tag != null && (m.needsNumber != mode.needsNumber || !m.needsTag)) next = next.withProp('tagId', null);
+            if (!m.isBit) next = next.withProp('feedbackTagId', null);
+            if (!m.needsTag && next.props['label'] == tag?.name) next = next.withProp('label', '');
             save(next);
           },
         ));
+        if (mode == ButtonMode.screen) {
+          w.add(const SectionHeader('Abre a tela', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+          w.add(_ScreenPick(
+            project: project,
+            currentScreenId: screenId,
+            selected: e.props['goTo'] as String?,
+            onChanged: (id) {
+              var next = e.withProp('goTo', id);
+              final label = e.props['label'] as String?;
+              final old = project.screen(e.props['goTo'] as String? ?? '')?.name;
+              if (id != null && (label == null || label.isEmpty || label == old || label == 'Botão')) {
+                next = next.withProp('label', project.screen(id)?.name ?? '');
+              }
+              save(next);
+            },
+          ));
+          break;
+        }
+        if (mode.isBit) {
+          w.add(const SectionHeader('Retorno da máquina', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+          w.add(_FeedbackPick(project: project, selectedId: e.props['feedbackTagId'] as String?, commandId: tag?.id, onChanged: (id) => set('feedbackTagId', id)));
+        }
         if (mode == ButtonMode.value) {
           w.add(const SizedBox(height: 12));
           w.add(_NumProp(label: 'Valor gravado ao tocar', value: e.props['value'] as num?, onChanged: (v) => set('value', v)));
@@ -201,12 +231,35 @@ class ElementConfigSheet extends StatelessWidget {
             ChoiceChip(label: Text(t), selected: e.prop<String>('align', 'left') == v, onSelected: (_) => set('align', v)),
         ]));
       case ElementType.image:
+        final byValue = e.prop<String>('source', 'fixed') == 'byValue';
         w.add(const SizedBox(height: 12));
-        w.add(FilledButton.icon(
-          onPressed: () => _pickImage(context, set),
-          icon: const Icon(Icons.photo_library_outlined),
-          label: Text(e.props['data'] == null ? 'Escolher imagem' : 'Trocar imagem'),
+        w.add(ChoiceCards<bool>(
+          options: const [
+            ChoiceOption(value: false, title: 'Fixa', subtitle: 'Foto, esquema, logotipo', icon: Icons.image_outlined),
+            ChoiceOption(value: true, title: 'Muda com a variável', subtitle: 'Uma imagem por etapa', icon: Icons.burst_mode_outlined),
+          ],
+          selected: byValue,
+          onChanged: (v) => set('source', v ? 'byValue' : 'fixed'),
         ));
+        if (byValue) {
+          w.add(const SectionHeader('Variável da etapa', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+          w.add(_TagPicker(project: project, fit: TagFit.scalar, selected: tag, onChanged: (t) => set('tagId', t.id)));
+          w.add(const SectionHeader('Imagens', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+          w.add(const Text('Quando a variável vale o código, a tela mostra a imagem dele. Um PDF vira uma imagem por página: página 1 = código 1.',
+              style: TextStyle(color: Ind.textDim, height: 1.35)));
+          w.add(const SizedBox(height: 12));
+          w.add(_ImagesEditor(
+            images: [for (final i in (e.props['images'] as List? ?? const [])) if (i is Map) Map<String, dynamic>.from(i)],
+            onChanged: (v) => set('images', v),
+          ));
+        } else {
+          w.add(const SizedBox(height: 16));
+          w.add(FilledButton.icon(
+            onPressed: () => _pickImage(context, set),
+            icon: const Icon(Icons.photo_library_outlined),
+            label: Text(e.props['data'] == null ? 'Escolher imagem' : 'Trocar imagem'),
+          ));
+        }
         w.add(const SizedBox(height: 12));
         w.add(Wrap(spacing: 8, children: [
           for (final (v, t) in [('contain', 'Mostrar inteira'), ('cover', 'Preencher o espaço')])
@@ -218,10 +271,22 @@ class ElementConfigSheet extends StatelessWidget {
         break;
     }
 
-    if (tag != null && info.writes && !tag.canWrite) {
+    if (tag != null && info.writes && !tag.canWrite && buttonMode != ButtonMode.screen) {
       w.add(const SizedBox(height: 16));
       w.add(_Hint(icon: Icons.lock_outline_rounded, color: Ind.warn,
           text: '"${tag.name}" está como só leitura. Para este elemento gravar, abra a variável e marque "Pode ser alterada pela tela".'));
+    }
+
+    // ── Ao tocar, abrir tela ── (botão e ajuste: o toque já grava)
+    if (e.type != ElementType.button && e.type != ElementType.input && project.screens.length > 1) {
+      w.add(const SectionHeader('Ao tocar, abrir a tela', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+      w.add(_ScreenPick(
+        project: project,
+        currentScreenId: screenId,
+        selected: e.props['goTo'] as String?,
+        allowNone: true,
+        onChanged: (id) => set('goTo', id),
+      ));
     }
     return w;
   }
@@ -607,6 +672,227 @@ class _StatesEditor extends StatelessWidget {
           label: const Text('Acrescentar estado'),
         ),
       ),
+    ]);
+  }
+}
+
+/// Escolha de uma das outras telas do projeto.
+class _ScreenPick extends StatelessWidget {
+  const _ScreenPick({required this.project, required this.currentScreenId, required this.selected, required this.onChanged, this.allowNone = false});
+  final Project project;
+  final String currentScreenId;
+  final String? selected;
+  final bool allowNone;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final others = project.screens.where((s) => s.id != currentScreenId).toList();
+    if (others.isEmpty) {
+      return const _Hint(icon: Icons.info_outline_rounded, color: Ind.info, text: 'Crie outra tela para este botão abrir.');
+    }
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      if (allowNone) ChoiceChip(label: const Text('Nada'), selected: selected == null, onSelected: (_) => onChanged(null)),
+      for (final s in others)
+        ChoiceChip(key: ValueKey('tela-${s.id}'), label: Text(s.name), selected: selected == s.id, onSelected: (_) => onChanged(s.id)),
+    ]);
+  }
+}
+
+/// Retorno do botão: por padrão acende pela própria variável do comando; com
+/// retorno, acende pelo que a máquina confirma.
+class _FeedbackPick extends StatelessWidget {
+  const _FeedbackPick({required this.project, required this.selectedId, required this.commandId, required this.onChanged});
+  final Project project;
+  final String? selectedId;
+  final String? commandId;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = selectedId == null ? null : project.tag(selectedId!);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(
+        t == null
+            ? 'O botão acende pela própria variável do comando.'
+            : 'O botão grava no comando e só acende quando "${t.name}" confirmar. Comando sem confirmação aparece como aguardando.',
+        style: const TextStyle(color: Ind.textDim, height: 1.35),
+      ),
+      const SizedBox(height: 10),
+      Material(
+        color: Ind.surfaceHigh,
+        borderRadius: BorderRadius.circular(Ind.radiusSmall),
+        child: InkWell(
+          key: const ValueKey('escolher-retorno'),
+          borderRadius: BorderRadius.circular(Ind.radiusSmall),
+          onTap: () async {
+            final picked = await _TagChooser.show(context, fit: TagFit.boolean, needsWritable: false, selectedId: selectedId);
+            if (picked != null) onChanged(picked.id == commandId ? null : picked.id);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            child: Row(children: [
+              const Icon(Icons.keyboard_return_rounded, color: Ind.textDim),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(t == null ? 'Mesma variável do comando' : t.name,
+                    style: TextStyle(fontWeight: FontWeight.w600, color: t == null ? Ind.textDim : Ind.text)),
+              ),
+              if (t != null)
+                IconButton(tooltip: 'Usar a mesma do comando', onPressed: () => onChanged(null), icon: const Icon(Icons.close_rounded, color: Ind.textMuted))
+              else
+                const Icon(Icons.chevron_right_rounded, color: Ind.textMuted),
+            ]),
+          ),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// Lista "código → imagem" da imagem por etapa, com importação de fotos
+/// (várias de uma vez) e de PDF (uma imagem por página).
+class _ImagesEditor extends StatefulWidget {
+  const _ImagesEditor({required this.images, required this.onChanged});
+  final List<Map<String, dynamic>> images;
+  final ValueChanged<List<Map<String, dynamic>>> onChanged;
+
+  /// Acima disso o arquivo do projeto passa de ~10 MB e vai mal por WhatsApp.
+  static const maxPages = 40;
+
+  @override
+  State<_ImagesEditor> createState() => _ImagesEditorState();
+}
+
+class _ImagesEditorState extends State<_ImagesEditor> {
+  bool _busy = false;
+  String _progress = '';
+
+  List<Map<String, dynamic>> get _images => widget.images;
+
+  int get _nextCode => _images.isEmpty ? 1 : _images.map((s) => (s['value'] as num?)?.toInt() ?? 0).reduce((a, b) => a > b ? a : b) + 1;
+
+  void _update(int i, String k, Object? v) {
+    final next = [for (final s in _images) Map<String, dynamic>.of(s)];
+    next[i][k] = v;
+    widget.onChanged(next);
+  }
+
+  Future<void> _addImages() async {
+    try {
+      // pickFiles (file_picker 13) já aceita várias; pickFile é o de uma só.
+      final files = await FilePicker.pickFiles(type: FileType.image);
+      if (files.isEmpty) return;
+      setState(() => _busy = true);
+      var code = _nextCode;
+      final added = <Map<String, dynamic>>[];
+      for (final f in files) {
+        setState(() => _progress = 'Preparando imagem ${added.length + 1} de ${files.length}…');
+        added.add({'value': code++, 'data': await shrinkToBase64Png(await f.readAsBytes(), maxSide: 1200)});
+      }
+      widget.onChanged([..._images, ...added]);
+    } catch (_) {
+      if (mounted) WriteActions.toast(context, 'Não consegui abrir as imagens.', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// PDF → uma imagem por página, na ordem, com código = número da página.
+  /// A página é desenhada pelo próprio Android (pacote printing); a tela não
+  /// precisa de leitor de PDF, e o projeto continua um arquivo só.
+  Future<void> _importPdf() async {
+    try {
+      final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf']);
+      if (files.isEmpty) return;
+      final bytes = await files.first.readAsBytes();
+      setState(() {
+        _busy = true;
+        _progress = 'Abrindo o PDF…';
+      });
+      final pages = <Map<String, dynamic>>[];
+      var truncated = false;
+      await for (final page in Printing.raster(bytes, dpi: 110)) {
+        if (pages.length >= _ImagesEditor.maxPages) {
+          truncated = true;
+          break;
+        }
+        if (mounted) setState(() => _progress = 'Página ${pages.length + 1}…');
+        pages.add({'value': pages.length + 1, 'data': await shrinkToBase64Png(await page.toPng(), maxSide: 1200)});
+      }
+      if (pages.isEmpty) throw const FormatException('PDF sem páginas');
+      // PDF substitui a lista: página N = código N só vale se a lista for a do PDF.
+      widget.onChanged(pages);
+      if (mounted) {
+        WriteActions.toast(context, truncated
+            ? 'Importei as ${_ImagesEditor.maxPages} primeiras páginas (limite para o projeto não ficar pesado).'
+            : '${pages.length} páginas importadas.');
+      }
+    } catch (_) {
+      if (mounted) WriteActions.toast(context, 'Não consegui abrir o PDF.', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _images.fold<int>(0, (n, s) => n + ((s['data'] as String?)?.length ?? 0));
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (var i = 0; i < _images.length; i++)
+        Padding(
+          key: ValueKey('imagem-$i-${_images.length}'),
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 56,
+                height: 56,
+                color: Ind.bg,
+                child: _images[i]['data'] is String
+                    ? Image.memory(base64Decode(_images[i]['data'] as String), fit: BoxFit.cover, gaplessPlayback: true)
+                    : const Icon(Icons.image_not_supported_outlined, color: Ind.textMuted),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 90,
+              child: TextFormField(
+                initialValue: '${_images[i]['value'] ?? ''}',
+                keyboardType: TextInputType.number,
+                style: Ind.number(16),
+                decoration: const InputDecoration(labelText: 'Código'),
+                onChanged: (t) => _update(i, 'value', int.tryParse(t.trim())),
+              ),
+            ),
+            const Spacer(),
+            IconButton(
+              tooltip: 'Tirar imagem',
+              onPressed: () => widget.onChanged([..._images]..removeAt(i)),
+              icon: const Icon(Icons.close_rounded, color: Ind.textMuted),
+            ),
+          ]),
+        ),
+      if (_busy)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(children: [
+            const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4)),
+            const SizedBox(width: 12),
+            Text(_progress, style: const TextStyle(color: Ind.textDim)),
+          ]),
+        )
+      else
+        Wrap(spacing: 10, runSpacing: 10, children: [
+          FilledButton.tonalIcon(onPressed: _addImages, icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text('Acrescentar imagens')),
+          FilledButton.tonalIcon(onPressed: _importPdf, icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('Importar PDF')),
+        ]),
+      if (_images.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text('${_images.length} ${_images.length == 1 ? 'imagem' : 'imagens'} · ${(bytes * 0.75 / 1048576).toStringAsFixed(1).replaceAll('.', ',')} MB no projeto',
+            style: const TextStyle(color: Ind.textMuted, fontSize: 12.5)),
+      ],
     ]);
   }
 }

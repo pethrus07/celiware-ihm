@@ -70,6 +70,9 @@ class HmiElement {
   Iterable<String> get tagIds sync* {
     final main = props['tagId'];
     if (main is String) yield main;
+    // Retorno do botão: a memória que confirma o comando.
+    final feedback = props['feedbackTagId'];
+    if (feedback is String) yield feedback;
     final many = props['tagIds'];
     if (many is List) yield* many.whereType<String>();
   }

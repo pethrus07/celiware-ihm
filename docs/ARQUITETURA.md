@@ -30,6 +30,16 @@ Combinado na reunião de 24/09/2026 (Pedro × cliente):
 
 Fora da versão 1.0, registrado como ideia: conversões/script de variável calculada, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 
+**Versão 1.1** — recursos básicos de IHM que o cliente cobrou depois de ver o vídeo (áudios de 26 e 27/09/2026):
+
+- **escala** na variável (fator e soma): o equipamento manda 752, a tela mostra 75,2 °C, e gravar 75,2 manda 752;
+- **texto ASCII**: nome da máquina, receita, lote — memória inicial + tamanho, 2 letras por registrador;
+- **botão com retorno**: grava numa memória e acende pela outra, com o estado "aguardando" quando a máquina não confirma;
+- **troca de tela**: botão "Ir para tela" e, em qualquer mostrador, "ao tocar, abrir a tela";
+- **imagem por etapa**: uma imagem por código da variável, inclusive um PDF importado (página N = código N).
+
+Script livre (JavaScript) na variável ficou de fora de propósito: a escala linear cobre os casos de manual, e uma fórmula qualquer não tem conta inversa — o botão e o ajuste não conseguiriam gravar.
+
 ### 1.3. Princípios que guiaram o projeto
 
 - **Fácil e visual antes de tudo.** Escolhas em cartões, valor lido ao vivo enquanto se configura, tutorial em cada tela, nenhum jargão sem tradução.
@@ -48,6 +58,7 @@ Fora da versão 1.0, registrado como ideia: conversões/script de variável calc
 | Comunicação industrial | Modbus TCP/IP sobre socket TCP cru, sem biblioteca Modbus externa. |
 | Persistência | JSON num arquivo na pasta privada do app (`path_provider`). |
 | Arquivos | Exportar/importar projeto e escolher imagem (`file_picker`). |
+| PDF | Página de PDF → imagem, para a imagem por etapa (`printing`, que usa o renderizador do próprio Android). |
 | Marcas por aparelho | "Tutorial já visto" (`shared_preferences`). |
 | Logs | `logging`. |
 | Estado | `ValueNotifier` / `ChangeNotifier` / `InheritedNotifier` — sem biblioteca de estado. |
@@ -239,9 +250,23 @@ Sem resposta ou sem conexão, todas as variáveis do equipamento ficam "comunica
 
 Cuidado com bit dentro de registrador: se o programa do CLP mudar outro bit da mesma palavra entre a leitura e a escrita, essa mudança se perde. Para comando crítico, prefira coil.
 
+Variável com escala: o codec desfaz a conta antes de montar os registradores — bruto = (valor − soma) ÷ fator. Em registrador inteiro, valor que não cai num passo da escala é recusado ("aceita passos de 0,1"), com tolerância para o erro de ponto flutuante (75,2 ÷ 0,1 = 751,9999…). As mensagens de faixa usam a unidade da tela ("aceita de 0,0 a 6553,5"), nunca o número cru. Texto é só leitura nesta versão.
+
+### 4.12. Escala e texto
+
+**Escala.** Muitos equipamentos mandam número sem vírgula e o manual diz "divida por 10". A conta é da variável, não do elemento: valor = bruto × `scale` + `offset`. Assim o medidor, a barra, o gráfico, as faixas de alarme e os limites do ajuste trabalham todos na unidade de engenharia, e a mesma variável aparece igual em qualquer elemento. As casas decimais saem da escala quando ninguém pediu (÷ 10 → 1 casa; sem isso, 75,2 apareceria arredondado para 75). O painel "Lendo agora" mostra os dois números — "75,2 °C" e "vem 752 do equipamento" — que é a prova de que a conta está certa.
+
+**Texto.** `length` registradores seguidos, 2 letras em cada (byte alto primeiro; com a ordem "bytes trocados", o baixo). Para no primeiro byte zero — o resto do campo costuma vir zerado — e corta espaços do fim. Byte fora do ASCII visível aparece como "?" em vez de sumir calado. É um valor só, não uma lista: vai no mostrador.
+
 ### 4.11. Botão de pulso
 
 `press` grava 1 e `release` grava 0. Se a soltura falhar (rede caiu com o dedo no botão), a variável entra numa fila e o runtime tenta gravar 0 a cada segundo até conseguir. Todos os botões são soltos ao fechar a tela, quando o elemento sai da árvore e quando o app vai para segundo plano. Pulso não pede confirmação: "tem certeza?" quebraria o gesto de segurar.
+
+### 4.13. Botão com retorno
+
+Padrão de IHM de mercado: "comando liga" numa memória, "motor ligado" em outra. Com `feedbackTagId`, o comando decide o que o toque faz (liga/desliga inverte o **comando**) e o retorno decide se o botão acende. Comando ligado sem retorno aparece como **aguardando** — borda grossa na cor do botão e ampulheta: a máquina recebeu a ordem e não partiu (porta aberta, intertravamento, emergência). Sem retorno, o botão acende pela própria variável do comando, como na 1.0.
+
+Por que o toque segue o comando e não o retorno: se seguisse o retorno, com a máquina travada o operador tocaria "desligar" e o app gravaria "ligar" de novo no comando que já estava ligado — o botão nunca desligaria.
 
 ## 5. Modelo de dados
 
@@ -260,14 +285,15 @@ Cuidado com bit dentro de registrador: se o programa do CLP mudar outro bit da m
 |---|---|
 | area | coil, discreteInput, holdingRegister, inputRegister. |
 | address | Endereço base 0. |
-| dataType | bool, uint16, int16, uint32, int32, float32. |
+| dataType | bool, uint16, int16, uint32, int32, float32, string. |
 | byteOrder | abcd, cdab, badc, dcba. |
 | bitIndex | Para liga/desliga dentro de registrador: bit 0 a 15. |
-| length | Quantos valores seguidos. Maior que 1 = lista ("memória inicial + tamanho"). |
-| writable | Pode ser alterada pela tela (nunca em área só-leitura). |
+| length | Quantos valores seguidos. Maior que 1 = lista ("memória inicial + tamanho"). Em texto, quantos registradores (2 letras cada). |
+| writable | Pode ser alterada pela tela (nunca em área só-leitura; nunca em texto nesta versão). |
 | unit, decimals | Apresentação: "°C", 1 casa decimal. |
+| scale, offset | Escala linear: valor = bruto × scale + offset (padrão 1 e 0; só vão para o arquivo quando diferentes). |
 
-`Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura tira a escrita).
+`Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura e texto tiram a escrita; escala zero volta a 1).
 
 ### 5.3. Tela e elemento
 
@@ -275,7 +301,7 @@ A tela é uma grade de **6 colunas de células quadradas**; a célula mede largu
 
 | Tipo | Propriedades |
 |---|---|
-| button | tagId, label, mode (toggle · momentary · set · reset · value), value, color |
+| button | tagId, label, mode (toggle · momentary · set · reset · value · screen), value, color, feedbackTagId (retorno), goTo (modo screen) |
 | lamp | tagId, label, onText, offText, color |
 | value | tagId, label |
 | input | tagId, label, min, max |
@@ -285,7 +311,11 @@ A tela é uma grade de **6 colunas de células quadradas**; a célula mede largu
 | trend | tagIds (até 3), label, windowSec, min, max (vazios = escala automática) |
 | barChart | tagId (variável lista), label |
 | label | text, size (s · m · l), align (left · center) |
-| image | data (PNG em base64, reduzido a 900 px), fit (contain · cover) |
+| image | data (PNG em base64, reduzido a 900 px), fit (contain · cover), source (fixed · byValue), tagId + images: lista de {value, data} (modo byValue, reduzidas a 1200 px) |
+
+Em qualquer elemento menos botão e ajuste de valor, `goTo` é a tela que abre ao tocar (nos dois o toque já grava; o botão tem o próprio modo "Ir para tela"). Trocar de tela **substitui** a atual, como numa IHM de painel: só a tela à vista é lida e o "voltar" leva à lista de telas.
+
+A imagem por etapa é o "multiestado de imagem" das IHMs de mercado: o CLP põe o número da etapa numa memória e a tela mostra como fazer aquela etapa. Um PDF importado vira uma imagem por página (desenhada pelo próprio Android, pacote `printing`), com código = número da página, até 40 páginas. As imagens moram dentro do arquivo do projeto, como a imagem fixa: exportar leva tudo junto. O editor mostra quanto o conjunto pesa ("12 imagens · 3,4 MB no projeto"). Código sem imagem mostra a imagem fixa, se houver, ou "SEM IMAGEM PARA O CÓDIGO n" — nunca uma área em branco que parece defeito.
 
 `color` é o nome de uma cor de estado (green, red, amber, blue, neutral). Tipos e chaves desconhecidos — arquivo de uma versão mais nova — são preservados ao salvar, nunca apagados.
 
@@ -330,6 +360,8 @@ Grade pontilhada; "+ Elemento" abre a paleta (ícone, nome e uma frase curta). O
 
 Prévia ao vivo no topo, na proporção real. A variável aparece numa linha só; tocar abre uma folha com as variáveis compatíveis (cada uma com o valor atual) e "Criar variável" sem sair do editor. Campos só do que faz sentido para o tipo (modo do botão, cores de estado, limites, estados do indicador, janela do gráfico, texto, imagem). Aviso quando a variável escolhida é só leitura num elemento que grava.
 
+Botão: seis modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira o nome dela) e, nos modos liga/desliga, **Retorno da máquina** — por padrão "Mesma variável do comando", tocar escolhe outra. Imagem: **Fixa** ou **Muda com a variável**; no segundo, a variável da etapa e a lista código → imagem, com "Acrescentar imagens" (várias de uma vez) e "Importar PDF". Demais elementos: **Ao tocar, abrir a tela** (Nada ou uma das telas), só quando o projeto tem mais de uma tela.
+
 ![Editor com elemento selecionado](imagens/editor.png)
 ![Configuração do elemento](imagens/configurar-elemento.png)
 
@@ -339,7 +371,7 @@ Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à
 
 ### 6.6. Variáveis
 
-Lista agrupada por equipamento: nome, endereço e o valor ao vivo. O cadastro cabe numa tela: equipamento (só aparece se houver mais de um), nome, o que é (liga/desliga, número inteiro, número com vírgula), onde fica (lê e grava / só leitura), endereço com − / + e "pode ser alterada pela tela". Unidade, decimais, lista, formatos raros (INT16, 32 bits), ordem de bytes e observação ficam em "Mais opções", que abre sozinho quando algum deles está em uso. No topo, **Lendo agora do equipamento**: o endereço digitado é lido a cada segundo, pela mesma conexão da varredura.
+Lista agrupada por equipamento: nome, endereço e o valor ao vivo. O cadastro cabe numa tela: equipamento (só aparece se houver mais de um), nome, o que é (liga/desliga, número inteiro, número com vírgula), onde fica (lê e grava / só leitura), endereço com − / + e "pode ser alterada pela tela". Escala, unidade, decimais, lista, formatos raros (INT16, 32 bits, texto), ordem de bytes e observação ficam em "Mais opções", que abre sozinho quando algum deles está em uso; fechado, o resumo mostra o que está valendo ("÷ 10 · °C · 1 decimais"). A escala tem atalhos — Sem escala, ÷ 10, ÷ 100, ÷ 1000, × 10 — e "Outra", que abre fator e soma. Escolher ÷ 100 já acerta as casas decimais para 2. Texto mostra à vista o tamanho em registradores ("8 = até 16 letras"). No topo, **Lendo agora do equipamento**: o endereço digitado é lido a cada segundo, pela mesma conexão da varredura.
 
 ![Endereço inexistente + notação de manual](imagens/notacao-manual.png)
 ![Endereço corrigido, lendo ao vivo](imagens/variavel-lendo-agora.png)
@@ -474,10 +506,10 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 |---|---|
 | `test/core/modbus_pdu_test.dart` | Montagem de pedidos, limites, respostas de exceção, lógica do escravo. |
 | `test/core/modbus_client_tcp_test.dart` | Cliente TCP real × escravo Dart por socket: leitura/escrita, endereço inexistente, 50 pedidos paralelos, timeout, queda e reconexão, desconexão manual, IP morto. |
-| `test/runtime/tag_codec_test.dart` | 4 ordens de 32 bits, float, sinal, bit em registrador, listas, faixa, vírgula brasileira, formatação. |
+| `test/runtime/tag_codec_test.dart` | 4 ordens de 32 bits, float, sinal, bit em registrador, listas, faixa, vírgula brasileira, formatação; escala ida e volta (÷ 10, deslocamento 4–20 mA, lista), passo e faixa na unidade da tela, casas implícitas, JSON; texto ASCII (zero final, bytes trocados, caractere inválido, só leitura). |
 | `test/runtime/scan_planner_test.dart` | Agrupamento, buracos, limite de 125, áreas separadas, isolamento. |
 | `test/runtime/hmi_runtime_test.dart` | Inscrição, isolamento do endereço errado, escrita, queda com último valor, soltura insistente do pulso, variável apagada. |
-| `test/widgets/app_flow_test.dart` | Primeira abertura, valores ao vivo, botão com confirmação ligando a máquina, tela só acompanhamento, editor com paleta, escolha de variável e configuração. |
+| `test/widgets/app_flow_test.dart` | Primeira abertura, valores ao vivo, botão com confirmação ligando a máquina, tela só acompanhamento, editor com paleta, escolha de variável e configuração; escala e texto na tela do líder, troca de tela pelo botão e pelo mostrador, botão com retorno aguardando com a porta aberta. |
 | `test/widgets/tour_test.dart` | Tutorial aparece na primeira visita, "já vi" com versão na chave, rearme por versão nova, "voltar" fecha o tutorial e não a página. |
 
 Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstração e animações avançam por passos, sem depender da velocidade da máquina. Toque que não acerta o alvo é falha, não aviso (`hitTestWarningShouldBeFatal`). Eles já pegaram seis defeitos reais antes do aparelho: quatro transbordos de layout (cartão de tela, legenda do gráfico, lâmpada estreita em dois tamanhos), leitura publicando depois do encerramento e toque sem retorno em tela só acompanhamento.
@@ -487,4 +519,5 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Etapa 3 — Play Store:** conta de desenvolvedor da Celiware, chave de upload, ficha da loja. Roteiro em `docs/PUBLICACAO.md`.
 - **Perfil Inovance:** tradução de nomes de memória em endereço (10.2), validada no equipamento real.
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
-- **Ideias registradas:** variável calculada/script, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
+- **Ideias registradas:** variável calculada/script (só se aparecer caso que a escala linear não cobre), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
+- **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.

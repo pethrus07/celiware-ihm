@@ -71,6 +71,77 @@ void main() {
     expect(TagCodec.format(tag, null), '---');
   });
 
+  group('escala (valor = bruto × fator + soma)', () {
+    const temp = Tag(id: 's', name: 'Temp', deviceId: 'd', scale: 0.1, unit: '°C', writable: true);
+
+    test('÷10: lê 752 como 75,2 e grava 75,2 como 752', () {
+      expect(TagCodec.decodeRegisters(temp, [752]), closeTo(75.2, 1e-9));
+      expect(TagCodec.encodeRegisters(temp, 75.2), [752]); // 75,2 ÷ 0,1 = 751,999… → 752
+    });
+
+    test('casas decimais saem da escala quando ninguém pediu', () {
+      expect(temp.displayDecimals, 1);
+      expect(TagCodec.format(temp, 75.2), '75,2 °C');
+      expect(const Tag(id: 'c', name: 'c', deviceId: 'd', scale: 0.01).displayDecimals, 2);
+      expect(const Tag(id: 'c', name: 'c', deviceId: 'd', scale: 10).displayDecimals, 0);
+    });
+
+    test('mensagens falam na unidade da tela, não no número cru', () {
+      expect(() => TagCodec.encodeRegisters(temp, 75.25),
+          throwsA(isA<TagValueError>().having((e) => e.message, 'msg', contains('passos de 0,1'))));
+      expect(() => TagCodec.encodeRegisters(temp, 7000),
+          throwsA(isA<TagValueError>().having((e) => e.message, 'msg', contains('0,0 a 6553,5'))));
+    });
+
+    test('deslocamento: 4–20 mA em 0..1000 virando -50..150 °C', () {
+      const t = Tag(id: 'o', name: 'Sonda', deviceId: 'd', scale: 0.2, offset: -50, writable: true);
+      expect(TagCodec.decodeRegisters(t, [0]), closeTo(-50, 1e-9));
+      expect(TagCodec.decodeRegisters(t, [1000]), closeTo(150, 1e-9));
+      expect(TagCodec.encodeRegisters(t, 25), [375]);
+    });
+
+    test('lista escalada: cada valor passa pela conta', () {
+      const t = Tag(id: 'l', name: 'Lista', deviceId: 'd', length: 3, scale: 0.5);
+      expect(TagCodec.decodeRegisters(t, [2, 4, 6]), [1.0, 2.0, 3.0]);
+    });
+
+    test('JSON guarda a escala e arquivo sem escala continua igual', () {
+      expect(Tag.fromJson(temp.toJson()).scale, 0.1);
+      expect(const Tag(id: 'x', name: 'x', deviceId: 'd').toJson().containsKey('scale'), isFalse);
+      expect(Tag.fromJson(const Tag(id: 'x', name: 'x', deviceId: 'd').toJson()).scale, 1);
+    });
+
+    test('escala zero é corrigida (apagaria o valor)', () {
+      expect(const Tag(id: 'z', name: 'z', deviceId: 'd', scale: 0).normalized().scale, 1);
+    });
+  });
+
+  group('texto ASCII', () {
+    const name = Tag(id: 'n', name: 'Nome', deviceId: 'd', dataType: TagDataType.string, length: 4);
+
+    test('2 letras por registrador, para no primeiro zero', () {
+      // "CORT" "A" + zeros
+      expect(TagCodec.decodeRegisters(name, [0x434F, 0x5254, 0x4100, 0x0000]), 'CORTA');
+    });
+
+    test('bytes trocados (byte baixo primeiro)', () {
+      const t = Tag(id: 'n', name: 'Nome', deviceId: 'd', dataType: TagDataType.string, length: 2, byteOrder: ByteOrder.badc);
+      expect(TagCodec.decodeRegisters(t, [0x4F43, 0x5452]), 'CORT');
+    });
+
+    test('é um valor só (não lista), ocupa length registradores e é só leitura', () {
+      expect(name.isArray, isFalse);
+      expect(name.span, 4);
+      expect(name.addressLabel, 'HR 0..3');
+      expect(name.copyWith(writable: true).normalized().writable, isFalse);
+      expect(() => TagCodec.encodeRegisters(name, 1), throwsA(isA<TagValueError>()));
+    });
+
+    test('byte fora do ASCII visível vira "?" em vez de sumir', () {
+      expect(TagCodec.decodeRegisters(name, [0x41FF, 0x4200, 0, 0]), 'A?B');
+    });
+  });
+
   test('normalized() corrige combinações impossíveis', () {
     const t = Tag(id: 'x', name: 'x', deviceId: 'd', area: ModbusArea.discreteInput, dataType: TagDataType.uint16, writable: true);
     final n = t.normalized();

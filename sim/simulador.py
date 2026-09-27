@@ -54,6 +54,8 @@ DI_DOOR, DI_EMERGENCY, DI_PAPER = 0, 1, 2
 HR_STATUS, HR_SETPOINT, HR_SPEED, HR_PRODUCTION = 0, 1, 2, 3  # produção: UINT32 em 3..4
 HR_LENGTH, HR_TEMP, HR_TENSION, HR_HOURLY = 5, 6, 8, 10  # temp: FLOAT32 em 6..7; hora: 10..17
 HR_ALARM_CODE, HR_STATUS_WORD = 20, 30
+HR_TEMP_X10 = 9  # UINT16, °C × 10 (352 = 35,2 °C): exemplo de escala ÷ 10
+HR_NAME, NAME_REGS, MACHINE_NAME = 40, 8, "CORTADORA R1"  # texto ASCII, 2 letras por registrador
 IR_UPTIME = 0
 TEMP_ALARM, TEMP_RESET = 85.0, 80.0
 
@@ -99,6 +101,8 @@ class Cortadora:
         self.set(HR, HR_LENGTH, [120])
         self.set(DI, DI_DOOR, [1, 1, 1])  # porta fechada, emergência ok, papel
         self.set(HR, HR_HOURLY, [random.randint(2300, 2900) for _ in range(7)] + [0])
+        nome = MACHINE_NAME.encode("ascii").ljust(NAME_REGS * 2, b"\0")
+        self.set(HR, HR_NAME, [(nome[2 * i] << 8) | nome[2 * i + 1] for i in range(NAME_REGS)])
         self.write_outputs(False, False, True)
 
     def step(self, dt: float) -> None:
@@ -152,6 +156,7 @@ class Cortadora:
         self.set(HR, HR_PRODUCTION, [(prod >> 16) & 0xFFFF, prod & 0xFFFF])
         self.set(HR, HR_TEMP, [temp_hi, temp_lo])
         self.set(HR, HR_TENSION, [max(0, min(100, int(round(self.tension))))])
+        self.set(HR, HR_TEMP_X10, [max(0, min(0xFFFF, int(round(self.temp * 10))))])
         self.set(HR, HR_STATUS_WORD, [(1 if in_cycle else 0) | (2 if alarm else 0) | (4 if door else 0)])
         self.set(IR, IR_UPTIME, [int(self.uptime // 60)])
         knife = in_cycle and self.speed > 1 and (self.ticks // 2) % 2 == 0

@@ -30,13 +30,40 @@ class TagCodec {
   }
 
   /// [regs] = exatamente [Tag.span] registradores, a partir de [Tag.address].
+  ///
+  /// Número volta **já na escala** da variável ([Tag.scale]/[Tag.offset]).
   static Object decodeRegisters(Tag tag, List<int> regs) {
+    if (tag.isText) return decodeText(tag, regs);
     final n = tag.dataType.registerCount;
     final values = [
       for (var i = 0; i < tag.length; i++)
-        _decodeOne(tag, regs.sublist(i * n, i * n + n)),
+        _scaled(tag, _decodeOne(tag, regs.sublist(i * n, i * n + n))),
     ];
     return tag.length == 1 ? values.first : values;
+  }
+
+  /// Registradores → texto ASCII, 2 letras por registrador (byte alto
+  /// primeiro; com bytes trocados, o baixo). Para no primeiro zero — o resto
+  /// do campo costuma vir preenchido com 0 — e corta espaços do fim.
+  /// Byte fora do ASCII visível vira "?" em vez de sumir calado.
+  static String decodeText(Tag tag, List<int> regs) {
+    final buf = StringBuffer();
+    outer:
+    for (final raw in regs.take(tag.length)) {
+      final w = _word16(raw, tag.byteOrder);
+      for (final b in [(w >> 8) & 0xFF, w & 0xFF]) {
+        if (b == 0) break outer;
+        buf.writeCharCode(b >= 0x20 && b < 0x7F ? b : 0x3F);
+      }
+    }
+    return buf.toString().trimRight();
+  }
+
+  /// Bruto → unidade de engenharia. Sem escala, devolve o próprio valor
+  /// (inteiro continua inteiro).
+  static Object _scaled(Tag tag, Object raw) {
+    if (!tag.hasScale || raw is! num) return raw;
+    return raw * tag.scale + tag.offset;
   }
 
   static Object _decodeOne(Tag tag, List<int> r) {
@@ -57,6 +84,8 @@ class TagCodec {
       case TagDataType.float32:
         final bd = ByteData(4)..setUint32(0, _word32(r, tag.byteOrder));
         return bd.getFloat32(0);
+      case TagDataType.string:
+        return decodeText(tag, r);
     }
   }
 
@@ -83,26 +112,28 @@ class TagCodec {
 
   // ── Escrita ──────────────────────────────────────────────────────────────────
 
-  /// Valor lógico → registradores crus de **um** elemento da variável.
+  /// Valor na unidade de engenharia → registradores crus de **um** elemento
+  /// da variável. Desfaz a escala antes: com ÷10, gravar 75,2 manda 752.
   static List<int> encodeRegisters(Tag tag, num value) {
+    if (value.isNaN || value.isInfinite) throw const TagValueError('Número inválido');
+    final raw = tag.hasScale ? (value - tag.offset) / tag.scale : value;
     switch (tag.dataType) {
       case TagDataType.bool:
         throw const TagValueError('Use encodeBitIntoRegister para bits');
+      case TagDataType.string:
+        throw TagValueError('"${tag.name}" é texto; não é gravável pela tela');
       case TagDataType.uint16:
-        return [_to16(_checkedInt(value, 0, 0xFFFF, tag), tag.byteOrder)];
+        return [_to16(_checkedInt(raw, 0, 0xFFFF, tag), tag.byteOrder)];
       case TagDataType.int16:
-        final v = _checkedInt(value, -32768, 32767, tag);
+        final v = _checkedInt(raw, -32768, 32767, tag);
         return [_to16(v & 0xFFFF, tag.byteOrder)];
       case TagDataType.uint32:
-        return _to32(_checkedInt(value, 0, 0xFFFFFFFF, tag), tag.byteOrder);
+        return _to32(_checkedInt(raw, 0, 0xFFFFFFFF, tag), tag.byteOrder);
       case TagDataType.int32:
-        final v = _checkedInt(value, -2147483648, 2147483647, tag);
+        final v = _checkedInt(raw, -2147483648, 2147483647, tag);
         return _to32(v & 0xFFFFFFFF, tag.byteOrder);
       case TagDataType.float32:
-        if (value.isNaN || value.isInfinite) {
-          throw const TagValueError('Número inválido');
-        }
-        final bd = ByteData(4)..setFloat32(0, value.toDouble());
+        final bd = ByteData(4)..setFloat32(0, raw.toDouble());
         return _to32(bd.getUint32(0), tag.byteOrder);
     }
   }
@@ -132,15 +163,30 @@ class TagCodec {
     return [w0, w1];
   }
 
-  static int _checkedInt(num value, int min, int max, Tag tag) {
-    if (value is double && value != value.roundToDouble()) {
-      throw TagValueError('"${tag.name}" só aceita número inteiro');
+  /// [raw] já sem escala. As mensagens falam na unidade da tela: com ÷10,
+  /// "aceita de 0 a 6553,5" e "passos de 0,1" — nunca o número cru.
+  static int _checkedInt(num raw, int min, int max, Tag tag) {
+    // Tolerância: 75,2 ÷ 0,1 dá 751,9999999 em ponto flutuante.
+    if ((raw - raw.round()).abs() > 1e-6) {
+      throw TagValueError(tag.hasScale
+          ? '"${tag.name}" aceita passos de ${_num(tag, tag.scale.abs())}'
+          : '"${tag.name}" só aceita número inteiro');
     }
-    final v = value.round();
+    final v = raw.round();
     if (v < min || v > max) {
-      throw TagValueError('"${tag.name}" aceita de $min a $max');
+      final a = _eng(tag, min), b = _eng(tag, max);
+      final lo = tag.scale < 0 ? b : a, hi = tag.scale < 0 ? a : b;
+      throw TagValueError('"${tag.name}" aceita de $lo a $hi');
     }
     return v;
+  }
+
+  /// Número cru → texto na unidade da tela (para mensagens).
+  static String _eng(Tag tag, num raw) => _num(tag, tag.hasScale ? raw * tag.scale + tag.offset : raw);
+
+  static String _num(Tag tag, num v) {
+    final d = tag.displayDecimals;
+    return (d > 0 ? v.toStringAsFixed(d) : v.round().toString()).replaceAll('.', ',');
   }
 
   // ── Apresentação ─────────────────────────────────────────────────────────────
@@ -150,8 +196,9 @@ class TagCodec {
     if (value == null) return '---';
     if (value is bool) return value ? 'LIGADO' : 'DESLIGADO';
     if (value is num) {
-      final text = tag.dataType == TagDataType.float32 || tag.decimals > 0
-          ? value.toStringAsFixed(tag.decimals).replaceAll('.', ',')
+      final d = tag.displayDecimals;
+      final text = tag.dataType == TagDataType.float32 || d > 0
+          ? value.toStringAsFixed(d).replaceAll('.', ',')
           : value.round().toString();
       return withUnit && tag.unit.isNotEmpty ? '$text ${tag.unit}' : text;
     }

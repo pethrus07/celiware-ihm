@@ -4,9 +4,11 @@ import '../app/app_scope.dart';
 import '../core/theme/app_theme.dart';
 import '../models/device.dart';
 import '../models/hmi_screen.dart';
+import '../models/project.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/hmi_canvas.dart';
 import '../widgets/hmi/live_tags.dart';
+import '../widgets/hmi/write_actions.dart';
 import '../widgets/tour/tour.dart';
 import 'editor/screen_editor_page.dart';
 import 'tours.dart';
@@ -32,6 +34,22 @@ class _ScreenRunPageState extends State<ScreenRunPage> {
   final _statusKey = GlobalKey();
   final _buttonKey = GlobalKey();
   final _inputKey = GlobalKey();
+
+  /// Troca de tela **substitui** esta (como numa IHM de painel): só a tela à
+  /// vista fica sendo lida, e o "voltar" leva à lista de telas, não a uma
+  /// pilha de telas visitadas.
+  void _open(Project project, String id) {
+    if (id == widget.screenId) return;
+    if (project.screen(id) == null) {
+      WriteActions.toast(context, 'A tela deste atalho foi apagada.', error: true);
+      return;
+    }
+    Navigator.pushReplacement(context, PageRouteBuilder(
+      pageBuilder: (_, _, _) => ScreenRunPage(screenId: id),
+      transitionDuration: const Duration(milliseconds: 160),
+      transitionsBuilder: (_, a, _, child) => FadeTransition(opacity: a, child: child),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +124,7 @@ class _ScreenRunPageState extends State<ScreenRunPage> {
                   label: const Text('Montar a tela'),
                 ),
               )
-            : HmiCanvas(screen: screen, keyFor: (e) => targets[e.id]),
+            : HmiCanvas(screen: screen, keyFor: (e) => targets[e.id], onNavigate: (id) => _open(project, id)),
       ),
       ),
     );

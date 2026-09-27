@@ -106,7 +106,7 @@ void main() {
     final leader = c.project.screen(DemoProject.leaderScreenId)!;
     c.saveScreen(leader.copyWith(elements: [
       ...leader.elements,
-      const HmiElement(id: 't_btn', type: ElementType.button, x: 0, y: 5, w: 2, h: 2,
+      const HmiElement(id: 't_btn', type: ElementType.button, x: 0, y: 7, w: 2, h: 2,
           props: {'tagId': 'demo_liga', 'label': 'Teste', 'mode': 'toggle'}),
     ]));
     await live(tester, 200);
@@ -117,6 +117,52 @@ void main() {
     expect(find.byKey(const ValueKey('confirmar-escrita')), findsNothing);
     expect(find.text('Esta tela é só de acompanhamento.'), findsOneWidget);
     expect(DemoRegistry.forDevice(DemoProject.deviceId).memory.bit(ModbusArea.coil, DemoMap.coilRun), isFalse);
+    await shutdown(tester, c);
+  });
+
+  testWidgets('escala e texto: 352 do equipamento vira 35,2 °C; nome lido em ASCII', (tester) async {
+    final c = await boot(tester);
+    final memory = DemoRegistry.forDevice(DemoProject.deviceId).memory;
+    await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.leaderScreenId}')));
+    await live(tester, 1200);
+    expect(find.text(DemoMap.machineName), findsOneWidget);
+    final raw = memory.register(ModbusArea.holdingRegister, DemoMap.hrMotorTempX10);
+    expect(raw, greaterThan(300)); // ~32 °C × 10
+    // O mostrador tem o número sem unidade; a leitura anda, então basta a vírgula da escala.
+    expect(find.textContaining(RegExp(r'^\d{2},\d$')), findsWidgets);
+    await shutdown(tester, c);
+  });
+
+  testWidgets('botão "Ir para tela" e mostrador com "ao tocar, abrir" trocam de tela', (tester) async {
+    final c = await boot(tester);
+    await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.leaderScreenId}')));
+    await live(tester, 900);
+    // Funciona em tela só de acompanhamento: navegar não grava nada.
+    await tester.tap(find.byKey(const ValueKey('ir-li_ir')));
+    await live(tester, 600);
+    expect(find.text('Cortadora — operação'), findsOneWidget);
+    expect(find.text('Resumo do líder'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('ir-op_prod')));
+    await live(tester, 600);
+    expect(find.text('Resumo do líder'), findsOneWidget);
+    await shutdown(tester, c);
+  });
+
+  testWidgets('botão com retorno: porta aberta = comando gravado, botão aguardando', (tester) async {
+    final c = await boot(tester);
+    final memory = DemoRegistry.forDevice(DemoProject.deviceId).memory;
+    memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, false);
+    await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.operationScreenId}')));
+    await live(tester, 1200);
+    await tester.tap(find.text('LIGA'));
+    await live(tester, 300);
+    await tester.tap(find.byKey(const ValueKey('confirmar-escrita')));
+    await live(tester, 1500);
+
+    expect(memory.bit(ModbusArea.coil, DemoMap.coilRun), isTrue); // o comando foi
+    expect(memory.bit(ModbusArea.coil, DemoMap.coilInCycle), isFalse); // a máquina não partiu
+    expect(find.byIcon(Icons.hourglass_top_rounded), findsOneWidget);
     await shutdown(tester, c);
   });
 

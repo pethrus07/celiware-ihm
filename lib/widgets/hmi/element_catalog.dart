@@ -14,8 +14,11 @@ enum TagFit {
   /// Número único (inteiro ou com vírgula).
   number,
 
-  /// Número ou liga/desliga (ex.: mostrador, indicador de estado).
+  /// Número ou liga/desliga (ex.: indicador de estado, imagem por etapa).
   scalar,
+
+  /// Qualquer valor único, inclusive texto (mostrador).
+  any,
 
   /// Lista de números (memória inicial + tamanho).
   numberList,
@@ -31,6 +34,8 @@ extension TagFitCheck on TagFit {
       case TagFit.number:
         return t.dataType.isNumeric && !t.isArray;
       case TagFit.scalar:
+        return !t.isArray && !t.isText;
+      case TagFit.any:
         return !t.isArray;
       case TagFit.numberList:
         return t.dataType.isNumeric && t.isArray;
@@ -46,6 +51,8 @@ extension TagFitCheck on TagFit {
       case TagFit.number:
         return 'variável numérica';
       case TagFit.scalar:
+        return 'variável de número ou liga/desliga';
+      case TagFit.any:
         return 'variável de valor único';
       case TagFit.numberList:
         return 'variável do tipo lista (tamanho maior que 1)';
@@ -96,7 +103,8 @@ class ElementInfo {
 ///
 /// | tipo        | props                                                                                   |
 /// |-------------|-----------------------------------------------------------------------------------------|
-/// | button      | tagId, label, mode (toggle·momentary·set·reset·value), value (num, modo value), color   |
+/// | button      | tagId, label, mode (toggle·momentary·set·reset·value·screen), value (num, modo value), |
+/// |             | color, feedbackTagId (retorno: o que acende o botão), goTo (modo screen)                |
 /// | lamp        | tagId, label, onText, offText, color                                                    |
 /// | value       | tagId, label                                                                            |
 /// | input       | tagId, label, min, max                                                                  |
@@ -106,7 +114,11 @@ class ElementInfo {
 /// | trend       | tagIds (até 3), label, windowSec, min?, max? (sem min/max = escala automática)           |
 /// | barChart    | tagId (lista), label                                                                    |
 /// | label       | text, size (s·m·l), align (left·center)                                                 |
-/// | image       | data (PNG/JPG em base64), fit (contain·cover)                                           |
+/// | image       | data (PNG em base64), fit (contain·cover), source (fixed·byValue),                      |
+/// |             | tagId + images: [{value, data}] (modo byValue: uma imagem por código)                   |
+///
+/// Em qualquer elemento menos botão e ajuste: `goTo` = id da tela que abre ao
+/// tocar (nos dois, o toque já tem dono: gravar).
 ///
 /// `color` é o nome de um [StateColor]. Chaves ausentes usam o padrão do
 /// renderizador; chaves desconhecidas são preservadas (arquivo de versão
@@ -140,9 +152,9 @@ class ElementCatalog {
     ElementInfo(
       type: ElementType.value,
       name: 'Mostrador',
-      description: 'Um valor em destaque.',
+      description: 'Um valor ou texto em destaque.',
       icon: Icons.pin_outlined,
-      fit: TagFit.scalar,
+      fit: TagFit.any,
       defaultW: 3,
       defaultH: 2,
     ),
@@ -221,7 +233,7 @@ class ElementCatalog {
     ElementInfo(
       type: ElementType.image,
       name: 'Imagem',
-      description: 'Foto ou esquema.',
+      description: 'Fixa, ou uma por etapa.',
       icon: Icons.image_outlined,
       fit: TagFit.none,
       defaultW: 3,

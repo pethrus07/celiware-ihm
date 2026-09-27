@@ -83,7 +83,11 @@ class _TagTile extends StatelessWidget {
     return ListTile(
       key: ValueKey('var-${tag.id}'),
       leading: Icon(
-        tag.dataType == TagDataType.bool ? Icons.toggle_on_outlined : (tag.isArray ? Icons.view_week_outlined : Icons.pin_outlined),
+        tag.dataType == TagDataType.bool
+            ? Icons.toggle_on_outlined
+            : tag.isText
+                ? Icons.text_fields_rounded
+                : (tag.isArray ? Icons.view_week_outlined : Icons.pin_outlined),
         color: Ind.textDim,
       ),
       title: Text(tag.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),

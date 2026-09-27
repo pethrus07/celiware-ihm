@@ -12,8 +12,13 @@ class HmiScreenContext extends InheritedWidget {
     required this.editMode,
     required this.readOnly,
     required this.confirmWrites,
+    this.onNavigate,
     required super.child,
   });
+
+  /// Abre outra tela do projeto (botão "Ir para tela" e "ao tocar, abrir").
+  /// Nulo fora da tela em operação — no editor e na prévia o toque não navega.
+  final void Function(String screenId)? onNavigate;
 
   /// Montando a tela: elementos mostram valor ao vivo mas não reagem a toque.
   final bool editMode;
@@ -32,7 +37,7 @@ class HmiScreenContext extends InheritedWidget {
 
   @override
   bool updateShouldNotify(HmiScreenContext old) =>
-      old.editMode != editMode || old.readOnly != readOnly || old.confirmWrites != confirmWrites;
+      old.editMode != editMode || old.readOnly != readOnly || old.confirmWrites != confirmWrites || old.onNavigate != onNavigate;
 }
 
 /// Liga um widget a uma variável: entrega a [Tag] (do projeto) e a última

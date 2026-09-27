@@ -28,6 +28,10 @@ enum TagDataType {
 
   /// Número com vírgula IEEE-754 (32 bits), em 2 registradores seguidos.
   float32,
+
+  /// Texto ASCII: 2 letras por registrador, [Tag.length] registradores
+  /// seguidos (nome da máquina, receita, lote). Para no primeiro byte zero.
+  string,
 }
 
 extension TagDataTypeMeta on TagDataType {
@@ -43,7 +47,7 @@ extension TagDataTypeMeta on TagDataType {
     }
   }
 
-  bool get isNumeric => this != TagDataType.bool;
+  bool get isNumeric => this != TagDataType.bool && this != TagDataType.string;
   bool get is32Bit => registerCount == 2;
 
   /// Nome para leigo — o que aparece no botão de escolha.
@@ -61,6 +65,8 @@ extension TagDataTypeMeta on TagDataType {
         return 'Inteiro grande c/ sinal';
       case TagDataType.float32:
         return 'Número com vírgula';
+      case TagDataType.string:
+        return 'Texto';
     }
   }
 
@@ -79,6 +85,8 @@ extension TagDataTypeMeta on TagDataType {
         return 'INT32';
       case TagDataType.float32:
         return 'FLOAT32';
+      case TagDataType.string:
+        return 'STRING';
     }
   }
 
@@ -141,6 +149,8 @@ class Tag {
     this.writable = false,
     this.unit = '',
     this.decimals = 0,
+    this.scale = 1,
+    this.offset = 0,
     this.description = '',
   });
 
@@ -173,12 +183,40 @@ class Tag {
   /// Casas decimais exibidas. Não altera o valor, só a apresentação.
   final int decimals;
 
+  /// Escala linear do equipamento: **valor na tela = bruto × [scale] + [offset]**.
+  ///
+  /// Muitos equipamentos mandam número sem vírgula e o manual diz "divida por
+  /// 10" (752 = 75,2 °C) — isso é `scale = 0.1`. Vale nos dois sentidos: ao
+  /// gravar 75,2 o app manda 752. Tudo que a tela mostra, compara (faixas do
+  /// medidor, limites do ajuste) e grava já está na unidade de engenharia.
+  final double scale;
+  final double offset;
+
   final String description;
 
   /// Variável lida de um bit dentro de um registrador.
   bool get isBitOfRegister => dataType == TagDataType.bool && !area.isBit;
 
-  bool get isArray => length > 1;
+  /// Texto ocupa [length] registradores mas é **um** valor, não uma lista.
+  bool get isArray => length > 1 && dataType != TagDataType.string;
+
+  bool get isText => dataType == TagDataType.string;
+
+  bool get hasScale => dataType.isNumeric && (scale != 1 || offset != 0);
+
+  /// Casas decimais de fato usadas na tela: as pedidas, ou as que a escala
+  /// cria (÷10 → 1 casa) quando ninguém pediu — senão 752 × 0,1 apareceria
+  /// arredondado para 75.
+  int get displayDecimals {
+    if (decimals > 0 || !hasScale) return decimals;
+    for (var d = 0; d <= 6; d++) {
+      final f = scale * _pow10(d), o = offset * _pow10(d);
+      if ((f - f.roundToDouble()).abs() < 1e-9 && (o - o.roundToDouble()).abs() < 1e-9) return d;
+    }
+    return 6;
+  }
+
+  static double _pow10(int d) => [1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0][d];
 
   /// Pode escrever de fato: marcado pelo usuário **e** a área permite.
   bool get canWrite => writable && area.isWritable;
@@ -209,6 +247,8 @@ class Tag {
     bool? writable,
     String? unit,
     int? decimals,
+    double? scale,
+    double? offset,
     String? description,
   }) =>
       Tag(
@@ -224,19 +264,27 @@ class Tag {
         writable: writable ?? this.writable,
         unit: unit ?? this.unit,
         decimals: decimals ?? this.decimals,
+        scale: scale ?? this.scale,
+        offset: offset ?? this.offset,
         description: description ?? this.description,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
-  /// área de bit força tipo liga/desliga; área só-leitura tira a escrita.
+  /// área de bit força tipo liga/desliga; área só-leitura tira a escrita;
+  /// escala zero (que apagaria o valor) volta a 1.
   Tag normalized() {
     var t = this;
     if (t.area.isBit && t.dataType != TagDataType.bool) {
       t = t.copyWith(dataType: TagDataType.bool);
     }
     if (!t.area.isWritable && t.writable) t = t.copyWith(writable: false);
+    // Texto é só leitura nesta versão (nenhum elemento digita texto).
+    if (t.isText && t.writable) t = t.copyWith(writable: false);
     if (t.length < 1) t = t.copyWith(length: 1);
     if (t.bitIndex < 0 || t.bitIndex > 15) t = t.copyWith(bitIndex: 0);
+    if (t.scale == 0 || !t.scale.isFinite) t = t.copyWith(scale: 1);
+    if (!t.offset.isFinite) t = t.copyWith(offset: 0);
+    if (!t.dataType.isNumeric && (t.scale != 1 || t.offset != 0)) t = t.copyWith(scale: 1, offset: 0);
     return t;
   }
 
@@ -253,6 +301,9 @@ class Tag {
         'writable': writable,
         'unit': unit,
         'decimals': decimals,
+        // Só grava quando há escala: arquivo sem escala fica igual ao da 1.0.
+        if (scale != 1) 'scale': scale,
+        if (offset != 0) 'offset': offset,
         'description': description,
       };
 
@@ -270,6 +321,8 @@ class Tag {
         writable: (j['writable'] as bool?) ?? false,
         unit: (j['unit'] as String?) ?? '',
         decimals: (j['decimals'] as int?) ?? 0,
+        scale: (j['scale'] as num?)?.toDouble() ?? 1,
+        offset: (j['offset'] as num?)?.toDouble() ?? 0,
         description: (j['description'] as String?) ?? '',
       ).normalized();
 }

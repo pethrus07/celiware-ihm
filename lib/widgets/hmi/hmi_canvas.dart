@@ -72,8 +72,13 @@ class HmiCanvas extends StatelessWidget {
     this.onChanged,
     this.onEmptyCellTap,
     this.keyFor,
+    this.onNavigate,
     this.padding = const EdgeInsets.fromLTRB(14, 14, 14, 110),
   });
+
+  /// Tela em operação: abre outra tela (botão "Ir para tela" e elementos com
+  /// "ao tocar, abrir").
+  final void Function(String screenId)? onNavigate;
 
   final HmiScreen screen;
   final bool editMode;
@@ -98,6 +103,7 @@ class HmiCanvas extends StatelessWidget {
       editMode: editMode,
       readOnly: screen.readOnly,
       confirmWrites: screen.confirmWrites,
+      onNavigate: editMode ? null : onNavigate,
       child: LayoutBuilder(builder: (context, box) {
         final width = box.maxWidth - padding.horizontal;
         final cell = width / screen.columns;
@@ -141,13 +147,44 @@ class HmiCanvas extends StatelessWidget {
                           top: e.y * cell + gap / 2,
                           width: e.w * cell - gap,
                           height: e.h * cell - gap,
-                          child: KeyedSubtree(key: keyFor?.call(e), child: HmiElementView(element: e)),
+                          child: KeyedSubtree(key: keyFor?.call(e), child: _Linked(element: e, onNavigate: onNavigate)),
                         ),
               ],
             ),
           ),
         );
       }),
+    );
+  }
+}
+
+/// Elemento em operação com "ao tocar, abrir tela" (`goTo`): o toque abre a
+/// tela e uma seta discreta no canto avisa que ele leva a algum lugar — sem
+/// ela, o operador não descobre que o mostrador é tocável.
+///
+/// Botão e ajuste de valor ficam de fora: neles o toque já grava. O botão
+/// tem o próprio modo "Ir para tela".
+class _Linked extends StatelessWidget {
+  const _Linked({required this.element, required this.onNavigate});
+  final HmiElement element;
+  final void Function(String screenId)? onNavigate;
+
+  @override
+  Widget build(BuildContext context) {
+    final view = HmiElementView(element: element);
+    final target = element.props['goTo'];
+    final nav = onNavigate;
+    if (target is! String || nav == null || element.type == ElementType.button || element.type == ElementType.input) {
+      return view;
+    }
+    return GestureDetector(
+      key: ValueKey('ir-${element.id}'),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => nav(target),
+      child: Stack(children: [
+        Positioned.fill(child: view),
+        const Positioned(top: 6, right: 6, child: Icon(Icons.arrow_outward_rounded, size: 16, color: Ind.textMuted)),
+      ]),
     );
   }
 }

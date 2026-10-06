@@ -18,6 +18,53 @@ Tag `v1.3.1`. É a versão para apresentar e instalar
 | 1.3.0 | Alarmes ISA-18.2: prioridade por cor + forma + número, faixa no topo, marca no elemento, lista, histórico, editor na variável, falta de comunicação como alarme. |
 | 1.3.1 | QA do APK instalado: botão com retorno vira "SEM RETORNO" após 5 s; faixa sem valor congelado e em uma linha com o celular deitado; tutorial explica cores e alarmes; "ligado" sem verde na lista de variáveis; alarme "Máquina parada" (média) na demonstração; tirado o "Vídeos · Em breve"; textos. |
 
+## Etapa 4 — acordada em 05/10/2026 (escopo a fechar)
+
+Reunião de 3h com o cliente (ata `2026-10-05_alinhamento` no Atas).
+Resumo enviado a ele em 06/10; **espera a lista dele** (~09/10) para fechar o
+escopo. Nada aqui começou.
+
+- **Valor:** R$ [valor], como a etapa anterior. R$ [valor] até 20/10; R$ [valor] na
+  publicação na Play Store (R$ [valor] desta + R$ [valor] guardados da etapa 3).
+- **Forma:** uma entrega com escopo fechado (a lista dele + a nossa), depois
+  quantas rodadas de teste forem precisas. Sem versões incrementais no meio.
+- **Produto:** app gratuito por agora; a receita vem do hardware (conversores
+  RS-485/232 → Wi-Fi, roteador 4G com VPN, repetidores), vendido na loja
+  Shopify com link no site. Marca "Powered by Celiware".
+
+| # | Item | Hoje (conferido no código em 06/10) | Tipo |
+|---|---|---|---|
+| 1 | Comunicação com Siemens e OPC UA | só Modbus TCP | novo |
+| 2 | Mapas de memória prontos das marcas parceiras (Inovance, INVT…) | perfil Inovance planejado (ARQUITETURA §10.2), nenhum pronto | novo |
+| 3 | Importar memórias por faixa (M0–M1000, D0–D3000, X, Y) | importa o projeto inteiro | novo |
+| 4 | Avisos por voz no fone | o alarme só vibra; o app não tem som | novo |
+| 5 | Intertravamento entre máquinas | uma tela junta várias máquinas, mas não há motor de lógica | novo |
+| 6 | Versão para Windows | a pasta `windows/` existe; o `.exe` nunca foi gerado nem testado | novo |
+| 7 | Grade maior e mais variáveis por tela | grade atual do editor | ajuste |
+| 8 | Correções no "editar memória" | — | ajuste |
+| 9 | Tela de tablet | item 3 de "Próximo" abaixo | ajuste |
+| 10 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | não existe | novo |
+| 11 | Publicação na Play Store | roteiro em `PUBLICACAO.md` | novo |
+| 12 | Arduino e macros em JavaScript | script na variável foi **recusado na 1.1** (ver o fim deste arquivo) | a avaliar |
+
+**Ao fechar o escopo:** separar o que cabe nos R$ [valor] (site, Play Store,
+Windows, grade, tablet, editar memória, importação por faixa) do que pede etapa
+própria (Siemens, OPC UA, voz, intertravamento). O preço foi fixado antes do
+escopo: esse é o risco.
+
+**Do lado do cliente:** nome comercial, marca e domínio do app; lista do hardware
+e cadastro na Shopify; uma peça de cada para os testes; testes nas máquinas
+reais com as marcas parceiras.
+
+**Respostas que ficaram da reunião (enviadas a ele):**
+- O Windows 11 não roda APK direto (o subsistema Android foi encerrado em 2025);
+  no PC, só com emulador. Por isso o item 6.
+- Para presentear o app, o Google Play tem códigos promocionais gratuitos.
+- Público (leigo ou técnico): em aberto, decidir junto da lista dele.
+- Nomes com `.com.br` livre em 06/10: MáquinaNaMão, IHM no Bolso,
+  MonitoraMáquina, LigaMáquina, PainelNaMão, MáquinaConectada, ConectaPLC.
+  "Conecta Fácil" já é registrado. A decisão é dele.
+
 ## Próximo — visual e operação
 
 Na ordem em que convém fazer. Cada item é uma versão pequena, testada no
@@ -89,7 +136,8 @@ Roteiro completo em `PUBLICACAO.md`.
 - Backup e comparação de parâmetros de inversor.
 - Conversores RS-485 e CANopen; perfil Siemens.
 - Licenciamento.
-- Identidade da Celiware no app (ficou de fora de propósito na 1.2).
+- Identidade da Celiware no app (ficou de fora de propósito na 1.2). Em
+  05/10 ficou "Powered by Celiware" no app e na máquina (etapa 4).
 
 ## Ficou de fora de propósito
 

@@ -4,6 +4,7 @@ import '../../models/device.dart';
 import '../../models/hmi_screen.dart';
 import '../../models/narration.dart';
 import '../../models/project.dart';
+import '../../models/recipe.dart';
 import '../../models/tag.dart';
 import 'demo_process.dart';
 
@@ -22,6 +23,7 @@ class DemoProject {
   static const deviceId = 'demo_cortadora';
   static const operationScreenId = 'demo_tela_operacao';
   static const leaderScreenId = 'demo_tela_lider';
+  static const recipeTypeId = 'demo_receitas_rotulo';
 
   static Project build() {
     const dev = Device(id: deviceId, name: 'Cortadora de rótulos', kind: DeviceKind.demo, pollMs: 300);
@@ -154,6 +156,26 @@ class DemoProject {
       ],
     );
 
-    return Project(name: 'Demonstração', devices: const [dev], tags: tags, screens: [operation, leader]);
+    // Receitas (Mais → Receitas): os dois ajustes graváveis da cortadora,
+    // aplicados só com ela parada ("Em ciclo" desligado). A de 120 mm é o
+    // ajuste com que a máquina abre; a de 60 mm fica abaixo dos 75 °C do
+    // alarme baixo (a 70 m/min o motor chegaria a ~75,4 °C).
+    const rotulo = RecipeType(
+      id: recipeTypeId,
+      name: 'Rótulo',
+      params: [
+        RecipeParam(key: 'vel', name: 'Velocidade', unit: 'm/min', min: 0, max: 150),
+        RecipeParam(key: 'comp', name: 'Comprimento do rótulo', unit: 'mm', min: 20, max: 500),
+      ],
+      machines: [
+        RecipeMachine(deviceId: deviceId, tags: {'vel': 'demo_sp', 'comp': 'demo_comp'}, conditionTagId: 'demo_bit_ciclo'),
+      ],
+    );
+    const recipes = [
+      Recipe(id: 'demo_receita_120', typeId: recipeTypeId, name: 'Rótulo 120 mm', values: {'vel': 80.0, 'comp': 120.0}, note: Recipe.noteCreated),
+      Recipe(id: 'demo_receita_60', typeId: recipeTypeId, name: 'Rótulo 60 mm', values: {'vel': 65.0, 'comp': 60.0}, note: Recipe.noteCreated),
+    ];
+
+    return Project(name: 'Demonstração', devices: const [dev], tags: tags, screens: [operation, leader], recipeTypes: const [rotulo], recipes: recipes);
   }
 }

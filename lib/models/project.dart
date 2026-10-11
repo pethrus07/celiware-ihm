@@ -1,6 +1,7 @@
 import 'device.dart';
 import 'hmi_screen.dart';
 import 'log_group.dart';
+import 'recipe.dart';
 import 'tag.dart';
 
 /// O projeto inteiro: equipamentos, variáveis e telas.
@@ -19,6 +20,8 @@ class Project {
     this.tags = const [],
     this.screens = const [],
     this.logGroups = const [],
+    this.recipeTypes = const [],
+    this.recipes = const [],
   });
 
   static const int schemaVersion = 1;
@@ -31,6 +34,11 @@ class Project {
   /// Registros de dados (Mais → Registros). A configuração viaja com o
   /// projeto; o histórico gravado é do aparelho.
   final List<LogGroup> logGroups;
+
+  /// Receitas (Mais → Receitas): tipos com os parâmetros e as máquinas, e os
+  /// valores de cada produto. Edições e regras em `recipe.dart`.
+  final List<RecipeType> recipeTypes;
+  final List<Recipe> recipes;
 
   bool get isEmpty => devices.isEmpty && tags.isEmpty && screens.isEmpty;
 
@@ -52,6 +60,8 @@ class Project {
     List<Tag>? tags,
     List<HmiScreen>? screens,
     List<LogGroup>? logGroups,
+    List<RecipeType>? recipeTypes,
+    List<Recipe>? recipes,
   }) =>
       Project(
         name: name ?? this.name,
@@ -59,6 +69,8 @@ class Project {
         tags: tags ?? this.tags,
         screens: screens ?? this.screens,
         logGroups: logGroups ?? this.logGroups,
+        recipeTypes: recipeTypes ?? this.recipeTypes,
+        recipes: recipes ?? this.recipes,
       );
 
   // ── Edições (sempre devolvem um projeto novo) ────────────────────────────────
@@ -107,6 +119,9 @@ class Project {
         'screens': [for (final s in screens) s.toJson()],
         // Só quando há algum: projeto sem registro fica igual ao da 1.3.
         if (logGroups.isNotEmpty) 'logGroups': [for (final g in logGroups) g.toJson()],
+        // Idem: projeto sem receita fica igual ao de antes, sem subir a versão.
+        if (recipeTypes.isNotEmpty) 'recipeTypes': [for (final t in recipeTypes) t.toJson()],
+        if (recipes.isNotEmpty) 'recipes': [for (final r in recipes) r.toJson()],
       };
 
   factory Project.fromJson(Map<String, dynamic> j) => Project(
@@ -126,6 +141,14 @@ class Project {
         logGroups: [
           for (final g in (j['logGroups'] as List? ?? const []))
             if (g is Map) LogGroup.fromJson(Map<String, dynamic>.from(g)),
+        ],
+        recipeTypes: [
+          for (final t in (j['recipeTypes'] as List? ?? const []))
+            if (t is Map) RecipeType.fromJson(Map<String, dynamic>.from(t)),
+        ],
+        recipes: [
+          for (final r in (j['recipes'] as List? ?? const []))
+            if (r is Map) Recipe.fromJson(Map<String, dynamic>.from(r)),
         ],
       );
 

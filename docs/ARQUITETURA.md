@@ -146,6 +146,8 @@ lib/
 │   ├── mqtt_config.dart              Broker do equipamento e tópico da variável (MQTT).
 │   ├── s7_config.dart                Família do CLP (rack/slot) e endereço S7 da variável.
 │   ├── raw_config.dart               TCP/UDP e perfil do equipamento cru; campo da variável; modelos prontos.
+│   ├── log_group.dart                Grupo de registro de dados (§6.10).
+│   ├── recipe.dart                   Tipo de receita, máquina, receita e versões (§6.11).
 │   ├── hmi_screen.dart               Tela e elemento posicionado na grade.
 │   └── project.dart                  Projeto inteiro (unidade de arquivo).
 ├── services/
@@ -161,6 +163,7 @@ lib/
 │   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver, s7_driver, raw_driver.
 │   │   └── tag_store.dart            Última leitura por variável + histórico curto.
 │   ├── logging/                      Registro de dados: motor, banco SQLite, CSV (§6.10).
+│   ├── recipes/                      Receitas: regras puras, ler/preparar/aplicar, histórico (§6.11).
 │   ├── demo/
 │   │   ├── demo_process.dart         "Programa do CLP" da cortadora simulada.
 │   │   └── demo_project.dart         Projeto de demonstração (duas telas).
@@ -174,7 +177,8 @@ lib/
 │   ├── devices/                      Lista e cadastro de equipamento (Testar conexão); editor da mensagem crua.
 │   ├── tags/                         Lista e cadastro de variável (Lendo agora).
 │   ├── logs/                         Registros: lista, folha do grupo, histórico.
-│   ├── more_page.dart                Projeto, registros, tutoriais, sobre.
+│   ├── recipes/                      Receitas: lista, receita, tipo e máquina, aplicar, histórico.
+│   ├── more_page.dart                Projeto, registros, receitas, tutoriais, sobre.
 │   └── tours.dart                    Textos de todas as trilhas de tutorial.
 └── widgets/
     ├── hmi/
@@ -513,7 +517,19 @@ O projeto inteiro é um JSON (`projeto.ihm.json` na pasta privada; `nome-data.ih
 }
 ```
 
+Campos opcionais, que só vão para o arquivo quando há algum (projeto sem eles fica byte a byte igual ao de antes, `schemaVersion` segue 1): `logGroups` (§6.10), `recipeTypes` e `recipes` (§5.5, §6.11).
+
 A gravação é atômica (grava `.tmp` e renomeia): se a bateria acabar no meio, sobra o arquivo anterior inteiro. Arquivo ilegível é guardado como cópia `.corrompido-…` em vez de apagado. Arquivo de versão mais nova é recusado com mensagem pedindo para atualizar o app.
+
+### 5.5. Receitas (`RecipeType`, `Recipe`)
+
+| Campo | Significado |
+|---|---|
+| recipeTypes[].params | Parâmetros do tipo: {key (estável), name, unit, decimals, min, max, tolerance, onOff}. Faixa e tolerância na unidade de engenharia; só vão para o arquivo quando diferem do padrão. `onOff` = liga/desliga (1/0, sem unidade, faixa nem tolerância). |
+| recipeTypes[].machines | Uma por equipamento onde o tipo vale: {deviceId, tags (chave do parâmetro → id da variável), condition {tagId, value} opcional, loadedTagId opcional}. |
+| recipes[] | {id, typeId, name, values (chave → valor; liga/desliga 1/0), version, updatedAt (UTC), note (o que criou a versão), history (até 9 versões anteriores: {version, at, note, values})}. |
+
+`normalized()` corrige o que vem de arquivo editado à mão: mín. maior que máx. troca de lugar, tolerância negativa vira 0, chave repetida ou vazia sai, vínculo para parâmetro que não existe sai, valor que não é número sai, histórico que passa de 9 é cortado. Receita de tipo apagado fica no arquivo, sem aparecer. O histórico de **aplicações** é do aparelho (`historico-receitas.json`), não do projeto.
 
 ## 6. Funcionalidades por tela
 
@@ -564,7 +580,7 @@ Na escolha de variável do editor, a lista é **agrupada por equipamento** (os q
 
 ### 6.7. Mais
 
-Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças.
+Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Dados: **Registros** (§6.10) e **Receitas** (§6.11). Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças.
 
 ### 6.8. Alarmes
 
@@ -631,6 +647,44 @@ Mais → **Registros** (REQUISITOS-ETAPA4 §9.4, RG-1 a RG-6): variáveis gravad
 **Planilha** (`LogCsv`): a janela à vista, no jeito do Excel pt-BR — `;`, vírgula decimal, `dd/MM/aaaa HH:mm:ss` local, cabeçalho "Nome (unidade)", UTF-8 com BOM, lacuna = célula vazia, sem `sep=;` (o Excel ignoraria o BOM). Lida em páginas de 5.000 linhas, página grande formatada num isolate, enviada pelo `share_plus`.
 
 **Limite desta versão:** grava só com o app aberto (o histórico mostra o buraco). Com o serviço em primeiro plano basta o `DataLogger.pause` não pausar — ponto de extensão comentado lá.
+
+### 6.11. Receitas
+
+Mais → **Receitas** (REQUISITOS-ETAPA4 §9.3, RC-1 a RC-7): os ajustes de cada produto guardados no projeto e aplicados na máquina com uma confirmação. Vocabulário da ISA-88 (`docs/pesquisa-etapa4/4-…`, seção 3): **tipo de receita** = quais parâmetros existem ("Rótulo": velocidade e comprimento); **receita** = os valores de um produto ("Rótulo 120 mm"); **máquina** = o vínculo parâmetro → variável num equipamento.
+
+**Modelo** (`lib/models/recipe.dart`, campos em §5.5; `Project.recipeTypes` e `Project.recipes` só vão para o arquivo quando há algum, `schemaVersion` segue 1). Parâmetro: nome, unidade, casas, mín./máx. opcionais e tolerância da comparação — ou liga/desliga. Só entra variável gravável pela tela, de valor único, número ou liga/desliga (`RecipeParam.canUse`). O tipo tem uma lista de máquinas (`RecipeMachine`): a variável de cada parâmetro naquele equipamento, a condição para aplicar e o bit de receita carregada. As edições moram numa extensão (`ProjectRecipes`), para `project.dart` mudar o mínimo.
+
+**Valores na unidade de engenharia.** A escala da variável faz a conta nos dois sentidos: 752 lido é 75,2 °C; gravar 80,5 manda 805. Digitar confere a faixa da receita e o que a variável da máquina aceita ("Nesta máquina, "Temperatura" aceita passos de 0,1"). A faixa é rígida (a tolerância é da comparação). Número lido de FLOAT32 perde o ruído (75,19999 → 75,2) com uma folga de meio passo do FLOAT32 (2⁻²⁴ do valor) — mais que isso arredondaria valor de verdade; inteiro não tem folga nenhuma (1.000.000 ≠ 1.000.001).
+
+**Telas** (`lib/screens/recipes/`): lista por tipo; a receita com os valores (tocar edita), **Comparar** e **Aplicar** à vista e, no menu, Ler da máquina, Transferir, Versões, Renomear, Duplicar, Apagar. "Nova receita" pede o nome e oferece **Ler da máquina** (o caso comum: a máquina já está no ponto) ou Em branco. O tipo (ícone de ajuste na seção) mostra parâmetros, com faixa e tolerância, e máquinas; condição e bit ficam em "Mais opções" da máquina.
+
+**Ler da máquina** (RC-3): cada parâmetro pela conexão da sessão (`HmiRuntime.readNow`). Receita vazia só se preenche; com valores, mostra o que muda ("Comprimento do rótulo: 120 mm → 90 mm") e pede para atualizar. O que está dentro da tolerância fica como estava (ruído de leitura não vira versão); parâmetro que não deu para ler mantém o valor antigo, e isso é dito.
+
+**Comparar** (RC-4): só as diferenças além da tolerância, "na máquina × na receita"; o que não deu para ler e o que falta na receita aparecem à parte; tudo igual = "A máquina está com esta receita". Dali já se aplica.
+
+**Aplicar** (RC-5, RC-6; `RecipeApplier` em `lib/services/recipes/`, pelo `readNow`/`write` de sempre):
+
+1. prepara: lê tudo e monta a lista "de → para". Só o que difere além da tolerância é gravado; o que não deu para ler entra como "?";
+2. o que impede aplicar aparece no lugar do botão: variável que falta, foi apagada ou não grava; valor fora da faixa ou que a variável não aceita; receita sem valor; sem comunicação; condição falsa ("Só aplica com "Em ciclo" DESLIGADO. Agora está LIGADO.");
+3. **uma** confirmação, com Cancelar e "Aplicar N valores", e o campo opcional "Quem está aplicando" (vem com o último nome usado no aparelho);
+4. confere a condição de novo — a máquina pode ter partido entre a confirmação e o toque — e desliga o bit de receita carregada;
+5. grava parâmetro por parâmetro, com o progresso à vista ("Gravando 2 de 3…"); a folha não fecha enquanto grava. **Na primeira falha, para**: recusa do equipamento (endereço inexistente, valor inválido) ou do app vira "Recusado: …", falta de comunicação vira "Sem comunicação: …", e o resto fica "Não gravado: a aplicação parou antes";
+6. relê o que gravou e confere a tolerância, 300 ms depois (o CLP limita o valor na varredura seguinte): "Gravou 140 m/min, a máquina ficou com 120 m/min". Com a comunicação caída não relê no escuro ("Gravado, sem conferência");
+7. liga o bit de receita carregada só se tudo foi gravado e conferido.
+
+O relatório abre com uma frase que não esconde nada — "Receita aplicada", "Aplicada com 1 divergência", "Parou no 2º de 3 valores: endereço inexistente no equipamento", "Não aplicada: …" — e uma linha por parâmetro. Não há desfazer automático: voltar atrás também grava e também pode falhar; o relatório mostra o estado de verdade, e a versão anterior da receita está em Versões.
+
+**Condição e segurança.** "Só aplicar quando" é uma variável liga/desliga com o valor esperado ("Em ciclo" desligado = máquina parada). É conferência do app, **não intertravamento** — a folha da máquina diz isso, e a segurança continua no CLP (REQUISITOS-ETAPA4 §9.5). Liga/desliga dentro de registrador grava por leitura-modificação-escrita (§4.10): para o bit de receita carregada, prefira coil.
+
+**Transferir** (RC-7). O mesmo tipo vale em várias máquinas, cada uma com as suas variáveis. "Ligar outra máquina" (no tipo) e "Transferir para outra máquina" (na receita) sugerem as variáveis da outra máquina (`RecipeLogic.suggestBinding`), nesta ordem: mesmo nome da variável de origem, mesma memória do CLP ("D200"), mesmo endereço (mesmo modelo de máquina), nome igual ao do parâmetro — sem acento, nunca uma variável que não grava ou de outro tipo, nunca a mesma para dois parâmetros. Máquina pronta: a aplicação abre lá. Faltando variável: abre a folha de vínculo antes.
+
+**Versões** (RC-7). Mudou valor, versão nova; ficam as últimas 10, contando a atual (`Recipe.maxVersions`). Edições à mão seguidas, em menos de 10 min, viram uma versão só — três ajustes não empurram para fora as versões que importam; ler da máquina nunca se junta com edição. Restaurar cria versão nova com os valores antigos: nada se apaga. Renomear não muda a versão; duplicar começa na 1 ("Cópia de "Rótulo 120 mm" (versão 2)").
+
+**Histórico de aplicações** (RC-7; ícone no topo da lista): quem, qual receita e versão, em qual máquina, quando e como terminou, com o "de → para" e o resultado de cada parâmetro. É do aparelho, como o histórico de alarmes: `historico-receitas.json` ao lado do projeto, as últimas 200, com o texto pronto (continua legível depois de renomear ou apagar receita, variável ou máquina). Resultado de uma versão mais nova do app é pulado, não vira "aplicada".
+
+**Demonstração.** A cortadora vem com o tipo "Rótulo" (velocidade 0–150 m/min, comprimento 20–500 mm, só com "Em ciclo" desligado) e duas receitas: "Rótulo 120 mm" (80 m/min — o ajuste com que a máquina abre) e "Rótulo 60 mm" (65 m/min, abaixo do alarme baixo de temperatura do motor).
+
+**Fora desta entrega:** gravar o nome da receita ou do lote no CLP (texto é só leitura, §4.12); elemento de tela de receita; gravação em bloco (FC16 numa faixa contínua, como a Weintek) — hoje é um pedido por parâmetro; receitas em CSV.
 
 ## 7. Tutoriais dentro do app
 
@@ -804,6 +858,9 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/runtime/data_logger_test.dart` | SQLite real (ffi) e relógio controlado: periódico, compasso com timer atrasado, "ao mudar" com banda morta e máximo entre amostras, lacuna sem comunicação/endereço recusado/leitura parada, folga da primeira leitura, lote e descarga, segundo plano, retenção, apagar grupo, banco órfão, ponta a ponta com equipamento simulado caindo. |
 | `test/runtime/log_store_test.dart` | Consulta reduzida (mín./máx. por fatia, pico preservado, lacuna com contagem zero, uma linha por fatia quando cabe), colunas que sobrevivem a renomear e sair do grupo; CSV: vírgula decimal, data local, cabeçalho com unidade e aspas, BOM, `;`, CRLF, isolate igual ao caminho direto. |
 | `test/widgets/logs_page_test.dart` | Mais → Registros: criar com aviso sem variável, gravar sem tela aberta, uso de disco na lista, histórico com pinça, arrastar e valor sob o dedo, outro período, desligar; apagar o registro apaga o arquivo. |
+| `test/models/recipe_test.dart` | Receitas, regra pura: comparação com tolerância (borda, ruído do FLOAT32, inteiro grande, liga/desliga) mostrando só as diferenças; formato pt-BR e limpeza do FLOAT32; faixa da receita e o que a variável aceita (passo da escala); versões (10 contando a atual, edição juntada em 10 min, restaurar, duplicar); variáveis sugeridas para outra máquina e problemas da máquina; JSON ida e volta, projeto antigo byte a byte igual, `schemaVersion` 1, valores impossíveis; histórico de aplicações (ordem, último nome, 200, resultado desconhecido pulado). |
+| `test/runtime/recipe_apply_test.dart` | Aplicar pelo caminho de produção com a máquina de demonstração: grava só o que difere, relê, confere e liga o bit; escala nos dois sentidos; condição falsa ao preparar e entre a confirmação e o toque; recusa no 2º valor (1º gravado, 3º não tentado, bit desligado); comunicação que cai na 3ª gravação (ordem das gravações, sem releitura); CLP que limita o valor (divergência, bit não liga); sem comunicação ao preparar; transferir para outra máquina. |
+| `test/widgets/recipes_page_test.dart` | Mais → Receitas: criar lendo da máquina, comparar só a diferença, aplicar com uma confirmação "de → para", relatório e histórico (nome já preenchido na próxima; Cancelar não grava); condição que impede aplicar; tipo novo com faixa, tolerância e condição; atualizar pela máquina com confirmação e restaurar versão. |
 | `test/widgets/trend_axis_test.dart` | Eixo da direita do gráfico de tendência: cobre os dados, mesmo número de passos, passo redondo, sem eixo negativo para grandeza positiva (inclusive valor constante 0). |
 | `test/widgets/tour_test.dart` | Tutorial aparece na primeira visita, "já vi" com versão na chave, rearme por versão nova, "voltar" fecha o tutorial e não a página. |
 | `test/models/vendor_profiles_test.dart` | Uma linha por linha de tabela de cada perfil (extremos de cada trecho, ida e volta texto ⇄ endereço), octal com as vizinhas certas em toda família, prefixo mais longo, contador de 32 bits, bit de registrador, mensagens de memória inexistente, áreas sem sobreposição, notação de manual só sem perfil, parâmetros MD500/GD20 (com e sem EEPROM), modelos prontos, recalcular ao trocar de perfil. |

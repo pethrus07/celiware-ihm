@@ -38,7 +38,8 @@ class TagUse {
         }
         if (e.props['feedbackTagId'] == tagId) uses.add(TagUse(s, e, TagFit.boolean, feedback: true));
         final many = e.props['tagIds'];
-        if (many is List && many.contains(tagId)) uses.add(TagUse(s, e, TagFit.number));
+        // Tendência pede número; a tabela aceita qualquer valor único.
+        if (many is List && many.contains(tagId)) uses.add(TagUse(s, e, e.type == ElementType.table ? TagFit.any : TagFit.number));
       }
     }
     return uses;

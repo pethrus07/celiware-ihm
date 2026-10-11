@@ -15,11 +15,13 @@ import '../../widgets/common/common.dart';
 import '../../widgets/hmi/element_catalog.dart';
 import '../../widgets/hmi/elements/control_elements.dart';
 import '../../widgets/hmi/elements/indicator_elements.dart';
+import '../../widgets/hmi/elements/table_element.dart';
 import '../../widgets/hmi/hmi_canvas.dart';
 import '../../widgets/hmi/hmi_frame.dart';
 import '../../widgets/hmi/live_tags.dart';
 import '../../widgets/hmi/write_actions.dart';
 import '../tags/tag_form_page.dart';
+import 'table_config.dart';
 
 /// Configuração de um elemento: prévia ao vivo no topo, campos do tipo
 /// embaixo. Tudo salva na hora (sem botão Salvar).
@@ -97,7 +99,10 @@ class ElementConfigSheet extends StatelessWidget {
 
     // ── Variável ── ("Ir para tela" não grava nada: não pede variável)
     if (info.fit != TagFit.none && buttonMode != ButtonMode.screen) {
-      if (info.multiTag) {
+      if (e.type == ElementType.table) {
+        w.add(const SectionHeader('Variáveis (até ${TableElement.maxRows})', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+        w.add(TableRowsEditor(project: project, element: e, preferDevices: screenDevices, onChanged: (ids) => set('tagIds', ids)));
+      } else if (info.multiTag) {
         w.add(const SectionHeader('Variáveis (até 3)', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
         w.add(_MultiTagPicker(project: project, selected: e.tagIds.toList(), onChanged: (ids) => set('tagIds', ids)));
       } else {
@@ -129,7 +134,7 @@ class ElementConfigSheet extends StatelessWidget {
     // ── Texto do elemento ──
     if (e.type != ElementType.label && e.type != ElementType.image) {
       w.add(const SizedBox(height: 16));
-      w.add(_TextProp(key: ValueKey('rotulo-${tag?.id}'), label: 'Rótulo', value: e.prop<String>('label', ''), onChanged: (v) => set('label', v)));
+      w.add(_TextProp(key: ValueKey('rotulo-${tag?.id}'), label: e.type == ElementType.table ? 'Título (opcional)' : 'Rótulo', value: e.prop<String>('label', ''), onChanged: (v) => set('label', v)));
     }
 
     switch (e.type) {
@@ -283,6 +288,8 @@ class ElementConfigSheet extends StatelessWidget {
           for (final (v, t) in [('contain', 'Mostrar inteira'), ('cover', 'Preencher o espaço')])
             ChoiceChip(label: Text(t), selected: e.prop<String>('fit', 'contain') == v, onSelected: (_) => set('fit', v)),
         ]));
+      case ElementType.table:
+        w.addAll(tableTextFields(project, e, set));
       case ElementType.value:
       case ElementType.barChart:
       case ElementType.unknown:

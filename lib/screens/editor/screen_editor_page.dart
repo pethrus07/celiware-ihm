@@ -121,7 +121,7 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
     final firstId = screen.elements.firstOrNull?.id;
 
     return LiveTags(
-      tagIds: screen.tagIds,
+      tagIds: screen.liveTagIds,
       child: TourHost(
         spec: Tours.editor(palette: _paletteKey, element: _firstElementKey, config: _configKey, settings: _settingsKey, done: _doneKey),
         forceStart: widget.startTour,

@@ -2,8 +2,8 @@
 
 /// Tipos de elemento — o conjunto "principal do mercado" das IHMs.
 ///
-/// A ordem aqui é a ordem da paleta no editor. Para acrescentar um tipo:
-/// valor novo aqui + entrada no [ElementCatalog] + um renderizador em
+/// Para acrescentar um tipo: valor novo **no fim** + entrada no
+/// [ElementCatalog] (a ordem da paleta é a de lá) + um renderizador em
 /// `widgets/hmi/`. Tipos desconhecidos num arquivo (versão mais nova do app)
 /// são preservados como [ElementType.unknown] em vez de apagados.
 enum ElementType {
@@ -19,6 +19,9 @@ enum ElementType {
   label,
   image,
   unknown,
+
+  /// Tabela de valores (GR-7): várias variáveis, uma por linha.
+  table,
 }
 
 extension ElementTypeMeta on ElementType {
@@ -173,8 +176,16 @@ class HmiScreen {
   int get rows =>
       elements.fold(0, (m, e) => e.bottom > m ? e.bottom : m);
 
-  /// Todas as variáveis que a tela precisa ler — é isso que liga a varredura.
+  /// Todas as variáveis que a tela usa (equipamentos da faixa, "usada em").
   Set<String> get tagIds => {for (final e in elements) ...e.tagIds};
+
+  /// O que a tela inscreve de uma vez no runtime — é isso que liga a
+  /// varredura. A tabela de valores fica de fora: ela mesma inscreve só as
+  /// linhas montadas, e uma tabela de 30 que rola lê o que está à vista.
+  Set<String> get liveTagIds => {
+        for (final e in elements)
+          if (e.type != ElementType.table) ...e.tagIds,
+      };
 
   HmiScreen copyWith({
     String? name,

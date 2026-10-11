@@ -161,7 +161,7 @@ lib/
 │   ├── shell.dart                    Barra inferior (4 abas).
 │   ├── screens_page.dart             Lista de telas com planta em miniatura.
 │   ├── screen_run_page.dart          Tela em operação.
-│   ├── editor/                       Editor, paleta, configuração de elemento.
+│   ├── editor/                       Editor, paleta, configuração de elemento (a da tabela em table_config.dart).
 │   ├── devices/                      Lista e cadastro de equipamento (Testar conexão).
 │   ├── tags/                         Lista e cadastro de variável (Lendo agora).
 │   ├── logs/                         Registros: lista, folha do grupo, histórico.
@@ -174,13 +174,13 @@ lib/
     │   ├── hmi_frame.dart            Moldura comum + estados de problema.
     │   ├── live_tags.dart            "Estas variáveis ao vivo enquanto eu estiver na tela."
     │   ├── write_actions.dart        Regras de escrita + teclado numérico grande.
-    │   └── elements/                 Renderizadores (controle, indicador, gráfico, estático).
+    │   └── elements/                 Renderizadores (controle, indicador, gráfico, estático, tabela).
     ├── tour/tour.dart                Motor de tutorial (realce, balão, "já vi").
     └── common/common.dart            Estado vazio, selo de conexão, cartões de escolha...
 
 sim/            Simulador Modbus TCP externo (Python) — ver SIMULACAO.md.
 test/           Testes: protocolo, TCP real, codec, planejador, runtime, fluxos de tela.
-tool/           Gerador de ícone e da documentação em Word.
+tool/           Gerador de ícone e da documentação em Word; bench/ mede a rolagem em modo profile (§8).
 store/          Material da Play Store (ícone 512).
 ```
 
@@ -422,6 +422,10 @@ Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; 
 
 A tela é uma grade de **6 colunas de células quadradas**; a célula mede largura ÷ colunas, então a mesma tela fica proporcional em celular e tablet. Num aparelho de 390 dp a célula tem ~60 dp, acima do mínimo de toque de 48 dp. A célula tem **dois tetos**: 96 dp e 1/4,5 da altura útil. Sem eles, no tablet e no celular deitado a célula crescia com a largura e só cabiam dois elementos gigantes (achado do QA de 27/09); agora a grade fica centralizada, do tamanho de um celular em pé 1,5× maior, e o celular deitado mostra ~4,5 linhas. Cada elemento tem posição e tamanho em células e um mapa `props` com a configuração do tipo.
 
+**Grade fina e densidade** (REQUISITOS-ETAPA4 §5.1). Em **Regras da tela → Grade**, Normal (6 colunas) ou **Fina (12)**. Passar para a fina multiplica posição e tamanho por 2 e a tela não mexe; voltar só quando tudo é par (`HmiScreen.withColumns`; o arquivo guarda `columns` e o `schemaVersion` segue 1). Na fina o respiro é 20% da célula (4 a 12 dp), o teto passa a ser a largura (1.200 dp) e o mínimo dobra — menos para quem cabe numa linha (mostrador, lâmpada, indicador, texto: uma célula fina, rótulo ao lado do valor); quem grava nunca desce de 2×2 (~60 dp). **GR-8:** num celular de 390×844 dp, duas tabelas lado a lado (6 colunas finas × 22 linhas finas, 23 variáveis cada) mostram **46 variáveis sem rolar** com barras de Android de 32/24 dp, e 44 no pior recorte de câmera (47/34 dp) — o teste conta as linhas inteiras à vista e com valor.
+
+**Tabela de valores** (GR-7, `TableElement`). Até 30 variáveis, uma por linha: nome à esquerda (reticências se faltar espaço), valor à direita em número tabular com a unidade menor colada; liga/desliga mostra o texto de ligado/desligado da tabela (ligado em negrito, desligado apagado — cor só no anormal); texto lido aparece como texto. A linha tem de 28 a 40 dp: espalha até 40 quando sobra altura, encolhe até 28 e daí a tabela rola, com um trilho fino sempre à vista. Linhas ímpares ganham um tom de fundo (sem borda). Qualidade por linha, como nos cartões: "---" esperando, último valor esmaecido com o ícone de sem comunicação, motivo em vermelho no endereço recusado, a forma da prioridade ao lado do nome e a linha tingida enquanto o alarme da variável está ativo. **Tocar numa linha numérica gravável** abre o teclado do "Ajuste de valor" (lápis na cor de interação, confirmação da tela); o toque só abre o teclado, quem grava é o GRAVAR, por isso a linha pode ter menos que os 48 dp de um botão. Liga/desliga fica **só leitura** na tabela: raspão numa linha de 28 dp não pode ligar motor — comando é o Botão. Tamanho padrão 6×4 (12×8 na fina), mínimo 3×2 (6×4). **Só lê o que está à vista:** a tela inscreve `HmiScreen.liveTagIds`, que deixa as linhas da tabela de fora; a tabela inscreve as próprias linhas com `VisibleLiveTags` (uma linha de folga em cima e embaixo) — numa tabela 6×3 com 30 variáveis, menos de 10 são lidas, e rolar troca a inscrição. A folga vale para a rolagem da própria tabela: tabela inteira fora da tela (abaixo, na rolagem da grade) continua lida. Variável apagada some da tabela. A demonstração **não** ganhou tela com tabela: o vídeo (`tool/video/apresentacao.py`) toca a tela "Cortadora na rede" pela posição na lista (`TELA_REDE`), e uma terceira tela da demonstração a empurraria para baixo.
+
 | Tipo | Propriedades |
 |---|---|
 | button | tagId, label, mode (toggle · momentary · set · reset · value · screen), value, color, feedbackTagId (retorno), goTo (modo screen) |
@@ -435,6 +439,7 @@ A tela é uma grade de **6 colunas de células quadradas**; a célula mede largu
 | barChart | tagId (variável lista), label |
 | label | text, size (s · m · l), align (left · center) |
 | image | data (PNG em base64, reduzido a 900 px), fit (contain · cover), source (fixed · byValue), tagId + images: lista de {value, data} (modo byValue, reduzidas a 1200 px) |
+| table | tagIds (até 30, na ordem das linhas), label (título; vazio = sem título), onText, offText (texto das linhas liga/desliga) |
 
 Em qualquer elemento menos botão e ajuste de valor, `goTo` é a tela que abre ao tocar (nos dois o toque já grava; o botão tem o próprio modo "Ir para tela"). Trocar de tela **substitui** a atual, como numa IHM de painel: só a tela à vista é lida e o "voltar" leva à lista de telas.
 
@@ -483,7 +488,7 @@ Grade pontilhada; "+ Elemento" abre a paleta (ícone, nome e uma frase curta). O
 
 Prévia ao vivo no topo, na proporção real. A variável aparece numa linha só; tocar abre uma folha com as variáveis compatíveis (cada uma com o valor atual) e "Criar variável" sem sair do editor. Campos só do que faz sentido para o tipo (modo do botão, cores de estado, limites, estados do indicador, janela do gráfico, texto, imagem). Aviso quando a variável escolhida é só leitura num elemento que grava.
 
-Botão: seis modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira o nome dela) e, nos modos liga/desliga, **Retorno da máquina** — por padrão "Mesma variável do comando", tocar escolhe outra. Imagem: **Fixa** ou **Muda com a variável**; no segundo, a variável da etapa e a lista código → imagem, com "Acrescentar imagens" (várias de uma vez) e "Importar PDF". Demais elementos: **Ao tocar, abrir a tela** (Nada ou uma das telas), só quando o projeto tem mais de uma tela.
+Botão: seis modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira o nome dela) e, nos modos liga/desliga, **Retorno da máquina** — por padrão "Mesma variável do comando", tocar escolhe outra. Imagem: **Fixa** ou **Muda com a variável**; no segundo, a variável da etapa e a lista código → imagem, com "Acrescentar imagens" (várias de uma vez) e "Importar PDF". Tabela (`table_config.dart`): as variáveis na ordem das linhas, cada uma com o valor ao vivo, **x** para tirar e a alça para arrastar; **Escolher variáveis** abre a lista com caixas de marcar (agrupada por equipamento, busca a partir de 8): cada toque marca ou desmarca e a tabela muda na hora, na ordem dos toques, até 30; "Pronto · 12 variáveis" fecha. O rótulo vira **Título (opcional)**, e o texto de ligado/desligado só aparece quando a tabela tem alguma linha liga/desliga. Demais elementos: **Ao tocar, abrir a tela** (Nada ou uma das telas), só quando o projeto tem mais de uma tela.
 
 ![Editor com elemento selecionado](imagens/editor.png)
 ![Configuração do elemento](imagens/configurar-elemento.png)
@@ -615,6 +620,8 @@ Tipografia IBM Plex (licença OFL): Sans para texto e rótulos (caixa alta com e
 
 **Desempenho medido** (emulador Pixel 7, SurfaceFlinger): rolagem a 60 quadros/s sem quadro lento; partida a frio 1,1–2 s; 72 MB de memória. Tela parada desenha só quando um valor muda: a barra anima apenas em mudança de mais de 3%, a lâmpada troca na hora e cada elemento tem a própria camada (`RepaintBoundary`) — a operação com a máquina em ciclo caiu de 38 para 12 quadros/s. A cor de estado é salva no projeto pelo nome, então o tom pode ser ajustado sem quebrar arquivos.
 
+**Grade densa (GR-9).** *Só o que mudou redesenha:* a varredura publica uma leitura nova a cada ciclo, mesmo com o valor igual (carimbo de hora novo), e o `TagBuilder` reconstruía o elemento a cada uma. Agora ele compara o que aparece — valor, qualidade e motivo — e ignora o resto; motor de alarmes e registro continuam ouvindo o runtime direto e recebem toda leitura (o atraso de 1 s do alarme e o "leitura parada" do registro dependem disso). Na tela de teste de 48 elementos com varredura de 500 ms (`test/widgets/grid_performance_test.dart`), contado com os ganchos de reconstrução e de pintura do Flutter: equipamento parado → **0** reconstruções por varredura (eram 58, uma por leitura à vista); três valores mudam → 3 reconstruções e só esses 3 elementos repintam; rolar a tela por ~1 s → nenhum elemento repinta (as camadas só se movem); tudo muda → 58 e 48 (contraprova). *Quadros por segundo:* `tool/bench/gr9_rolagem.dart` roda a mesma tela em modo profile, rolando sem parar, e anota o `FrameTiming` de cada quadro (com uma fase de referência na tela de operação da demonstração). Medido num AVD Pixel 7 próprio (Android 36, Impeller sobre OpenGLES traduzido para a GPU do PC): na rodada com o PC folgado, 22,5 quadros/s com a máquina em ciclo e 24,3 com todas as leituras mudando; montagem na thread da interface com mediana de 1,6–2,0 ms e desenho com mediana de 28–33 ms. As rodadas seguintes, com o PC a 91–100% de CPU (outros emuladores abertos), foram descartadas — até a referência caiu para 27–30 quadros/s. **O GR-9 ainda não está comprovado:** a interface sobra; o tempo vai no desenho, que no emulador passa por tradução de OpenGL. Falta medir num aparelho de verdade (Pixel 7 e um de entrada) com o mesmo medidor. Se o aparelho confirmar, o primeiro suspeito é o acabamento dos cartões — sombra em duas camadas e brilho do topo — multiplicado pelos ~25 cartões que a grade fina põe à vista de uma vez.
+
 ## 9. Padrões de projeto
 
 | Padrão | Onde |
@@ -636,7 +643,8 @@ Tipografia IBM Plex (licença OFL): Sans para texto e rótulos (caixa alta com e
 1. Valor novo em `ElementType` (`lib/models/hmi_screen.dart`).
 2. Ficha em `ElementCatalog.all` e propriedades iniciais em `defaultProps` (`lib/widgets/hmi/element_catalog.dart`); documente as chaves na tabela do catálogo.
 3. Renderizador em `lib/widgets/hmi/elements/`, usando `HmiFrame` + `TagBuilder` (a moldura já trata os estados de problema) e `WriteActions` se gravar.
-4. Caso novo no `switch` de `HmiElementView` e campos na `ElementConfigSheet`.
+4. Caso novo no `switch` de `HmiElementView` e campos na `ElementConfigSheet` (configuração grande vai num arquivo próprio, como `table_config.dart`).
+5. Valor novo sempre **no fim** do enum. Elemento que inscreve as próprias variáveis (como a tabela, que só lê as linhas à vista) sai de `HmiScreen.liveTagIds`; `tagIds` continua com todas (faixa de equipamentos, "usada em").
 
 ### 10.2. Acrescentar um perfil de fabricante
 
@@ -746,6 +754,8 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/models/profile_json_test.dart` | `Device.profile` e `Tag.memory` no JSON: ida e volta, ausentes no genérico, arquivo antigo, id de perfil desconhecido preservado, `schemaVersion` 1. |
 | `test/services/tag_batch_test.dart` | Criar várias: faixa (contagem, nomes, passo de 32 bits, octal, contador de 32 bits, buraco entre trechos, par de 32 bits), limites 256/1000, leituras por ciclo, conflitos pular/substituir, parâmetros e modelos de inversor; CSV (separadores, aspas, BOM, Latin-1, cabeçalho opcional, erro por linha, contato × valor); `saveTags` com um aviso e uma gravação. |
 | `test/widgets/bulk_tags_test.dart` | Criar várias pela interface (faixa em 32 bits, prévia, criar e substituir; X8 recusado; CSV com linha ruim), marca e modelo no equipamento com recalcular endereços, lista com 2.000 variáveis montando e lendo só as visíveis e rolando até a última. |
+| `test/widgets/table_element_test.dart` | Tabela de valores (GR-7): tamanhos nas duas grades, arquivo ida e volta, `liveTagIds` sem as linhas, "usada em" aceitando texto; valores ao vivo com unidade, liga/desliga com o texto da tabela e texto lido, na ordem configurada; endereço recusado só na linha dele, alarme marcando a linha, queda com o último valor esmaecido e volta; tocar na linha gravável abre o teclado, confirma e grava (liga/desliga, só leitura e tela só acompanhamento não); tabela que rola lê só as linhas à vista e troca a inscrição ao rolar; pelo editor: paleta na grade fina, escolher várias, reordenar pela alça, tirar. GR-8: 390×844 dp com barras de Android e de recorte de câmera, contando as variáveis inteiras à vista (46 e 44). |
+| `test/widgets/grid_performance_test.dart` | GR-9: tela fina de 48 elementos (a mesma de `tool/bench/gr9_rolagem.dart`) com varredura de 500 ms, contando reconstruções por leitura e camadas repintadas: nada muda → 0; três mudam → 3, e só esses repintam; rolar ~1 s → nenhum elemento repinta; tudo muda → 58 e 48 (contraprova de que o contador conta). |
 
 Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstração e animações avançam por passos, sem depender da velocidade da máquina. Toque que não acerta o alvo é falha, não aviso (`hitTestWarningShouldBeFatal`). Eles já pegaram seis defeitos reais antes do aparelho: quatro transbordos de layout (cartão de tela, legenda do gráfico, lâmpada estreita em dois tamanhos), leitura publicando depois do encerramento e toque sem retorno em tela só acompanhamento.
 

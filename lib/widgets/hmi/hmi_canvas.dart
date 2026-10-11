@@ -10,6 +10,7 @@ import 'elements/chart_elements.dart';
 import 'elements/control_elements.dart';
 import 'elements/indicator_elements.dart';
 import 'elements/static_elements.dart';
+import 'elements/table_element.dart';
 import 'hmi_frame.dart';
 
 /// Desenha um elemento conforme o tipo.
@@ -43,6 +44,8 @@ class HmiElementView extends StatelessWidget {
         return LabelElement(element: e);
       case ElementType.image:
         return ImageElement(element: e);
+      case ElementType.table:
+        return TableElement(element: e);
       case ElementType.unknown:
         return UnknownElement(element: e);
     }

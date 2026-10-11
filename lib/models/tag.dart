@@ -293,12 +293,16 @@ class Tag {
     if (t.scale == 0 || !t.scale.isFinite) t = t.copyWith(scale: 1);
     if (!t.offset.isFinite) t = t.copyWith(offset: 0);
     if (!t.dataType.isNumeric && (t.scale != 1 || t.offset != 0)) t = t.copyWith(scale: 1, offset: 0);
-    // Alarme tem que casar com o tipo: limite para número, ligar/desligar
-    // para liga/desliga; texto e lista não alarmam.
-    final fits = t.alarms.where((a) => !t.isArray && !t.isText && (t.dataType == TagDataType.bool ? !a.kind.isAnalog : a.kind.isAnalog)).toList();
+    final fits = t.alarms.where(t.acceptsAlarm).toList();
     if (fits.length != t.alarms.length) t = t.copyWith(alarms: fits);
     return t;
   }
+
+  /// Alarme tem que casar com o tipo: limite para número, ligar/desligar para
+  /// liga/desliga; texto e lista não alarmam. O cadastro usa para avisar,
+  /// na hora da troca de tipo, quais alarmes deixam de valer.
+  bool acceptsAlarm(AlarmRule a) =>
+      !isArray && !isText && (dataType == TagDataType.bool ? !a.kind.isAnalog : a.kind.isAnalog);
 
   Map<String, dynamic> toJson() => {
         'id': id,

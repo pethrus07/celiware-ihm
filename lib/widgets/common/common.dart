@@ -259,16 +259,17 @@ class StepperField extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        _StepBtn(icon: Icons.remove_rounded, onTap: () => _bump(-1)),
+        StepButton(icon: Icons.remove_rounded, onTap: () => _bump(-1)),
         const SizedBox(width: 6),
-        _StepBtn(icon: Icons.add_rounded, onTap: () => _bump(1)),
+        StepButton(icon: Icons.add_rounded, onTap: () => _bump(1)),
       ],
     );
   }
 }
 
-class _StepBtn extends StatelessWidget {
-  const _StepBtn({required this.icon, required this.onTap});
+/// Botão − / + ao lado de um campo numérico (mesma altura do campo).
+class StepButton extends StatelessWidget {
+  const StepButton({super.key, required this.icon, required this.onTap});
   final IconData icon;
   final VoidCallback onTap;
 
@@ -281,6 +282,34 @@ class _StepBtn extends StatelessWidget {
           onPressed: onTap,
           style: FilledButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: Ind.surfaceHigh, foregroundColor: Ind.text),
           child: Icon(icon),
+        ),
+      );
+}
+
+/// Sugestão que se aplica com um toque ("Parece a notação de manual…",
+/// "Tente palavras trocadas…"). Azul de informação: não é erro, é atalho. Só
+/// aparece quando o problema existe.
+class SuggestionTile extends StatelessWidget {
+  const SuggestionTile({super.key, required this.text, required this.onTap, this.icon = Icons.auto_fix_high_rounded});
+  final String text;
+  final VoidCallback onTap;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Ind.info.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(Ind.radiusSmall),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Ind.radiusSmall),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              Icon(icon, color: Ind.info),
+              const SizedBox(width: 10),
+              Expanded(child: Text(text, style: const TextStyle(height: 1.35))),
+            ]),
+          ),
         ),
       );
 }

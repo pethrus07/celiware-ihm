@@ -118,6 +118,9 @@ void main() {
     await live(tester, 400);
     final tile = find.byKey(const ValueKey('voz-e-avisos'));
     await tester.scrollUntilVisible(tile, 200, scrollable: find.byType(Scrollable).first);
+    // Até o meio: na beirada de baixo, a barra de abas cobre a linha.
+    await Scrollable.ensureVisible(tester.element(tile), alignment: 0.5);
+    await live(tester, 400);
     expect(find.text('Fala os alarmes'), findsOneWidget);
     await tester.tap(tile);
     await live(tester, 600);
@@ -168,6 +171,9 @@ void main() {
     await live(tester, 400);
     final tile = find.byKey(const ValueKey('voz-e-avisos'));
     await tester.scrollUntilVisible(tile, 200, scrollable: find.byType(Scrollable).first);
+    // Até o meio: na beirada de baixo, a barra de abas cobre a linha.
+    await Scrollable.ensureVisible(tester.element(tile), alignment: 0.5);
+    await live(tester, 400);
     expect(find.text('Falta a voz em português'), findsOneWidget);
     await tester.tap(tile);
     await live(tester, 600);

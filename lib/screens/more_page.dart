@@ -17,6 +17,7 @@ import '../widgets/hmi/write_actions.dart';
 import '../widgets/tour/tour.dart';
 import 'devices/devices_page.dart';
 import 'editor/screen_editor_page.dart';
+import 'logs/logs_page.dart';
 import 'screen_run_page.dart';
 import 'screens_page.dart';
 import 'shell.dart';
@@ -80,6 +81,14 @@ class MorePage extends StatelessWidget {
             title: const Text('Começar do zero'),
             onTap: () => _replace(context, const Project(name: 'Meu projeto'), 'Começar um projeto vazio?'),
           ),
+          const SectionHeader('Dados'),
+          ListTile(
+            key: const ValueKey('registros'),
+            leading: const Icon(Icons.timeline_rounded),
+            title: const Text('Registros'),
+            subtitle: Text(_logsSummary(p)),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LogsPage())),
+          ),
           const SectionHeader('Aparência'),
           Padding(
             padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 4),
@@ -136,6 +145,13 @@ class MorePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// "Histórico em gráfico e planilha" ou "2 registros · 1 ligado".
+  static String _logsSummary(Project p) {
+    final n = p.logGroups.length, on = p.logGroups.where((g) => g.enabled).length;
+    if (n == 0) return 'Histórico em gráfico e planilha';
+    return '${n == 1 ? '1 registro' : '$n registros'} · ${on == 0 ? 'nenhum ligado' : on == 1 ? '1 ligado' : '$on ligados'}';
   }
 
   static void _openTour(BuildContext context, String id) {

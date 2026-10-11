@@ -7,6 +7,8 @@ import 'package:logging/logging.dart';
 import 'app/app_scope.dart';
 import 'app/appearance.dart';
 import 'services/alarms/alarm_engine.dart';
+import 'services/logging/data_logger.dart';
+import 'services/logging/log_store.dart';
 import 'widgets/alarms/alarm_widgets.dart';
 import 'app/project_controller.dart';
 import 'core/theme/app_theme.dart';
@@ -56,6 +58,7 @@ class CeliwareIhmApp extends StatefulWidget {
 class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObserver {
   late final AlarmEngine _alarms;
   late final VoiceAnnouncer _voice;
+  late final DataLogger _logger;
 
   /// Navegação a partir da faixa de alarme (que fica acima do Navigator).
   final _navigator = GlobalKey<NavigatorState>();
@@ -75,6 +78,8 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
       controller: widget.controller,
       runtime: widget.runtime,
     );
+    // Registro de dados: banco por grupo em `registros/`, ao lado do projeto.
+    _logger = DataLogger(controller: widget.controller, runtime: widget.runtime, store: LogStore.beside(widget.controller.repository));
     WidgetsBinding.instance.addObserver(this);
     AppearanceController.instance.addListener(_applyAppearance);
     _applySystemBars();
@@ -86,6 +91,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
     WidgetsBinding.instance.removeObserver(this);
     _voice.dispose();
     _alarms.dispose();
+    _logger.dispose();
     super.dispose();
   }
 
@@ -129,9 +135,12 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
         unawaited(_alarms.flush());
         // Sem varredura não há alarme novo; a voz para junto (§2.4).
         _voice.pause();
+        // O registro descarrega o lote e marca a lacuna (§6.10).
+        unawaited(_logger.pause());
       case AppLifecycleState.resumed:
         widget.runtime.resume();
         _voice.resume();
+        _logger.resume();
       default:
         break;
     }
@@ -144,6 +153,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
       runtime: widget.runtime,
       alarms: _alarms,
       voice: _voice,
+      logger: _logger,
       child: MaterialApp(
         title: 'Ware IoT',
         debugShowCheckedModeBanner: false,

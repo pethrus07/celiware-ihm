@@ -28,6 +28,9 @@ dependencies:
   flutter_tts: ^4.2.5
   # Cliente MQTT 3.1.1 (Dart puro, MIT) para equipamento que publica num broker.
   mqtt_client: ^10.12.0
+  # Registro de dados (Mais → Registros): o SQLite do próprio Android, sem
+  # biblioteca nativa no APK.
+  sqflite: ^2.4.4+1
 
 dev_dependencies:
   flutter_test:
@@ -35,6 +38,11 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   # Relógio e timers controlados nos testes da fila de voz (repetição de 30 s).
   fake_async: ^1.3.3
+  # SQLite nos testes (o flutter test roda no Windows). Só aqui de propósito:
+  # o build release não roda hooks de dev_dependencies, então o SQLite que ele
+  # embute não vai para o APK. Versão Windows do app: mover para dependencies
+  # e usar `databaseFactoryFfi` no main.dart.
+  sqflite_common_ffi: ^2.4.3
 
 flutter:
   uses-material-design: true

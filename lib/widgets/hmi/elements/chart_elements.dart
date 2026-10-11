@@ -118,7 +118,132 @@ class _TrendElementState extends State<TrendElement> {
 
 /// Eixo da direita do gráfico de tendência — exposto só para os testes.
 @visibleForTesting
-(double, double) trendAlignedRange(double dataLo, double dataHi, int steps) => _TrendPainter.alignedRange(dataLo, dataHi, steps);
+(double, double) trendAlignedRange(double dataLo, double dataHi, int steps) => TrendScale.alignedRange(dataLo, dataHi, steps);
+
+/// Régua dos gráficos de linha. A tendência da tela e o histórico do
+/// registro desenham poço, grade e eixos por aqui, para os dois lerem igual
+/// (mesmos passos redondos, mesmo eixo duplo, mesmos números).
+class TrendScale {
+  const TrendScale._(this.lo, this.hi, this.rLo, this.rHi);
+
+  /// Eixo da esquerda.
+  final double lo, hi;
+
+  /// Eixo da direita (unidade diferente da 1ª curva); 0..1 quando não há.
+  final double rLo, rHi;
+
+  /// Valor → y dentro de [plot], no eixo pedido.
+  double y(Rect plot, double v, {bool right = false}) {
+    final a = right ? rLo : lo, b = right ? rHi : hi;
+    return plot.bottom - plot.height * ((v - a) / (b - a));
+  }
+
+  /// Calcula as faixas e desenha poço, grade e números dos dois eixos.
+  /// [leftData]/[rightData] = (mín., máx.) dos dados de cada lado (infinitos
+  /// se vazio); sem [rightData], eixo só à esquerda.
+  static TrendScale paint(
+    Canvas canvas,
+    Rect plot, {
+    required (double, double) leftData,
+    (double, double)? rightData,
+    double? fixedMin,
+    double? fixedMax,
+    required Color leftColor,
+    required Color rightColor,
+  }) {
+    // Escala: fixa se configurada; senão automática, arredondada para números
+    // "redondos" (0, 25, 50...) — eixo com 87,2 e -6,46 ninguém lê de relance.
+    // Grandeza que nunca foi negativa não ganha eixo negativo.
+    final (dataMin, dataMax) = leftData;
+    var lo = fixedMin ?? dataMin, hi = fixedMax ?? dataMax;
+    if (!lo.isFinite || !hi.isFinite) {
+      lo = fixedMin ?? 0;
+      hi = fixedMax ?? 100;
+    }
+    if (hi - lo < 1e-9) {
+      hi += 1;
+      lo -= 1;
+    }
+    if (fixedMin == null || fixedMax == null) {
+      final step = niceStep((hi - lo) / 4);
+      if (fixedMin == null) lo = (lo / step).floor() * step;
+      if (fixedMax == null) hi = (hi / step).ceil() * step;
+      if (fixedMin == null && dataMin >= 0 && lo < 0) lo = 0;
+      if (hi - lo < step) hi = lo + step;
+    }
+
+    // Grade discreta: serve de régua, não compete com a curva.
+    final grid = Paint()
+      ..color = Ind.line.withValues(alpha: 0.7)
+      ..strokeWidth = 1;
+    // Fundo do gráfico rebaixado, como a face de um instrumento.
+    canvas.drawRRect(RRect.fromRectAndRadius(plot.inflate(2), const Radius.circular(6)), Paint()..color = Ind.well.withValues(alpha: Ind.isDark ? 0.55 : 0.45));
+    final tp = TextPainter(textDirection: TextDirection.ltr);
+    // Linhas nos múltiplos do passo redondo (0 · 50 · 100 · 150), não em
+    // quartos da faixa — quartos de 0..150 davam "37,5 · 75 · 113".
+    final step = niceStep((hi - lo) / 4);
+    final ticks = [for (var v = (lo / step).ceil() * step; v <= hi + step * 1e-6; v += step) v];
+    final dual = rightData != null;
+    final (rLo, rHi) = dual ? alignedRange(rightData.$1, rightData.$2, ((hi - lo) / step).round().clamp(1, 12)) : (0.0, 1.0);
+    for (final v in ticks) {
+      final frac = (v - lo) / (hi - lo);
+      final y = plot.bottom - plot.height * frac;
+      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
+      tp.text = TextSpan(text: short(v), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: leftColor));
+      tp.layout();
+      tp.paint(canvas, Offset(plot.left - tp.width - 5, y - tp.height / 2));
+      if (dual) {
+        tp.text = TextSpan(text: short(rLo + frac * (rHi - rLo)), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: rightColor));
+        tp.layout();
+        tp.paint(canvas, Offset(plot.right + 5, y - tp.height / 2));
+      }
+    }
+    return TrendScale._(lo, hi, rLo, rHi);
+  }
+
+  /// Eixo da direita com o MESMO número de passos do da esquerda, para as
+  /// marcas das duas escalas caírem nas mesmas linhas de grade — e ainda em
+  /// números redondos dos dois lados.
+  static (double, double) alignedRange(double dataLo, double dataHi, int steps) {
+    if (!dataLo.isFinite || !dataHi.isFinite) return (0, 100);
+    // Decidido ANTES de alargar a faixa: valor constante 0 virava -1..1 e
+    // ganhava eixo negativo.
+    final nonNegative = dataLo >= 0;
+    if (dataHi - dataLo < 1e-9) {
+      dataHi += 1;
+      dataLo -= 1;
+    }
+    var step = niceStep((dataHi - dataLo) / steps);
+    var lo = (dataLo / step).floor() * step;
+    if (nonNegative && lo < 0) lo = 0;
+    while (lo + steps * step < dataHi - 1e-9) {
+      step = niceStep(step * 1.0001);
+      lo = (dataLo / step).floor() * step;
+      if (nonNegative && lo < 0) lo = 0;
+    }
+    return (lo, lo + steps * step);
+  }
+
+  /// Passo "redondo" (1, 2, 2,5 ou 5 × 10ⁿ) mais próximo acima de [raw].
+  static double niceStep(double raw) {
+    if (raw <= 0 || !raw.isFinite) return 1;
+    final exp = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
+    final f = raw / exp;
+    final nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+    return nice * exp;
+  }
+
+  /// Número curto para eixo.
+  static String short(double v) {
+    // Marca redonda (os passos são 1·2·2,5·5×10ⁿ) sai sem casa decimal.
+    if (v == v.roundToDouble()) return v.round().toString();
+    final a = v.abs();
+    if (a >= 10000) return '${(v / 1000).toStringAsFixed(0)}k';
+    if (a >= 100) return v.toStringAsFixed(0);
+    if (a >= 10) return v.toStringAsFixed(1).replaceAll('.', ',');
+    return v.toStringAsFixed(2).replaceAll('.', ',');
+  }
+}
 
 class _Series {
   _Series({required this.tag, required this.color, required this.samples, required this.reading});
@@ -147,29 +272,6 @@ class _TrendPainter extends CustomPainter {
     return (lo, hi);
   }
 
-  /// Eixo da direita com o MESMO número de passos do da esquerda, para as
-  /// marcas das duas escalas caírem nas mesmas linhas de grade — e ainda em
-  /// números redondos dos dois lados.
-  static (double, double) alignedRange(double dataLo, double dataHi, int steps) {
-    if (!dataLo.isFinite || !dataHi.isFinite) return (0, 100);
-    // Decidido ANTES de alargar a faixa: valor constante 0 virava -1..1 e
-    // ganhava eixo negativo.
-    final nonNegative = dataLo >= 0;
-    if (dataHi - dataLo < 1e-9) {
-      dataHi += 1;
-      dataLo -= 1;
-    }
-    var step = _niceStep((dataHi - dataLo) / steps);
-    var lo = (dataLo / step).floor() * step;
-    if (nonNegative && lo < 0) lo = 0;
-    while (lo + steps * step < dataHi - 1e-9) {
-      step = _niceStep(step * 1.0001);
-      lo = (dataLo / step).floor() * step;
-      if (nonNegative && lo < 0) lo = 0;
-    }
-    return (lo, lo + steps * step);
-  }
-
   @override
   void paint(Canvas canvas, Size size) {
     // Unidades diferentes (m/min × °C) numa escala só achatavam uma das
@@ -184,54 +286,17 @@ class _TrendPainter extends CustomPainter {
     final plot = Rect.fromLTRB(left, 4, size.width - right, size.height - bottom);
     if (plot.width <= 10 || plot.height <= 10) return;
 
-    // Escala: fixa se configurada; senão automática, arredondada para números
-    // "redondos" (0, 25, 50...) — eixo com 87,2 e -6,46 ninguém lê de relance.
-    // Grandeza que nunca foi negativa não ganha eixo negativo.
-    final (dataMin, dataMax) = _dataRange(leftGroup);
-    var lo = fixedMin ?? dataMin, hi = fixedMax ?? dataMax;
-    if (!lo.isFinite || !hi.isFinite) {
-      lo = fixedMin ?? 0;
-      hi = fixedMax ?? 100;
-    }
-    if (hi - lo < 1e-9) {
-      hi += 1;
-      lo -= 1;
-    }
-    if (fixedMin == null || fixedMax == null) {
-      final step = _niceStep((hi - lo) / 4);
-      if (fixedMin == null) lo = (lo / step).floor() * step;
-      if (fixedMax == null) hi = (hi / step).ceil() * step;
-      if (fixedMin == null && dataMin >= 0 && lo < 0) lo = 0;
-      if (hi - lo < step) hi = lo + step;
-    }
-
-    // Grade discreta: serve de régua, não compete com a curva.
-    final grid = Paint()
-      ..color = Ind.line.withValues(alpha: 0.7)
-      ..strokeWidth = 1;
-    // Fundo do gráfico rebaixado, como a face de um instrumento.
-    canvas.drawRRect(RRect.fromRectAndRadius(plot.inflate(2), const Radius.circular(6)), Paint()..color = Ind.well.withValues(alpha: Ind.isDark ? 0.55 : 0.45));
+    final scale = TrendScale.paint(
+      canvas,
+      plot,
+      leftData: _dataRange(leftGroup),
+      rightData: dual ? _dataRange(rightGroup) : null,
+      fixedMin: fixedMin,
+      fixedMax: fixedMax,
+      leftColor: dual ? leftGroup.first.color : Ind.textMuted,
+      rightColor: dual ? rightGroup.first.color : Ind.textMuted,
+    );
     final tp = TextPainter(textDirection: TextDirection.ltr);
-    // Linhas nos múltiplos do passo redondo (0 · 50 · 100 · 150), não em
-    // quartos da faixa — quartos de 0..150 davam "37,5 · 75 · 113".
-    final step = _niceStep((hi - lo) / 4);
-    final ticks = [for (var v = (lo / step).ceil() * step; v <= hi + step * 1e-6; v += step) v];
-    final (rLo, rHi) = dual ? alignedRange(_dataRange(rightGroup).$1, _dataRange(rightGroup).$2, ((hi - lo) / step).round().clamp(1, 12)) : (0.0, 1.0);
-    final leftColor = dual ? leftGroup.first.color : Ind.textMuted;
-    final rightColor = dual ? rightGroup.first.color : Ind.textMuted;
-    for (final v in ticks) {
-      final frac = (v - lo) / (hi - lo);
-      final y = plot.bottom - plot.height * frac;
-      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), grid);
-      tp.text = TextSpan(text: _short(v), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: leftColor));
-      tp.layout();
-      tp.paint(canvas, Offset(left - tp.width - 5, y - tp.height / 2));
-      if (dual) {
-        tp.text = TextSpan(text: _short(rLo + frac * (rHi - rLo)), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: rightColor));
-        tp.layout();
-        tp.paint(canvas, Offset(plot.right + 5, y - tp.height / 2));
-      }
-    }
     for (final (label, frac) in [('-${_dur(window)}', 0.0), ('agora', 1.0)]) {
       tp.text = TextSpan(text: label, style: TextStyle(fontSize: 10, color: Ind.textMuted));
       tp.layout();
@@ -243,14 +308,13 @@ class _TrendPainter extends CustomPainter {
     for (final s in series) {
       if (s.samples.length < 2) continue;
       final onRight = rightGroup.contains(s);
-      final sLo = onRight ? rLo : lo, sHi = onRight ? rHi : hi;
       final path = Path();
       var first = true;
       var firstX = 0.0;
       var last = Offset.zero;
       for (final p in s.samples) {
         final x = plot.right - plot.width * (now.difference(p.at).inMilliseconds / ms);
-        final y = plot.bottom - plot.height * ((p.value - sLo) / (sHi - sLo));
+        final y = scale.y(plot, p.value, right: onRight);
         if (first) {
           path.moveTo(x, y);
           firstX = x;
@@ -290,25 +354,6 @@ class _TrendPainter extends CustomPainter {
       canvas.drawCircle(last, 4.5, Paint()..color = Ind.surface);
       canvas.drawCircle(last, 3, Paint()..color = s.color);
     }
-  }
-
-  /// Passo "redondo" (1, 2, 2,5 ou 5 × 10ⁿ) mais próximo acima de [raw].
-  static double _niceStep(double raw) {
-    if (raw <= 0 || !raw.isFinite) return 1;
-    final exp = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
-    final f = raw / exp;
-    final nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-    return nice * exp;
-  }
-
-  static String _short(double v) {
-    // Marca redonda (os passos são 1·2·2,5·5×10ⁿ) sai sem casa decimal.
-    if (v == v.roundToDouble()) return v.round().toString();
-    final a = v.abs();
-    if (a >= 10000) return '${(v / 1000).toStringAsFixed(0)}k';
-    if (a >= 100) return v.toStringAsFixed(0);
-    if (a >= 10) return v.toStringAsFixed(1).replaceAll('.', ',');
-    return v.toStringAsFixed(2).replaceAll('.', ',');
   }
 
   static String _dur(Duration d) => d.inSeconds >= 60 ? '${d.inMinutes} min' : '${d.inSeconds} s';

@@ -139,8 +139,11 @@ class ValueElement extends StatelessWidget {
           label: e.prop<String>('label', tag?.name ?? ''),
           tag: tag,
           reading: r,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: LayoutBuilder(builder: (context, box) {
+            // Numa linha fina a unidade encolhe junto, senão ela rouba o espaço do número.
+            final tight = box.maxHeight < 32;
+            return Row(
+            crossAxisAlignment: tight ? CrossAxisAlignment.center : CrossAxisAlignment.end,
             children: [
               Expanded(
                 // Texto (nome da máquina, receita) na letra de título mais
@@ -153,11 +156,12 @@ class ValueElement extends StatelessWidget {
               ),
               if (tag != null && tag.unit.isNotEmpty && v is num)
                 Padding(
-                  padding: const EdgeInsets.only(left: 6, bottom: 3),
-                  child: Text(tag.unit, style: TextStyle(color: Ind.textMuted, fontSize: 15, fontWeight: FontWeight.w600)),
+                  padding: EdgeInsets.only(left: tight ? 4 : 6, bottom: tight ? 0 : 3),
+                  child: Text(tag.unit, style: TextStyle(color: Ind.textMuted, fontSize: tight ? 11 : 15, fontWeight: FontWeight.w600)),
                 ),
             ],
-          ),
+          );
+          }),
         );
       },
     );

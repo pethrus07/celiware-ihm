@@ -140,16 +140,19 @@ class HmiFrame extends StatelessWidget {
     // célula baixa espremia tudo.
     return LayoutBuilder(builder: (context, box) {
       if (box.maxHeight < 76 && label.isNotEmpty) {
+        // Linha da grade fina (~26 dp): a largura é que aperta. Margem menor e
+        // rótulo numa linha só deixam o número legível.
+        final tight = box.maxHeight < 40;
         return _panel(
           borderColor: borderColor,
           width: bw,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: EdgeInsets.symmetric(horizontal: tight ? 8 : 14),
           child: Row(children: [
             ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: box.maxWidth * 0.34),
-              child: Text(label.toUpperCase(), maxLines: 2, overflow: TextOverflow.ellipsis, style: Ind.tag(size: 11)),
+              constraints: BoxConstraints(maxWidth: box.maxWidth * (tight ? 0.4 : 0.34)),
+              child: Text(label.toUpperCase(), maxLines: tight ? 1 : 2, overflow: TextOverflow.ellipsis, style: Ind.tag(size: tight ? 10 : 11)),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: tight ? 6 : 10),
             Expanded(
               child: missing
                   ? _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent)

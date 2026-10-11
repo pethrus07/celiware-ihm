@@ -512,6 +512,9 @@ Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mai
 
 ### 6.8. Alarmes
 
+![Lista de alarmes](imagens/alarmes.png)
+![Alarme na tela de operação](imagens/alarme-na-tela.png)
+
 Seguem a ANSI/ISA-18.2 (resumo em `docs/PESQUISA-UI-UX.md` §1.2). O alarme **mora na variável** — configurado no cadastro dela, viaja no arquivo do projeto e some junto se a variável for apagada.
 
 **Configurar.** No cadastro de variável, a linha **Alarmes** (resumo "Acima de 85,0 °C · …" e as formas das prioridades) abre o editor: *Quando* (acima de / abaixo de para número; quando ligar / quando desligar para liga-desliga), *Limite* na unidade da tela (já com escala), *Prioridade* em três cartões com a forma de verdade e uma frase ("Agir agora", "Agir logo", "Ficar atento") e *Mensagem para o operador* (vazia = gerada: "Temperatura do motor acima de 85,0 °C"). Texto e lista não alarmam.

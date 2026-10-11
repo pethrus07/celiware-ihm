@@ -78,7 +78,7 @@ class _ScreenRunPageState extends State<ScreenRunPage> {
     }..remove(null);
 
     return LiveTags(
-      tagIds: screen.tagIds,
+      tagIds: screen.liveTagIds,
       releaseOnDispose: true,
       child: TourHost(
       spec: Tours.operar(status: _statusKey, button: _buttonKey, input: _inputKey, link: _linkKey, edit: _editKey),

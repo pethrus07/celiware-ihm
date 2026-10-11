@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
@@ -43,7 +44,7 @@ class HmiScreenContext extends InheritedWidget {
 }
 
 /// Liga um widget a uma variável: entrega a [Tag] (do projeto) e a última
-/// [TagReading] (do runtime), e redesenha só quando ela muda.
+/// [TagReading] (do runtime), e redesenha só quando muda o que a tela mostra.
 class TagBuilder extends StatelessWidget {
   const TagBuilder({super.key, required this.tagId, required this.builder});
 
@@ -56,11 +57,73 @@ class TagBuilder extends StatelessWidget {
     final id = tagId;
     if (id == null) return builder(context, null, TagReading.waiting);
     final tag = scope.controller.project.tag(id);
-    return ValueListenableBuilder<TagReading>(
-      valueListenable: scope.runtime.watch(id),
-      builder: (context, reading, _) => builder(context, tag, reading),
+    return _ReadingListener(
+      listenable: scope.runtime.watch(id),
+      builder: (context, reading) => builder(context, tag, reading),
     );
   }
+
+  /// Duas leituras que aparecem iguais na tela: mesmo valor, mesma qualidade,
+  /// mesmo motivo. O carimbo de hora não conta.
+  static bool sameOnScreen(TagReading a, TagReading b) {
+    if (identical(a, b)) return true;
+    if (a.quality != b.quality || a.message != b.message) return false;
+    final x = a.value, y = b.value;
+    if (x is List && y is List) return listEquals(x, y);
+    return x == y;
+  }
+}
+
+/// O `ValueListenableBuilder` do [TagBuilder], com um filtro: a varredura
+/// publica uma leitura nova a cada ciclo — mesmo valor, carimbo de hora
+/// novo — e cada uma redesenhava o elemento. Com 48 elementos e varredura de
+/// 500 ms, eram 96 elementos redesenhados por segundo para mostrar a mesma
+/// coisa (GR-9). Agora só redesenha o que mudou. O motor de alarmes e o
+/// registro de dados ouvem o runtime direto e continuam recebendo toda
+/// leitura (o atraso de 1 s do alarme e o "leitura parada" dependem disso).
+class _ReadingListener extends StatefulWidget {
+  const _ReadingListener({required this.listenable, required this.builder});
+  final ValueListenable<TagReading> listenable;
+  final Widget Function(BuildContext context, TagReading reading) builder;
+
+  @override
+  State<_ReadingListener> createState() => _ReadingListenerState();
+}
+
+class _ReadingListenerState extends State<_ReadingListener> {
+  late TagReading _shown;
+
+  @override
+  void initState() {
+    super.initState();
+    _shown = widget.listenable.value;
+    widget.listenable.addListener(_changed);
+  }
+
+  @override
+  void didUpdateWidget(_ReadingListener old) {
+    super.didUpdateWidget(old);
+    if (old.listenable != widget.listenable) {
+      old.listenable.removeListener(_changed);
+      _shown = widget.listenable.value;
+      widget.listenable.addListener(_changed);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.listenable.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    final next = widget.listenable.value;
+    if (TagBuilder.sameOnScreen(_shown, next)) return;
+    setState(() => _shown = next);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _shown);
 }
 
 /// Moldura comum a todos os elementos: fundo, rótulo em placa e o

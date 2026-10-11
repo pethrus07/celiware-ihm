@@ -116,6 +116,8 @@ class ElementInfo {
 /// | label       | text, size (s·m·l), align (left·center)                                                 |
 /// | image       | data (PNG em base64), fit (contain·cover), source (fixed·byValue),                      |
 /// |             | tagId + images: [{value, data}] (modo byValue: uma imagem por código)                   |
+/// | table       | tagIds (até 30, na ordem das linhas), label (título; vazio = sem título),               |
+/// |             | onText, offText (texto das linhas liga/desliga)                                         |
 ///
 /// Em qualquer elemento menos botão e ajuste: `goTo` = id da tela que abre ao
 /// tocar (nos dois, o toque já tem dono: gravar).
@@ -191,6 +193,21 @@ class ElementCatalog {
       fit: TagFit.any,
       defaultW: 3,
       defaultH: 2,
+    ),
+    // Vizinha do mostrador na paleta: "um valor" e "vários valores".
+    ElementInfo(
+      type: ElementType.table,
+      name: 'Tabela de valores',
+      description: 'Várias variáveis, uma por linha.',
+      icon: Icons.table_rows_outlined,
+      fit: TagFit.any,
+      // Largura toda e 4 de altura: cabem 5 a 7 linhas no celular. Na fina,
+      // 12×8 — o mesmo tamanho na tela.
+      defaultW: 6,
+      defaultH: 4,
+      minW: 3,
+      minH: 2,
+      multiTag: true,
     ),
     ElementInfo(
       type: ElementType.input,
@@ -327,6 +344,15 @@ class ElementCatalog {
         return {'text': 'Título', 'size': 'm', 'align': 'left'};
       case ElementType.image:
         return {'fit': 'contain'};
+      case ElementType.table:
+        // Sem título por padrão: o nome da tela já está no topo, e a linha
+        // do título vale mais como uma variável a mais.
+        return {
+          'tagIds': [if (tag != null) tag.id],
+          'label': '',
+          'onText': 'LIGADO',
+          'offText': 'DESLIGADO',
+        };
       case ElementType.unknown:
         return const {};
     }

@@ -176,6 +176,29 @@ void main() {
     await shutdown(tester, c);
   });
 
+  testWidgets('Criar várias: só equipamento com memória Modbus (S7 e MQTT têm endereço próprio)', (tester) async {
+    final c = await boot(tester);
+    c.saveDevice(const Device(id: 's7', name: 'CLP S7', kind: DeviceKind.s7, host: '10.0.0.9', port: 102));
+    c.saveDevice(const Device(id: 'mq', name: 'Broker', kind: DeviceKind.mqtt, host: '10.0.0.8', port: 1883));
+    await live(tester, 300);
+    await openTab(tester, 'Variáveis');
+    await tester.tap(find.byKey(const ValueKey('criar-varias')));
+    await live(tester, 600);
+    final page = find.byType(BulkTagsPage);
+    // Sobra só a demonstração: um equipamento, nem pergunta qual.
+    expect(find.descendant(of: page, matching: find.text('CLP S7')), findsNothing);
+    expect(find.descendant(of: page, matching: find.text('Broker')), findsNothing);
+    expect(find.descendant(of: page, matching: find.byKey(const ValueKey('lote-perfil'))), findsOneWidget);
+    await tester.pageBack();
+    await live(tester, 600);
+
+    // Sem nenhum equipamento Modbus, o botão nem acende.
+    c.deleteDevice(DemoProject.deviceId);
+    await live(tester, 600);
+    expect(tester.widget<IconButton>(find.byKey(const ValueKey('criar-varias'))).onPressed, isNull);
+    await shutdown(tester, c);
+  });
+
   testWidgets('Criar várias: importar CSV com uma linha ruim', (tester) async {
     final c = await boot(tester);
     c.saveDevice(c.project.device(DemoProject.deviceId)!.withProfile('inovance-h3u'));

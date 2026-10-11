@@ -108,6 +108,11 @@ class Device {
 
   bool get isDemo => kind == DeviceKind.demo;
 
+  /// Variável aponta para área + endereço Modbus (a demonstração também:
+  /// ela simula um CLP Modbus). S7, MQTT e os outros têm endereço próprio —
+  /// ficam fora do "Criar várias", que gera faixas de memória Modbus.
+  bool get usesModbusMemory => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.demo;
+
   /// Fala com o equipamento pela rede (IP e porta), qualquer que seja o
   /// protocolo.
   bool get isNetwork => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt || kind == DeviceKind.s7;

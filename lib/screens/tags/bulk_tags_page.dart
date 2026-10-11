@@ -68,7 +68,8 @@ class _BulkTagsPageState extends State<BulkTagsPage> {
     super.didChangeDependencies();
     final project = AppScope.of(context).controller.project;
     final preferred = widget.preferDeviceId;
-    _deviceId ??= preferred != null && project.device(preferred) != null ? preferred : project.devices.lastOrNull?.id;
+    final devices = _devices(project);
+    _deviceId ??= preferred != null && devices.any((d) => d.id == preferred) ? preferred : devices.lastOrNull?.id;
   }
 
   @override
@@ -189,10 +190,14 @@ class _BulkTagsPageState extends State<BulkTagsPage> {
     return (name: f.name, bytes: await f.readAsBytes());
   }
 
+  /// Só equipamento com memória Modbus: faixa e CSV geram área + endereço.
+  static List<Device> _devices(Project project) => [for (final d in project.devices) if (d.usesModbusMemory) d];
+
   @override
   Widget build(BuildContext context) {
     final project = AppScope.watch(context).controller.project;
-    final device = _deviceId == null ? null : project.device(_deviceId!);
+    final devices = _devices(project);
+    final device = devices.where((d) => d.id == _deviceId).firstOrNull;
     if (device == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Criar várias')),
@@ -227,11 +232,11 @@ class _BulkTagsPageState extends State<BulkTagsPage> {
         padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 32),
         children: [
           // Um equipamento só (o caso comum): nem pergunta.
-          if (project.devices.length > 1) ...[
+          if (devices.length > 1) ...[
             const SectionHeader('Equipamento', padding: EdgeInsets.fromLTRB(0, 16, 0, 12)),
             ChoiceCards<String>(
               options: [
-                for (final d in project.devices) ChoiceOption(value: d.id, title: d.name, icon: d.isDemo ? Icons.smart_toy_outlined : Icons.router_outlined),
+                for (final d in devices) ChoiceOption(value: d.id, title: d.name, icon: d.isDemo ? Icons.smart_toy_outlined : Icons.router_outlined),
               ],
               selected: device.id,
               onChanged: (id) => setState(() => _deviceId = id),

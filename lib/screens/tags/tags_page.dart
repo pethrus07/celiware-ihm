@@ -67,7 +67,8 @@ class _TagsPageState extends State<TagsPage> {
               key: const ValueKey('criar-varias'),
               tooltip: 'Criar várias',
               icon: const Icon(Icons.playlist_add_rounded),
-              onPressed: project.devices.isEmpty ? null : () => _createMany(context),
+              // Faixa de memória é coisa de Modbus: sem equipamento Modbus, nada a criar.
+              onPressed: project.devices.any((d) => d.usesModbusMemory) ? () => _createMany(context) : null,
             ),
             const HelpButton(),
           ]),

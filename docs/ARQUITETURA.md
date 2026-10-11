@@ -128,6 +128,7 @@ lib/
 ├── models/
 │   ├── device.dart                   Equipamento.
 │   ├── tag.dart                      Variável (tipo, área, endereço, ordem de bytes).
+│   ├── vendor_profiles.dart          Perfis de fabricante: "D200" ⇄ área + endereço Modbus.
 │   ├── hmi_screen.dart               Tela e elemento posicionado na grade.
 │   └── project.dart                  Projeto inteiro (unidade de arquivo).
 ├── services/
@@ -140,6 +141,7 @@ lib/
 │   ├── demo/
 │   │   ├── demo_process.dart         "Programa do CLP" da cortadora simulada.
 │   │   └── demo_project.dart         Projeto de demonstração (duas telas).
+│   ├── import/tag_batch.dart         "Criar várias": faixa, modelos de inversor, CSV, conflitos.
 │   └── storage/project_repository.dart   Arquivo do projeto, gravação atômica, formato.
 ├── screens/
 │   ├── shell.dart                    Barra inferior (4 abas).
@@ -225,7 +227,35 @@ Toda a lógica mora em `TagCodec` e é coberta por teste com o valor 0x11223344 
 
 ### 4.6. Endereçamento e a notação de manual
 
-O app usa o endereço do protocolo, **base 0**. Manuais costumam usar a notação clássica com prefixo da área e base 1: "40001" = holding register 0, "30001" = input register 0, "10001" = entrada discreta 0. O cadastro de variável reconhece esse formato e sugere a conversão com um toque ("Parece a notação de manual: 40003 é o endereço 2"). Perfis de fabricante ("M100", "D200") entram aqui no futuro, como tradução nome → endereço.
+O app usa o endereço do protocolo, **base 0**. Manuais costumam usar a notação clássica com prefixo da área e base 1: "40001" = holding register 0, "30001" = input register 0, "10001" = entrada discreta 0. O cadastro de variável reconhece esse formato e sugere a conversão com um toque ("Parece a notação de manual: 40003 é o endereço 2").
+
+**Perfil de fabricante.** Com a marca escolhida no equipamento (**Mais opções → Marca e modelo**), a memória entra como está no manual do CLP — "D200", "M8000", "X10", "SM5" — e o perfil traduz em área + endereço Modbus (`lib/models/vendor_profiles.dart`, tabelas e fontes em `docs/pesquisa-etapa4/2-mapas-de-memoria-e-importacao.md`). As regras:
+
+- o prefixo mais longo casa primeiro: SM antes de S, SD antes de D;
+- X e Y contam em **octal** (Inovance série H, INVT, WEG, Delta): "X8 não existe — X conta em octal: X7, X10";
+- uma área pode ter vários trechos (o M do INVT é M0–M2047 em 2000 e M2048–M10239 em 12000); memória no buraco é recusada dizendo até onde a área vai ("M7700 não existe neste CLP: M vai de M0 a M7679 e de M8000 a M8511");
+- contadores de 32 bits (C200 em diante) ocupam 2 registradores cada e forçam INT32; num D de 16 bits, um valor de 32 bits ocupa também o D seguinte, que precisa existir e estar logo depois no mapa;
+- "D100.3" é o bit 3 do registrador D100;
+- T e C têm contato (bit) e valor (registrador) com a mesma letra: o tipo escolhido decide;
+- entrada física exposta como coil (X da Inovance e do WEG) nasce só leitura; no INVT o X é entrada discreta (pelo coil, o CLP ignora a gravação sem dar erro).
+
+`Tag.memory` guarda o texto ("D200") e a lista mostra "D200 · HR 200"; `area` e `address` continuam a verdade da varredura — nada no `ScanPlanner` nem no `TagCodec` muda. O endereço gravado é uma foto do dia da criação: trocar a marca do equipamento oferece **recalcular os endereços** das variáveis que têm memória (`VendorProfiles.remap`).
+
+Com perfil, a sugestão de notação de manual **não vale**: 40001–49999 são endereços legítimos (o R da Inovance vai até 45055, o do INVT até 45767). A chave que o cadastro consulta é `VendorProfiles.manualNotationApplies(device.profile)`; o endereço Modbus direto ("HR 200") vale com e sem perfil.
+
+**Inversores** usam regra de parâmetro: Inovance MD500 "F3-12" → 0xF30C (grupo no byte alto, número em hex no baixo); INVT GD20 "P05.05" → 0x0505. "Não gravar na EEPROM" usa o endereço da RAM do mesmo parâmetro (F3-12 → 0x030C, A0-05 → 0x4005, P00.07 → 0x8007), que só aceita escrita. Cada um traz modelos prontos: Comando, Referência de frequência, Estado e Falha.
+
+| Perfil | Origem da tabela | Observação |
+|---|---|---|
+| Inovance H3U | terceiros · **não validado em bancada** | Manual da série H não aberto; primeiro a conferir. |
+| Inovance H5U / Easy | terceiros · **não validado em bancada** | SM/SD não confirmados, ficaram de fora. |
+| INVT IVC1 / IVC1L / IVC2L | manual oficial | Só RTU (gateway). Ordem de 32 bits ambígua no manual (adotado CDAB). |
+| INVT IVC3 | manual oficial | Modbus TCP nativo. O relatório dá "C256–C511 em 10000–10511" (256 contatos, 512 bits): ficou 1:1, a conferir. |
+| WEG TPW04 | manual oficial | Só RTU. Z fora (a tabela não numera os itens). |
+| Delta DVP | terceiros · **não validado em bancada** | Só X, Y, M, D; fins M4095 e D9999 inferidos. |
+| Inovance MD500 · INVT GD20 | manual oficial | Parâmetros + modelos prontos. Só RTU. |
+
+**Criar várias** (lista de Variáveis → ícone no topo): equipamento → área (chips da marca; no genérico, as quatro áreas Modbus) → faixa na notação do fabricante (de/até) → tipo (32 bits anda de 2 em 2) → nome (vazio = a própria memória; com texto, texto + número) → prévia com a contagem, as 5 primeiras e as 5 últimas, as leituras por ciclo calculadas pelo `ScanPlanner` e os conflitos (mesmo equipamento, área e endereço) com **Pular** ou **Substituir** (substituir mantém o id e os alarmes: as telas continuam ligadas). Aviso a partir de 256 e teto de 1000 por vez. A segunda aba importa CSV no modelo Celiware (`memoria;nome;tipo;gravavel;unidade;escala;descricao`; separador `;` ou `,` detectado, UTF-8 com BOM ou Latin-1, aspas como no Excel, cabeçalho opcional) com relatório por linha. Tudo é gravado com **um** commit (`ProjectController.saveTags`). A lógica é pura, em `lib/services/import/tag_batch.dart`.
 
 ### 4.7. Agrupamento de leituras
 
@@ -292,6 +322,7 @@ Testes: `ModbusSerialTcpServer` (escravo RTU/ASCII em Dart, por socket real) e o
 | host, port, unitId | IP ou nome, porta (502), ID do escravo (1). |
 | timeoutMs | Tempo máximo por resposta (1500 ms). |
 | pollMs | Intervalo entre varreduras (500 ms). |
+| profile | Perfil de fabricante (`inovance-h3u`, `invt-ivc1`…); ausente = Modbus genérico. Só vai para o arquivo quando existe (4.6). |
 
 ### 5.2. Variável (`Tag`)
 
@@ -307,6 +338,7 @@ Testes: `ModbusSerialTcpServer` (escravo RTU/ASCII em Dart, por socket real) e o
 | unit, decimals | Apresentação: "°C", 1 casa decimal. |
 | scale, offset | Escala linear: valor = bruto × scale + offset (padrão 1 e 0; só vão para o arquivo quando diferentes). |
 | alarms | Alarmes da variável: lista de {id, kind (above · below · on · off), limit, priority (high · medium · low), message}. Só vai para o arquivo quando há algum; `normalized()` descarta o que não casa com o tipo. |
+| memory | A memória como no manual ("D200", "X10", "F3-12"), com perfil de fabricante. Só texto para mostrar e recalcular: `area`/`address` continuam a verdade. Só vai para o arquivo quando existe. |
 
 `Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura e texto tiram a escrita; escala zero volta a 1).
 
@@ -382,11 +414,11 @@ Botão: seis modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira 
 
 ### 6.5. Equipamentos
 
-Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à vista: onde está (rede ou demonstração), nome, IP e **Testar conexão**. Porta, ID, tempo-limite e ritmo ficam em "Mais opções" (o resumo "Porta 502 · ID 1" aparece fechado). O teste responde na hora; quando falha, mostra o que conferir, na ordem em que os problemas costumam acontecer (mesmo Wi-Fi, IP, Modbus ligado no equipamento, porta/ID). Quando o equipamento **recusa** a conexão (o IP respondeu na hora, mas nada escuta na porta — errno 111 no Android, 10061 no Windows), a mensagem vira "o equipamento recusou a conexão nesta porta" e só sobram as duas conferências que fazem sentido: porta e Modbus ligado. "Mais opções" rola a tela sozinho ao abrir, nos dois formulários.
+Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à vista: onde está (rede ou demonstração), nome, IP e **Testar conexão**. Marca e modelo (perfil de fabricante, 4.6), porta, ID, tempo-limite e ritmo ficam em "Mais opções" (o resumo "Porta 502 · ID 1 · Inovance H3U" aparece fechado). O teste responde na hora; quando falha, mostra o que conferir, na ordem em que os problemas costumam acontecer (mesmo Wi-Fi, IP, Modbus ligado no equipamento, porta/ID). Quando o equipamento **recusa** a conexão (o IP respondeu na hora, mas nada escuta na porta — errno 111 no Android, 10061 no Windows), a mensagem vira "o equipamento recusou a conexão nesta porta" e só sobram as duas conferências que fazem sentido: porta e Modbus ligado. "Mais opções" rola a tela sozinho ao abrir, nos dois formulários.
 
 ### 6.6. Variáveis
 
-Lista agrupada por equipamento: nome, endereço e o valor ao vivo. O cadastro cabe numa tela: equipamento (só aparece se houver mais de um), nome, o que é (liga/desliga, número inteiro, número com vírgula), onde fica (lê e grava / só leitura), endereço com − / + e "pode ser alterada pela tela". Escala, unidade, decimais, lista, formatos raros (INT16, 32 bits, texto), ordem de bytes e observação ficam em "Mais opções", que abre sozinho quando algum deles está em uso; fechado, o resumo mostra o que está valendo ("÷ 10 · °C · 1 decimais"). A escala tem atalhos — Sem escala, ÷ 10, ÷ 100, ÷ 1000, × 10 — e "Outra", que abre fator e soma. Escolher ÷ 100 já acerta as casas decimais para 2. Texto mostra à vista o tamanho em registradores ("8 = até 16 letras"). No topo, **Lendo agora do equipamento**: o endereço digitado é lido a cada segundo, pela mesma conexão da varredura. O painel fica **preso no topo** enquanto o formulário rola — é a resposta de cada campo mexido, inclusive da escala lá embaixo. Variável nova já vem com o equipamento da tela em montagem ou, fora do editor, com o último cadastrado.
+Lista agrupada por equipamento: nome, endereço (com perfil, "D200 · HR 200") e o valor ao vivo. A lista é montada sob demanda (`ListView.builder`) e só as linhas à vista ficam sendo lidas (`VisibleLiveTags` em `live_tags.dart`): com 2.000 variáveis, abrir a aba lê umas vinte, não o CLP inteiro. O ícone no topo abre **Criar várias** (4.6). O cadastro cabe numa tela: equipamento (só aparece se houver mais de um), nome, o que é (liga/desliga, número inteiro, número com vírgula), onde fica (lê e grava / só leitura), endereço com − / + e "pode ser alterada pela tela". Escala, unidade, decimais, lista, formatos raros (INT16, 32 bits, texto), ordem de bytes e observação ficam em "Mais opções", que abre sozinho quando algum deles está em uso; fechado, o resumo mostra o que está valendo ("÷ 10 · °C · 1 decimais"). A escala tem atalhos — Sem escala, ÷ 10, ÷ 100, ÷ 1000, × 10 — e "Outra", que abre fator e soma. Escolher ÷ 100 já acerta as casas decimais para 2. Texto mostra à vista o tamanho em registradores ("8 = até 16 letras"). No topo, **Lendo agora do equipamento**: o endereço digitado é lido a cada segundo, pela mesma conexão da varredura. O painel fica **preso no topo** enquanto o formulário rola — é a resposta de cada campo mexido, inclusive da escala lá embaixo. Variável nova já vem com o equipamento da tela em montagem ou, fora do editor, com o último cadastrado.
 
 Na escolha de variável do editor, a lista é **agrupada por equipamento** (os que a tela já usa primeiro) e ganha **busca** por nome ou endereço, sem acento, a partir de 8 variáveis compatíveis.
 
@@ -489,9 +521,18 @@ Tipografia IBM Plex (licença OFL): Sans para texto e rótulos (caixa alta com e
 3. Renderizador em `lib/widgets/hmi/elements/`, usando `HmiFrame` + `TagBuilder` (a moldura já trata os estados de problema) e `WriteActions` se gravar.
 4. Caso novo no `switch` de `HmiElementView` e campos na `ElementConfigSheet`.
 
-### 10.2. Acrescentar um perfil de fabricante (ex.: Inovance)
+### 10.2. Acrescentar um perfil de fabricante
 
-O protocolo não muda; muda onde cada área começa. Plano: campo `profile` em `Device`, e no cadastro de variável um campo "memória do CLP" ("M100", "D200") traduzido em área + endereço pelo perfil. O restante do app continua recebendo `Tag` com endereço Modbus — nada mais muda.
+O protocolo não muda; muda onde cada área começa. O perfil mora só em `lib/models/vendor_profiles.dart`; o resto do app continua recebendo `Tag` com área + endereço Modbus.
+
+1. Uma constante `VendorProfile` em `VendorProfiles`, com `id` estável — ele vai para o arquivo do projeto (`Device.profile`), nunca renomeie —, marca, família, origem (`official` · `thirdParty` · `benchValidated`), fonte, observações de conexão e a ordem de 32 bits mais comum da marca.
+2. Uma `AreaRule` por área do manual: prefixo, área Modbus, trechos `Segment(primeira, última, endereço inicial)` com a numeração já decodificada (X377 em octal = 255), base (`octal` em X/Y), `wordsPerItem` e `forcedType` (contador de 32 bits), `readOnly` (entrada física exposta como coil), rótulo e `variant` quando a letra se repete (T contato × T valor). A ordem da lista é a dos chips em "Criar várias" e decide a letra repetida quando ninguém disse o tipo.
+3. Inversor: `kind: ProfileKind.drive`, uma `ParameterRule` (estilo de numeração) e os `TagTemplate` dos modelos prontos.
+4. Acrescente ao `VendorProfiles.all` — o cadastro de equipamento e o "Criar várias" passam a oferecer sozinhos.
+5. Teste em `test/models/vendor_profiles_test.dart`: uma linha por linha da tabela do manual, os dois extremos de cada trecho, com os números **escritos à mão** a partir do manual (derivar do perfil só repetiria o código). O teste de sobreposição pega trecho que invade outra área; o de octal vale para toda família com X/Y.
+6. Tabela de terceiros fica "não validado em bancada" até conferir num CLP de verdade; depois, `origin: ProfileOrigin.benchValidated`.
+
+Corrigir uma tabela não muda sozinho o endereço das variáveis já criadas (ele é gravado na variável); `VendorProfiles.remap` recalcula a partir de `Tag.memory`. O cadastro de equipamento já oferece isso ao trocar a marca.
 
 ### 10.3. Acrescentar outro protocolo
 
@@ -572,13 +613,17 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/widgets/app_flow_test.dart` | Primeira abertura, valores ao vivo, botão com confirmação ligando a máquina, tela só acompanhamento, editor com paleta, escolha de variável e configuração; escala e texto na tela do líder, troca de tela pelo botão e pelo mostrador, botão com retorno aguardando com a porta aberta; celular deitado com célula no teto e grade centralizada; busca de variável sem acento; troca de aparência no meio do uso; alarme ponta a ponta (não dispara antes de 1 s, faixa no topo, marca no elemento, reconhecer, normalizar, histórico) e alarme que normaliza sem ninguém ver continuando na faixa. |
 | `test/widgets/trend_axis_test.dart` | Eixo da direita do gráfico de tendência: cobre os dados, mesmo número de passos, passo redondo, sem eixo negativo para grandeza positiva (inclusive valor constante 0). |
 | `test/widgets/tour_test.dart` | Tutorial aparece na primeira visita, "já vi" com versão na chave, rearme por versão nova, "voltar" fecha o tutorial e não a página. |
+| `test/models/vendor_profiles_test.dart` | Uma linha por linha de tabela de cada perfil (extremos de cada trecho, ida e volta texto ⇄ endereço), octal com as vizinhas certas em toda família, prefixo mais longo, contador de 32 bits, bit de registrador, mensagens de memória inexistente, áreas sem sobreposição, notação de manual só sem perfil, parâmetros MD500/GD20 (com e sem EEPROM), modelos prontos, recalcular ao trocar de perfil. |
+| `test/models/profile_json_test.dart` | `Device.profile` e `Tag.memory` no JSON: ida e volta, ausentes no genérico, arquivo antigo, id de perfil desconhecido preservado, `schemaVersion` 1. |
+| `test/services/tag_batch_test.dart` | Criar várias: faixa (contagem, nomes, passo de 32 bits, octal, contador de 32 bits, buraco entre trechos, par de 32 bits), limites 256/1000, leituras por ciclo, conflitos pular/substituir, parâmetros e modelos de inversor; CSV (separadores, aspas, BOM, Latin-1, cabeçalho opcional, erro por linha, contato × valor); `saveTags` com um aviso e uma gravação. |
+| `test/widgets/bulk_tags_test.dart` | Criar várias pela interface (faixa em 32 bits, prévia, criar e substituir; X8 recusado; CSV com linha ruim), marca e modelo no equipamento com recalcular endereços, lista com 2.000 variáveis montando e lendo só as visíveis e rolando até a última. |
 
 Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstração e animações avançam por passos, sem depender da velocidade da máquina. Toque que não acerta o alvo é falha, não aviso (`hitTestWarningShouldBeFatal`). Eles já pegaram seis defeitos reais antes do aparelho: quatro transbordos de layout (cartão de tela, legenda do gráfico, lâmpada estreita em dois tamanhos), leitura publicando depois do encerramento e toque sem retorno em tela só acompanhamento.
 
 ## 14. Próximos passos
 
 - **Etapa 3 — Play Store:** conta de desenvolvedor da Celiware, chave de upload, ficha da loja. Roteiro em `docs/PUBLICACAO.md`.
-- **Perfil Inovance:** tradução de nomes de memória em endereço (10.2), validada no equipamento real.
+- **Perfis de fabricante:** validar em bancada (Inovance H3U/H5U primeiro, o manual da série H não foi aberto) e ligar o campo "Memória do CLP" no cadastro de variável (MP-3), que usa o mesmo `VendorProfile.parse`.
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
 - **Ideias registradas:** variável calculada/script (só se aparecer caso que a escala linear não cobre), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.

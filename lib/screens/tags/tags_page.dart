@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/device.dart';
+import '../../models/project.dart';
 import '../../models/tag.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../services/runtime/tag_store.dart';
@@ -12,12 +14,18 @@ import '../../widgets/hmi/hmi_frame.dart';
 import '../../widgets/hmi/live_tags.dart';
 import '../../widgets/tour/tour.dart';
 import '../tours.dart';
+import 'bulk_tags_page.dart';
 import 'tag_form_page.dart';
 
 /// Lista de variáveis, agrupadas por equipamento, com o valor **ao vivo**.
 ///
 /// Ver o valor ao lado do nome é o jeito mais rápido de conferir que um
 /// endereço está certo: se "Velocidade" mostra 80 e a máquina está a 80, está.
+///
+/// Feita para milhares de variáveis (IF-3): a lista é montada sob demanda
+/// (`ListView.builder`) e só as linhas à vista ficam sendo lidas
+/// ([VisibleLiveTags]). Antes ela montava e inscrevia todas — com mil
+/// variáveis, abrir a aba varria o CLP inteiro.
 class TagsPage extends StatefulWidget {
   const TagsPage({super.key, this.startTour = false});
   final bool startTour;
@@ -30,19 +38,39 @@ class _TagsPageState extends State<TagsPage> {
   final _listKey = GlobalKey();
   final _addKey = GlobalKey();
 
+  Future<void> _createMany(BuildContext context) async {
+    final message = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) => const BulkTagsPage()));
+    if (message != null && context.mounted) {
+      // O resultado novo troca o anterior em vez de entrar na fila.
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final project = AppScope.watch(context).controller.project;
+    final rows = _rows(project);
+    // A primeira linha de variável da tela (a linha 0 é o cabeçalho do equipamento).
+    final firstId = rows.length > 1 ? rows[1].$2?.id : null;
 
-    return LiveTags(
-      tagIds: {for (final t in project.tags) t.id},
+    return VisibleLiveTags(
       child: TourHost(
         spec: Tours.variaveis(list: _listKey, add: _addKey),
         // Só pelo "?" ou por Mais → Tutoriais (ver DevicesPage).
         autoStart: false,
         forceStart: widget.startTour,
         child: Scaffold(
-          appBar: AppBar(title: const Text('Variáveis'), actions: const [HelpButton()]),
+          appBar: AppBar(title: const Text('Variáveis'), actions: [
+            IconButton(
+              key: const ValueKey('criar-varias'),
+              tooltip: 'Criar várias',
+              icon: const Icon(Icons.playlist_add_rounded),
+              onPressed: project.devices.isEmpty ? null : () => _createMany(context),
+            ),
+            const HelpButton(),
+          ]),
           floatingActionButton: FloatingActionButton.extended(
             key: _addKey,
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TagFormPage())),
@@ -60,21 +88,38 @@ class _TagsPageState extends State<TagsPage> {
                         : 'Dê nome a uma memória do equipamento: "Velocidade" = registrador 2.',
                   ),
                 )
-              : ListView(
+              : ListView.builder(
                   padding: const EdgeInsets.only(bottom: 100),
-                  children: [
-                    for (final d in project.devices)
-                      if (project.tagsOf(d.id).isNotEmpty) ...[
-                        SectionHeader(d.name, trailing: LinkChip(device: d)),
-                        for (final t in project.tagsOf(d.id))
-                          // O tutorial realça a primeira variável, não a lista inteira.
-                          KeyedSubtree(key: t.id == project.tags.first.id ? _listKey : null, child: _TagTile(tag: t)),
-                      ],
-                  ],
+                  itemCount: rows.length,
+                  itemBuilder: (context, i) => switch (rows[i]) {
+                    (final Device d, null) => SectionHeader(d.name, key: ValueKey('secao-${d.id}'), trailing: LinkChip(device: d)),
+                    (_, final Tag t) => KeyedSubtree(
+                        // O tutorial realça a primeira variável, não a lista inteira.
+                        key: t.id == firstId ? _listKey : ValueKey('linha-${t.id}'),
+                        child: LiveTagItem(tagId: t.id, child: _TagTile(tag: t)),
+                      ),
+                  },
                 ),
         ),
       ),
     );
+  }
+
+  /// Linhas já achatadas: cabeçalho do equipamento e as variáveis dele, na
+  /// ordem de cadastro. Agrupar num mapa evita varrer a lista inteira uma vez
+  /// por equipamento.
+  static List<(Device, Tag?)> _rows(Project project) {
+    final byDevice = <String, List<Tag>>{};
+    for (final t in project.tags) {
+      byDevice.putIfAbsent(t.deviceId, () => []).add(t);
+    }
+    return [
+      for (final d in project.devices)
+        if (byDevice[d.id] case final tags?) ...[
+          (d, null),
+          for (final t in tags) (d, t),
+        ],
+    ];
   }
 }
 
@@ -100,7 +145,8 @@ class _TagTile extends StatelessWidget {
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 3),
         child: Row(children: [
-          Text(tag.addressLabel, style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+          // Com perfil de fabricante, a memória do manual vem antes: "D200 · HR 200".
+          Flexible(child: Text(tag.memoryLabel, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textMuted, fontSize: 13))),
           // Tem alarme configurado: sino discreto; em alarme agora: a forma
           // da prioridade (piscando se ninguém reconheceu).
           if (tag.alarms.isNotEmpty) ...[

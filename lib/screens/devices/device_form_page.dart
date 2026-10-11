@@ -6,8 +6,10 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
 import '../../models/device.dart';
+import '../../models/vendor_profiles.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/common.dart';
+import 'vendor_profile_sheet.dart';
 
 /// Cadastro/edição de equipamento.
 ///
@@ -34,6 +36,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     Device(kind: DeviceKind.modbusRtuTcp) => _Protocol.rtu,
     _ => _Protocol.tcp,
   };
+
+  /// Marca e modelo (perfil de fabricante); nulo = Modbus genérico.
+  late String? _profile = widget.device?.profile;
+  String? get _profileName => VendorProfiles.byId(_profile)?.name;
   late final _name = TextEditingController(text: widget.device?.name ?? '');
   late final _host = TextEditingController(text: widget.device?.host ?? '');
   late final _port = TextEditingController(text: '${widget.device?.port ?? 502}');
@@ -64,6 +70,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         unitId: int.tryParse(_unit.text) ?? 1,
         timeoutMs: (int.tryParse(_timeout.text) ?? 1500).clamp(200, 10000),
         pollMs: (int.tryParse(_poll.text) ?? 500).clamp(100, 60000),
+        profile: _demo ? null : _profile,
       );
 
   Future<void> _test() async {
@@ -92,10 +99,36 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   final _moreKey = GlobalKey();
   final _ipField = GlobalKey<FormFieldState<String>>();
 
-  void _save() {
+  Future<void> _save() async {
     if (!(_form.currentState?.validate() ?? false)) return;
-    AppScope.of(context).controller.saveDevice(_build());
-    Navigator.pop(context);
+    final c = AppScope.of(context).controller;
+    final next = _build();
+    c.saveDevice(next);
+    // Trocou a marca: variável com a memória do manual ("D200") pode morar em
+    // outro endereço Modbus no perfil novo. Pergunta antes de mexer.
+    final moved = widget.device != null && widget.device!.profile != next.profile ? VendorProfiles.remap(c.project.tagsOf(_id), VendorProfiles.of(next)) : null;
+    if (moved != null && moved.isNotEmpty && await _confirmRemap(moved.length)) c.saveTags(moved);
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<bool> _confirmRemap(int n) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Recalcular endereços?'),
+          content: Text('${n == 1 ? 'Uma variável tem' : '$n variáveis têm'} a memória do manual ("D200"). Na marca nova ela fica em outro endereço Modbus.',
+              style: const TextStyle(height: 1.4)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Manter')),
+            FilledButton(key: const ValueKey('recalcular-enderecos'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Recalcular')),
+          ],
+        ),
+      ) ??
+      false;
+
+  Future<void> _pickProfile() async {
+    final r = await VendorProfileSheet.show(context, _profile);
+    if (r != null) setState(() => _profile = r.id);
   }
 
   Future<void> _delete() async {
@@ -187,8 +220,20 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   childrenPadding: const EdgeInsets.only(bottom: 8),
                   expandedCrossAxisAlignment: CrossAxisAlignment.start,
                   title: const Text('Mais opções'),
-                  subtitle: Text('${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+                  subtitle: Text('${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}${_profileName == null ? '' : ' · $_profileName'}',
+                      style: TextStyle(color: Ind.textMuted, fontSize: 13)),
                   children: [
+                    // Marca e modelo: com ela, as variáveis aceitam a memória
+                    // como no manual ("D200"). Genérico = endereço Modbus direto.
+                    ListTile(
+                      key: const ValueKey('marca-modelo'),
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Marca e modelo'),
+                      subtitle: Text(_profileName ?? 'Genérico', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _pickProfile,
+                    ),
+                    const SizedBox(height: Ind.spaceSmall),
                     // Gateway serial→Ethernet (RS-485 do outro lado) que repassa
                     // RTU/ASCII cru: escolha rara, por isso fica aqui.
                     Text('Protocolo', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),

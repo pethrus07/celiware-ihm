@@ -58,6 +58,24 @@ class Project {
   Project upsertTag(Tag t) => copyWith(tags: _upsert(tags, t.normalized(), (x) => x.id));
   Project upsertScreen(HmiScreen s) => copyWith(screens: _upsert(screens, s, (x) => x.id));
 
+  /// Várias variáveis de uma vez (Criar várias, CSV). Com índice por id: mil
+  /// [upsertTag] seguidos seriam mil cópias da lista inteira.
+  Project upsertTags(Iterable<Tag> list) {
+    final next = [...tags];
+    final index = {for (var i = 0; i < next.length; i++) next[i].id: i};
+    for (final t in list) {
+      final n = t.normalized();
+      final i = index[n.id];
+      if (i == null) {
+        index[n.id] = next.length;
+        next.add(n);
+      } else {
+        next[i] = n;
+      }
+    }
+    return copyWith(tags: next);
+  }
+
   /// Apaga o equipamento **e** as variáveis dele. Elementos de tela que
   /// apontavam para elas ficam "sem variável" (mostram aviso), não somem —
   /// o usuário decide o que fazer com eles.

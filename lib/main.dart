@@ -13,6 +13,9 @@ import 'core/theme/app_theme.dart';
 import 'screens/shell.dart';
 import 'services/runtime/hmi_runtime.dart';
 import 'services/storage/project_repository.dart';
+import 'services/voice/speech_engine.dart';
+import 'services/voice/voice_announcer.dart';
+import 'services/voice/voice_prefs.dart';
 
 /// Ponto de entrada: monta runtime + controlador e entrega ao [CeliwareIhmApp].
 Future<void> main() async {
@@ -21,6 +24,7 @@ Future<void> main() async {
 
   await AppearanceController.instance.load();
   Ind.use(AppearanceController.instance.resolve());
+  await VoicePrefsController.instance.load();
 
   final runtime = HmiRuntime();
   final controller = ProjectController(repository: ProjectRepository(), runtime: runtime);
@@ -37,10 +41,13 @@ void _setupLogging() {
 /// Raiz do app. Cuida do ciclo de vida: em segundo plano, solta botões de
 /// pulso, para a varredura (bateria e rede) e grava o que estiver pendente.
 class CeliwareIhmApp extends StatefulWidget {
-  const CeliwareIhmApp({super.key, required this.controller, required this.runtime});
+  const CeliwareIhmApp({super.key, required this.controller, required this.runtime, this.speech});
 
   final ProjectController controller;
   final HmiRuntime runtime;
+
+  /// Motor de voz (testes passam um falso); nulo = `flutter_tts`.
+  final SpeechEngine? speech;
 
   @override
   State<CeliwareIhmApp> createState() => _CeliwareIhmAppState();
@@ -48,6 +55,7 @@ class CeliwareIhmApp extends StatefulWidget {
 
 class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObserver {
   late final AlarmEngine _alarms;
+  late final VoiceAnnouncer _voice;
 
   /// Navegação a partir da faixa de alarme (que fica acima do Navigator).
   final _navigator = GlobalKey<NavigatorState>();
@@ -60,6 +68,13 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
       runtime: widget.runtime,
       historyFile: () => widget.controller.repository.sidecar('historico-alarmes.json'),
     );
+    _voice = VoiceAnnouncer(
+      alarms: AlarmFeed.of(_alarms),
+      engine: widget.speech ?? FlutterTtsEngine(),
+      prefs: VoicePrefsController.instance,
+      controller: widget.controller,
+      runtime: widget.runtime,
+    );
     WidgetsBinding.instance.addObserver(this);
     AppearanceController.instance.addListener(_applyAppearance);
     _applySystemBars();
@@ -69,6 +84,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
   void dispose() {
     AppearanceController.instance.removeListener(_applyAppearance);
     WidgetsBinding.instance.removeObserver(this);
+    _voice.dispose();
     _alarms.dispose();
     super.dispose();
   }
@@ -111,8 +127,11 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
         unawaited(widget.runtime.pause());
         unawaited(widget.controller.flush());
         unawaited(_alarms.flush());
+        // Sem varredura não há alarme novo; a voz para junto (§2.4).
+        _voice.pause();
       case AppLifecycleState.resumed:
         widget.runtime.resume();
+        _voice.resume();
       default:
         break;
     }
@@ -124,6 +143,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
       controller: widget.controller,
       runtime: widget.runtime,
       alarms: _alarms,
+      voice: _voice,
       child: MaterialApp(
         title: 'Ware IoT',
         debugShowCheckedModeBanner: false,

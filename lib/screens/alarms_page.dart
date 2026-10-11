@@ -6,6 +6,7 @@ import '../models/alarm.dart';
 import '../services/alarms/alarm_engine.dart';
 import '../services/runtime/tag_codec.dart';
 import '../widgets/alarms/alarm_widgets.dart';
+import '../widgets/alarms/silence_button.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/hmi_frame.dart';
 
@@ -154,12 +155,18 @@ class _AlarmCard extends StatelessWidget {
         ]),
         if (entry.phase.unacked) ...[
           const SizedBox(height: 14),
-          FilledButton.tonalIcon(
-            key: ValueKey('reconhecer-${entry.key}'),
-            onPressed: () => scope.alarms.acknowledge(entry.key),
-            icon: const Icon(Icons.done_rounded),
-            label: Text(returned ? 'Reconhecer (já normalizou)' : 'Reconhecer'),
-          ),
+          // Silenciar ao lado, discreto: cala a voz sem reconhecer (VZ-3).
+          Row(children: [
+            Expanded(
+              child: FilledButton.tonalIcon(
+                key: ValueKey('reconhecer-${entry.key}'),
+                onPressed: () => scope.alarms.acknowledge(entry.key),
+                icon: const Icon(Icons.done_rounded),
+                label: Text(returned ? 'Reconhecer (já normalizou)' : 'Reconhecer'),
+              ),
+            ),
+            SilenceButton(entry: entry),
+          ]),
         ],
       ]),
     );
@@ -217,6 +224,7 @@ class _HistoryRow extends StatelessWidget {
       AlarmEventType.activated => event.priority.textColor,
       AlarmEventType.acknowledged => Ind.textDim,
       AlarmEventType.returned => Ind.textFor(Ind.ok),
+      AlarmEventType.silenced => Ind.textMuted,
     };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../services/alarms/alarm_engine.dart';
 import '../services/runtime/hmi_runtime.dart';
+import '../services/voice/voice_announcer.dart';
 import 'project_controller.dart';
 
 /// Injeção de dependência do app — o equivalente ao `AppDataSource` do
@@ -12,11 +13,15 @@ import 'project_controller.dart';
 /// `AppScope.of(context)`. Ouvir mudanças do projeto: `AppScope.watch(context)`
 /// (reconstrói a tela quando o projeto muda).
 class AppScope extends InheritedNotifier<ProjectController> {
-  const AppScope({super.key, required ProjectController controller, required this.runtime, required this.alarms, required super.child})
+  const AppScope({super.key, required ProjectController controller, required this.runtime, required this.alarms, this.voice, required super.child})
       : super(notifier: controller);
 
   final HmiRuntime runtime;
   final AlarmEngine alarms;
+
+  /// Avisos por voz (folha "Voz e avisos": exemplo e voz instalada). Nulo
+  /// onde o app é montado sem voz.
+  final VoiceAnnouncer? voice;
 
   ProjectController get controller => notifier!;
 

@@ -9,6 +9,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Canal da voz: fone conectado e ajustes de voz (ver SaidaDeAudio).
+        SaidaDeAudio.registrar(flutterEngine.dartExecutor.binaryMessenger, applicationContext)
         val r = RedeLocal(applicationContext)
         rede = r
         // Canal da rede local (ver RedeLocal e lib/services/net/local_network.dart).

@@ -8,6 +8,7 @@
 
 import '../core/modbus/modbus_memory.dart';
 import 'alarm.dart';
+import 'narration.dart';
 
 /// Formato do dado dentro da memória.
 enum TagDataType {
@@ -154,6 +155,7 @@ class Tag {
     this.offset = 0,
     this.description = '',
     this.alarms = const [],
+    this.narrations = const [],
   });
 
   final String id;
@@ -199,6 +201,10 @@ class Tag {
   /// Alarmes desta variável (ver [AlarmRule]). Moram aqui para viajar com o
   /// projeto e sumir junto quando a variável for apagada.
   final List<AlarmRule> alarms;
+
+  /// Narrações por voz (ver [EventNarration]): "quando valer 1, falar 'A
+  /// máquina está iniciando'". Moram aqui pelo mesmo motivo dos alarmes.
+  final List<EventNarration> narrations;
 
   /// Variável lida de um bit dentro de um registrador.
   bool get isBitOfRegister => dataType == TagDataType.bool && !area.isBit;
@@ -257,6 +263,7 @@ class Tag {
     double? offset,
     String? description,
     List<AlarmRule>? alarms,
+    List<EventNarration>? narrations,
   }) =>
       Tag(
         id: id,
@@ -275,6 +282,7 @@ class Tag {
         offset: offset ?? this.offset,
         description: description ?? this.description,
         alarms: alarms ?? this.alarms,
+        narrations: narrations ?? this.narrations,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -297,6 +305,12 @@ class Tag {
     // para liga/desliga; texto e lista não alarmam.
     final fits = t.alarms.where((a) => !t.isArray && !t.isText && (t.dataType == TagDataType.bool ? !a.kind.isAnalog : a.kind.isAnalog)).toList();
     if (fits.length != t.alarms.length) t = t.copyWith(alarms: fits);
+    // Narração: mesma regra (texto e lista não falam); liga/desliga só
+    // "valer 1/0"; sem texto não há o que falar.
+    final says = t.narrations
+        .where((n) => !t.isArray && !t.isText && n.text.trim().isNotEmpty && (t.dataType != TagDataType.bool || (n.kind == NarrationKind.equals && (n.value == 0 || n.value == 1))))
+        .toList();
+    if (says.length != t.narrations.length) t = t.copyWith(narrations: says);
     return t;
   }
 
@@ -318,6 +332,9 @@ class Tag {
         if (offset != 0) 'offset': offset,
         'description': description,
         if (alarms.isNotEmpty) 'alarms': [for (final a in alarms) a.toJson()],
+        // Como os alarmes: só vai para o arquivo quando existe (arquivo sem
+        // narração fica igual ao de antes).
+        if (narrations.isNotEmpty) 'narrations': [for (final n in narrations) n.toJson()],
       };
 
   factory Tag.fromJson(Map<String, dynamic> j) => Tag(
@@ -340,6 +357,10 @@ class Tag {
         alarms: [
           for (final a in (j['alarms'] as List? ?? const []))
             if (a is Map) AlarmRule.fromJson(Map<String, dynamic>.from(a)),
+        ],
+        narrations: [
+          for (final n in (j['narrations'] as List? ?? const []))
+            if (n is Map) EventNarration.fromJson(Map<String, dynamic>.from(n)),
         ],
       ).normalized();
 }

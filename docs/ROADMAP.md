@@ -18,39 +18,77 @@ Tag `v1.3.1`. É a versão para apresentar e instalar
 | 1.3.0 | Alarmes ISA-18.2: prioridade por cor + forma + número, faixa no topo, marca no elemento, lista, histórico, editor na variável, falta de comunicação como alarme. |
 | 1.3.1 | QA do APK instalado: botão com retorno vira "SEM RETORNO" após 5 s; faixa sem valor congelado e em uma linha com o celular deitado; tutorial explica cores e alarmes; "ligado" sem verde na lista de variáveis; alarme "Máquina parada" (média) na demonstração; tirado o "Vídeos · Em breve"; textos. |
 
-## Etapa 4 — acordada em 05/10/2026 (escopo a fechar)
+## Etapa 4 — escopo fechado em 11/10/2026
 
-Reunião de 3h com o cliente (ata `2026-10-05_alinhamento` no Atas).
-Resumo enviado a ele em 06/10; **espera a lista dele** (~09/10) para fechar o
-escopo. Nada aqui começou.
+Reunião de 3h com o cliente em 05/10 (ata `2026-10-05_alinhamento`
+no Atas). A lista dele chegou em 11/10: uma conversa no ChatGPT que cresceu até
+159 itens e virou uma plataforma de três aplicações (celular, servidor Windows,
+nuvem). A própria lista admite que os itens 1–16 são provisórios e que 72–86
+repetem 57–71.
 
 - **Valor:** R$ [valor], como a etapa anterior. R$ [valor] até 20/10; R$ [valor] na
   publicação na Play Store (R$ [valor] desta + R$ [valor] guardados da etapa 3).
-- **Forma:** uma entrega com escopo fechado (a lista dele + a nossa), depois
-  quantas rodadas de teste forem precisas. Sem versões incrementais no meio.
+- **Forma:** uma entrega com escopo fechado, depois quantas rodadas de teste
+  forem precisas. Sem versões incrementais no meio (a 1.3.2 abaixo é exceção:
+  corrige a etapa anterior).
 - **Produto:** app gratuito por agora; a receita vem do hardware (conversores
   RS-485/232 → Wi-Fi, roteador 4G com VPN, repetidores), vendido na loja
   Shopify com link no site. Marca "Powered by Celiware".
 
-| # | Item | Hoje (conferido no código em 06/10) | Tipo |
-|---|---|---|---|
-| 1 | Comunicação com Siemens e OPC UA | só Modbus TCP | novo |
-| 2 | Mapas de memória prontos das marcas parceiras (Inovance, INVT…) | perfil Inovance planejado (ARQUITETURA §10.2), nenhum pronto | novo |
-| 3 | Importar memórias por faixa (M0–M1000, D0–D3000, X, Y) | importa o projeto inteiro | novo |
-| 4 | Avisos por voz no fone | o alarme só vibra; o app não tem som | novo |
-| 5 | Intertravamento entre máquinas | uma tela junta várias máquinas, mas não há motor de lógica | novo |
-| 6 | Versão para Windows | a pasta `windows/` existe; o `.exe` nunca foi gerado nem testado | novo |
-| 7 | Grade maior e mais variáveis por tela | grade atual do editor | ajuste |
-| 8 | Correções no "editar memória" | — | ajuste |
-| 9 | Tela de tablet | item 3 de "Próximo" abaixo | ajuste |
-| 10 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | não existe | novo |
-| 11 | Publicação na Play Store | roteiro em `PUBLICACAO.md` | novo |
-| 12 | Arduino e macros em JavaScript | script na variável foi **recusado na 1.1** (ver o fim deste arquivo) | a avaliar |
+**Regra de corte (decisão do Pedro, 11/10):** entra o que vive **dentro do
+app**. Fica fora tudo o que é externo ao sistema — servidor, nuvem, contas,
+licenças, biometria — e os idiomas. Argumento ao cliente: o que dificulta a
+aprovação na Play Store é recusado (conta e login obrigam exclusão de conta e
+formulário de segurança de dados; biometria é dado sensível; servidor e nuvem
+pedem política de privacidade e infraestrutura paga), e nada disso cabe num
+upgrade de R$ [valor].
 
-**Ao fechar o escopo:** separar o que cabe nos R$ [valor] (site, Play Store,
-Windows, grade, tablet, editar memória, importação por faixa) do que pede etapa
-própria (Siemens, OPC UA, voz, intertravamento). O preço foi fixado antes do
-escopo: esse é o risco.
+### Entra
+
+| # | Item | Da lista dele / da reunião | Hoje (código em 11/10) |
+|---|---|---|---|
+| 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | o app não amarra a conexão ao Wi-Fi |
+| 1 | Publicação na Play Store | reunião | roteiro em `PUBLICACAO.md` |
+| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | não existe |
+| 3 | Versão para Windows do **próprio app** (sem função de servidor) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
+| 4 | Grade maior e mais variáveis por tela | reunião | grade atual do editor |
+| 5 | Correções no "editar memória" | 2, 11 · reunião | — |
+| 6 | Tela de tablet | reunião | item 3 de "Próximo" |
+| 7 | Importar memórias por faixa (M0–M1000, D0–D3000, X, Y) | reunião | importa o projeto inteiro |
+| 8 | Mapas de memória prontos das marcas parceiras (Inovance, INVT…) | reunião | perfil Inovance planejado (ARQUITETURA §10.2) |
+| 9 | Protocolos: Siemens S7, OPC UA, MQTT, Modbus RTU/ASCII (serial e USB-OTG), TCP/UDP/serial com interpretador de mensagens (Arduino) | 15, 16, 60, 64 · reunião | só Modbus TCP |
+| 10 | Avisos por voz no fone e narração de eventos | 10, 12 · reunião | o alarme só vibra |
+| 11 | Lógica entre máquinas (intertravamento) e cálculos | 13, 14 · reunião | sem motor de lógica; script na escrita recusado na 1.1 — a lógica **nunca** é função de segurança da máquina |
+| 12 | Câmeras IP (RTSP) vinculadas à máquina, abertas por botão | 70, 71 | não existe |
+| 13 | Receitas: criar, salvar, comparar com a ativa, aplicar com confirmação | 96, 114–118 | não existe |
+| 14 | Registro periódico de variáveis, gráfico do registro e exportação CSV | 17, 63, 158, 159 | gráfico de 2 min só em memória |
+
+### Já existe (1.3.1) — conta como entregue
+
+Cadastro de equipamentos (5), variáveis e edição (2, 11), memória padronizada
+(6, 19), indicadores e elementos (7, 23), navegação entre telas (9),
+diagnóstico e teste de conexão (20, 26), alarmes e histórico (21, 22), modo de
+simulação (27), exportar/importar projeto (39), tutoriais de primeiro uso (53),
+aviso de dado desatualizado (142), vibração no alarme (157). Em parte:
+compartilhar projeto (18), duplicar (29), tela só de acompanhamento (32),
+várias máquinas numa tela (61).
+
+### Fica fora
+
+- **Externo ao sistema:** login e contas (1), permissões e auditoria em
+  servidor (30, 31), API, painel web, nuvem, sincronização, atualização remota
+  (34–38), servidor Windows central e projetos no servidor (89, 91), nuvem RT
+  (90), acesso remoto e sessões (103, 104), controle centralizado de comandos
+  (155, 156).
+- **Comercial e licenças:** planos e licenças (50, 51 — contradiz "app
+  gratuito"), marketplace (43), gateway de hardware próprio (49), loja (48, é
+  do cliente), banner (59), vídeos (46 — decidido em 27/09).
+- **Biometria:** reconhecimento facial (69).
+- **Idiomas:** app e site trilíngues (87, 88).
+- **Sem data, não decidido:** os itens locais de gestão (OEE, painéis por
+  perfil, turnos, metas, paradas, manutenção, peças, relatórios —
+  8, 24, 92–154). Não pedem nada externo, mas cada um é um módulo; ficam para
+  depois desta etapa.
 
 **Do lado do cliente:** nome comercial, marca e domínio do app; lista do hardware
 e cadastro na Shopify; uma peça de cada para os testes; testes nas máquinas

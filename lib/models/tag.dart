@@ -156,6 +156,7 @@ class Tag {
     this.description = '',
     this.alarms = const [],
     this.narrations = const [],
+    this.memory,
   });
 
   final String id;
@@ -205,6 +206,14 @@ class Tag {
   /// Narrações por voz (ver [EventNarration]): "quando valer 1, falar 'A
   /// máquina está iniciando'". Moram aqui pelo mesmo motivo dos alarmes.
   final List<EventNarration> narrations;
+  /// A memória como no manual do CLP ("D200", "X10", "F3-12"), quando o
+  /// equipamento tem perfil de fabricante. É só o texto que a pessoa conhece:
+  /// [area] e [address] continuam sendo a verdade da varredura. Nulo no Modbus
+  /// genérico.
+  final String? memory;
+
+  /// "D200 · HR 200" na lista; sem perfil, só o endereço Modbus.
+  String get memoryLabel => memory == null ? addressLabel : '$memory · $addressLabel';
 
   /// Variável lida de um bit dentro de um registrador.
   bool get isBitOfRegister => dataType == TagDataType.bool && !area.isBit;
@@ -283,6 +292,30 @@ class Tag {
         description: description ?? this.description,
         alarms: alarms ?? this.alarms,
         narrations: narrations ?? this.narrations,
+        memory: memory,
+      );
+
+  /// Troca o texto da memória — inclusive para nulo (endereço digitado à mão),
+  /// o que o [copyWith] não consegue.
+  Tag withMemory(String? memory) => Tag(
+        id: id,
+        name: name,
+        deviceId: deviceId,
+        area: area,
+        address: address,
+        dataType: dataType,
+        byteOrder: byteOrder,
+        bitIndex: bitIndex,
+        length: length,
+        writable: writable,
+        unit: unit,
+        decimals: decimals,
+        scale: scale,
+        offset: offset,
+        description: description,
+        alarms: alarms,
+        narrations: narrations,
+        memory: memory,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -309,6 +342,7 @@ class Tag {
         .where((n) => !t.isArray && !t.isText && n.text.trim().isNotEmpty && (t.dataType != TagDataType.bool || (n.kind == NarrationKind.equals && (n.value == 0 || n.value == 1))))
         .toList();
     if (says.length != t.narrations.length) t = t.copyWith(narrations: says);
+    if (t.memory != null && t.memory!.trim().isEmpty) t = t.withMemory(null);
     return t;
   }
 
@@ -339,6 +373,8 @@ class Tag {
         // Como os alarmes: só vai para o arquivo quando existe (arquivo sem
         // narração fica igual ao de antes).
         if (narrations.isNotEmpty) 'narrations': [for (final n in narrations) n.toJson()],
+        // Só com perfil de fabricante: projeto genérico fica igual ao de antes.
+        if (memory != null) 'memory': memory,
       };
 
   factory Tag.fromJson(Map<String, dynamic> j) => Tag(
@@ -366,5 +402,6 @@ class Tag {
           for (final n in (j['narrations'] as List? ?? const []))
             if (n is Map) EventNarration.fromJson(Map<String, dynamic>.from(n)),
         ],
+        memory: j['memory'] as String?,
       ).normalized();
 }

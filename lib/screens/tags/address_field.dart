@@ -34,8 +34,10 @@ class AddressReading {
 ///   * notação de manual ("40101", "400101"): não vira endereço sozinha, vira
 ///     sugestão ([AddressReading.manual]) — 40101 também é um endereço válido.
 ///
-/// Perfis de fabricante ("D100", "M0") entram aqui: mais um formato que
-/// devolve endereço (e área).
+/// Com perfil de fabricante a sugestão não vale ([manual] falso): lá,
+/// 40001–49999 são endereços legítimos (ver
+/// `VendorProfiles.manualNotationApplies`). A memória do manual do CLP
+/// ("D200") tem campo próprio no cadastro.
 class AddressInput {
   AddressInput._();
 
@@ -80,23 +82,23 @@ class AddressInput {
     return null;
   }
 
-  static AddressReading read(String text, {required ModbusArea area, bool hex = false}) {
+  static AddressReading read(String text, {required ModbusArea area, bool hex = false, bool manual = true}) {
     final t = _clean(text);
     if (t.isEmpty) return const AddressReading(error: 'Informe o endereço');
     final v = parse(t, hex: hex);
     if (v == null) return AddressReading(error: hex ? 'Hexadecimal: algarismos e letras de A a F' : 'Número inteiro');
     final converted = hex || !_decimal.hasMatch(t);
     // Notação de manual é sempre decimal.
-    final manual = converted ? null : manualNotation(v, area);
+    final suggestion = converted || !manual ? null : manualNotation(v, area);
     if (v > max) {
       return AddressReading(
-        error: manual != null ? 'Acima de 65535: veja a sugestão abaixo' : 'Endereço acima de 65535',
-        manual: manual,
+        error: suggestion != null ? 'Acima de 65535: veja a sugestão abaixo' : 'Endereço acima de 65535',
+        manual: suggestion,
         converted: converted,
         overMax: true,
       );
     }
-    return AddressReading(address: v, manual: manual, converted: converted);
+    return AddressReading(address: v, manual: suggestion, converted: converted);
   }
 
   /// − / +: um a mais ou a menos, escrito do mesmo jeito que estava
@@ -118,17 +120,20 @@ class AddressInput {
 /// de manual.
 ///
 /// Isolado aqui de propósito: o campo "Memória do CLP" (perfis de fabricante,
-/// "D100" → registrador 100) troca ou complementa este bloco sem mexer no
-/// resto do formulário — o formulário só lê o resultado por
-/// [AddressInput.read].
+/// "D100" → registrador 100) complementa este bloco sem mexer nele — o
+/// formulário só lê o resultado por [AddressInput.read].
 class AddressField extends StatelessWidget {
-  const AddressField({super.key, required this.controller, required this.area, required this.onChanged, this.hex = false});
+  const AddressField({super.key, required this.controller, required this.area, required this.onChanged, this.hex = false, this.manual = true});
 
   final TextEditingController controller;
   final ModbusArea area;
 
   /// Modo hexadecimal (ligado em "Mais opções"): "2000" = 8192.
   final bool hex;
+
+  /// Sugere a conversão da notação de manual ("40101" → 100). Falso com
+  /// perfil de fabricante.
+  final bool manual;
   final VoidCallback onChanged;
 
   void _set(String text) {
@@ -138,7 +143,7 @@ class AddressField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r = AddressInput.read(controller.text, area: area, hex: hex);
+    final r = AddressInput.read(controller.text, area: area, hex: hex, manual: this.manual);
     final manual = r.manual;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -162,7 +167,7 @@ class AddressField extends StatelessWidget {
               errorText: r.overMax && manual == null ? r.error : null,
             ),
             onChanged: (_) => onChanged(),
-            validator: (_) => AddressInput.read(controller.text, area: area, hex: hex).error,
+            validator: (_) => AddressInput.read(controller.text, area: area, hex: hex, manual: this.manual).error,
           ),
         ),
         const SizedBox(width: 6),

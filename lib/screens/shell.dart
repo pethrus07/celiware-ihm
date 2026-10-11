@@ -63,7 +63,10 @@ class ShellState extends State<Shell> {
         body: IndexedStack(
           index: _index,
           children: [
-            for (var i = 0; i < pages.length; i++) _visited.contains(i) ? pages[i] : const SizedBox.shrink(),
+            // HeroMode: só a aba à vista entra na animação de troca de página.
+            // Sem isso, duas abas visitadas com botão flutuante (mesma tag de
+            // Hero) quebravam qualquer navegação em modo debug.
+            for (var i = 0; i < pages.length; i++) _visited.contains(i) ? HeroMode(enabled: i == _index, child: pages[i]) : const SizedBox.shrink(),
           ],
         ),
         // Fonte do sistema em 130%: "Equipamentos" quebrava em "Equipamento/s".

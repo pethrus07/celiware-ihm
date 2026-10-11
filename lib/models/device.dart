@@ -39,10 +39,10 @@ extension DeviceKindMeta on DeviceKind {
 /// Imutável. Só guarda **como** conversar; os valores lidos vivem no
 /// [TagStore] e nunca vão para o disco.
 ///
-/// Ponto de extensão planejado: perfis de fabricante (ex.: Inovance) vão
-/// entrar aqui como um campo `profile` que traduz nomes de memória do CLP
-/// ("M100", "D200") em endereço Modbus. O protocolo não muda entre marcas —
-/// só onde cada área começa — então o resto do app não precisa saber.
+/// [profile] é o perfil de fabricante (`lib/models/vendor_profiles.dart`), que
+/// traduz nomes de memória do CLP ("M100", "D200") em endereço Modbus. O
+/// protocolo não muda entre marcas — só onde cada área começa — então o resto
+/// do app não precisa saber.
 class Device {
   const Device({
     required this.id,
@@ -54,6 +54,7 @@ class Device {
     this.timeoutMs = 1500,
     this.pollMs = 500,
     this.framing = ModbusFraming.rtu,
+    this.profile,
   });
 
   final String id;
@@ -76,6 +77,12 @@ class Device {
 
   /// Envelope das mensagens em [DeviceKind.modbusRtuTcp] (RTU ou ASCII).
   final ModbusFraming framing;
+
+  /// Id do perfil de fabricante ("inovance-h3u"); nulo = Modbus genérico. O
+  /// projeto guarda só o id: a tabela mora no código
+  /// (`lib/models/vendor_profiles.dart`), e cada variável guarda o texto da
+  /// memória (`Tag.memory`) para o endereço poder ser recalculado.
+  final String? profile;
 
   bool get isDemo => kind == DeviceKind.demo;
 
@@ -108,6 +115,22 @@ class Device {
         timeoutMs: timeoutMs ?? this.timeoutMs,
         pollMs: pollMs ?? this.pollMs,
         framing: framing ?? this.framing,
+        profile: profile,
+      );
+
+  /// Troca o perfil — inclusive para nulo (Genérico), o que o [copyWith] não
+  /// consegue. Não mexe na conexão.
+  Device withProfile(String? profile) => Device(
+        id: id,
+        name: name,
+        kind: kind,
+        host: host,
+        port: port,
+        unitId: unitId,
+        timeoutMs: timeoutMs,
+        pollMs: pollMs,
+        framing: framing,
+        profile: profile,
       );
 
   /// Duas configurações que exigem reabrir a conexão se mudarem.
@@ -130,6 +153,7 @@ class Device {
         'pollMs': pollMs,
         // Só quando importa: projeto de Modbus TCP fica igual ao de antes.
         if (kind == DeviceKind.modbusRtuTcp) 'framing': framing.name,
+        if (profile != null) 'profile': profile,
       };
 
   factory Device.fromJson(Map<String, dynamic> j) => Device(
@@ -142,5 +166,6 @@ class Device {
         timeoutMs: (j['timeoutMs'] as int?) ?? 1500,
         pollMs: (j['pollMs'] as int?) ?? 500,
         framing: ModbusFramingMeta.fromName(j['framing'] as String?),
+        profile: j['profile'] as String?,
       );
 }

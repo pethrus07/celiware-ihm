@@ -83,6 +83,14 @@ class ProjectController extends ChangeNotifier {
   void saveDevice(Device d) => _commit(_project.upsertDevice(d));
   void deleteDevice(String id) => _commit(_project.removeDevice(id));
   void saveTag(Tag t) => _commit(_project.upsertTag(t));
+
+  /// Grava várias variáveis com **um** commit: uma aplicação no runtime, um
+  /// aviso às telas, uma gravação. Com [saveTag] em laço, criar mil variáveis
+  /// eram mil replanejamentos da varredura e mil reconstruções da lista.
+  void saveTags(List<Tag> tags) {
+    if (tags.isEmpty) return;
+    _commit(_project.upsertTags(tags));
+  }
   void deleteTag(String id) => _commit(_project.removeTag(id));
   void saveScreen(HmiScreen s) => _commit(_project.upsertScreen(s));
   void deleteScreen(String id) => _commit(_project.removeScreen(id));

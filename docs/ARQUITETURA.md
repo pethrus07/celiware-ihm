@@ -310,6 +310,22 @@ Testes: o `S7TestServer` é um CLP de mentira em Dart que respeita a PDU como um
 - grava bit sobrescrevendo o byte inteiro;
 - só atende um item por pedido de escrita.
 
+### 4.17. Protocolo cru (Arduino)
+
+Arduino, ESP, balança e leitor não seguem norma: cada um manda a sua linha (`T=25.3;P=1\n`, `25.3,1,OK\n`, STX…ETX com BCC) ou o seu pacote binário, por TCP, UDP ou serial. Em vez de um driver por equipamento, um **perfil declarativo** (`MessageProfile`, em `lib/core/rawlink/`) vai no arquivo do projeto e um interpretador genérico o segue:
+
+| Pergunta | Opções |
+|---|---|
+| Onde a mensagem termina | fim de linha configurável · tamanho fixo (cabeçalho opcional para ressincronizar) · marcadores de início/fim · prefixo de tamanho (bytes depois do tamanho = valor + ajuste) |
+| Se ela confere | nenhum, XOR, soma 8 bits ou CRC16 Modbus; cru ou em hexadecimal; no fim do corpo (com separador, como o `*` do NMEA) ou depois do marcador de fim (BCC) |
+| Como tirar os campos | `chave=valor` · CSV por posição (com aspas) · regex com grupos nomeados · binário por deslocamento, tipo (u8…f32) e as mesmas quatro ordens de bytes do Modbus |
+| Quem fala primeiro | streaming (o equipamento manda) ou polling (pedido a cada N ms) |
+| Comandos | texto `SET {campo}={valor}\n` (`{valor:2}`, `{cs}`) ou binário `AA {valor:u16} {cs}` |
+
+`MessageParser` só conhece bytes — é o mesmo código no cliente e na futura prévia do editor. Junta mensagem partida, separa as grudadas, descarta lixo antes do início, limita o buffer (mensagem sem fim passa de `maxFrameBytes` e é descartada, inclusive o rabo dela) e, num binário com checksum errado, escorrega byte a byte até voltar a conferir. Mensagens com problema também saem (`FrameProblem`), para a prévia mostrar "checksum errado" em vez de nada. Campo vazio não vira valor; texto só vira número quando o campo inteiro é um número (`25.3C` continua texto — unidade grudada se tira com regex). `RawClient` roda sobre `ByteLink` (`TcpByteLink`, `UdpByteLink`): guarda o valor mais recente de cada chave com o horário, faz o polling sozinho, envia comandos e acusa equipamento mudo pela validade do perfil (`staleAfterMs`). Em UDP o fim do datagrama fecha a mensagem (ESP costuma mandar sem `\n`). Falhas são `RawLinkError`, um `CommError` como os do Modbus.
+
+Falta: o driver no motor (`raw_driver`, variável apontando para a chave do campo), a tela do perfil com prévia ao vivo (RW-3) e a serial por USB-OTG. Testes: `FakeArduinoServer` (Dart, TCP e UDP) e `sim/arduino_falso.py` (SIMULACAO §7).
+
 ## 5. Modelo de dados
 
 ### 5.1. Equipamento (`Device`)
@@ -593,6 +609,7 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/core/local_network_test.dart` | Faixa de IP, rede privada, diagnóstico do teste de conexão ("redes diferentes", "sem Wi-Fi"), rótulo da rede e leitura do mapa vindo do Android. |
 | `test/core/modbus_serial_test.dart` | CRC16 e LRC com vetores conhecidos, fim de quadro pelo código da função; RTU e ASCII sobre TCP por socket real: leitura e escrita, endereço inexistente, adaptador com eco, CRC corrompido, ID errado = sem resposta, porta fechada = recusou. |
 | `test/core/s7_test.dart` | Siemens S7. Endereços (alemão/inglês, `%`, `P#`, erros) e codecs. Vetores de referência: COTP CR, Setup Communication, Read/Write Var. Por socket real contra o `S7TestServer`: vários itens num pedido, divisão por itens e por PDU, item maior que a PDU, bit com transporte BIT, REAL/STRING, item com erro sem derrubar os outros, PUT/GET desligado, tempo esgotado, resposta atrasada descartada, pedidos em paralelo, resposta picada (TCP e COTP), queda e reconexão, porta fechada, rack/slot errados. |
+| `test/core/rawlink_test.dart` | Protocolo cru: os quatro tipos de delimitação, mensagem partida e grudada, lixo, buffer cheio, ressincronização do binário; checksum com vetores conhecidos (CRC16, NMEA), certo/errado, BCC depois do ETX; campos chave=valor, CSV, regex e binário nas quatro ordens; comandos de texto e binários; JSON do perfil ida e volta; cliente contra o Arduino falso por TCP e UDP (streaming, polling, comando, silêncio, queda, porta fechada). |
 | `test/runtime/rtu_device_test.dart` | Equipamento atrás de gateway RS-485 pelo caminho de produção (fábrica → driver → sessão): testar, ler na varredura e gravar em RTU e ASCII; envelope no arquivo do projeto. |
 | `test/runtime/device_driver_test.dart` | Contrato do driver com um driver de mentira (não Modbus): a sessão publica, grava e trata queda igual. |
 | `test/runtime/scan_planner_test.dart` | Agrupamento, buracos, limite de 125, áreas separadas, isolamento. |

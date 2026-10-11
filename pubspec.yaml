@@ -24,11 +24,19 @@ dependencies:
   printing: ^5.15.1
   share_plus: ^13.3.0
   clock: ^1.1.3
+  # Registro de dados (Mais → Registros): o SQLite do próprio Android, sem
+  # biblioteca nativa no APK.
+  sqflite: ^2.4.4+1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # SQLite nos testes (o flutter test roda no Windows). Só aqui de propósito:
+  # o build release não roda hooks de dev_dependencies, então o SQLite que ele
+  # embute não vai para o APK. Versão Windows do app: mover para dependencies
+  # e usar `databaseFactoryFfi` no main.dart.
+  sqflite_common_ffi: ^2.4.3
 
 flutter:
   uses-material-design: true

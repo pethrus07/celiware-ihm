@@ -1,5 +1,6 @@
 import 'device.dart';
 import 'hmi_screen.dart';
+import 'log_group.dart';
 import 'tag.dart';
 
 /// O projeto inteiro: equipamentos, variáveis e telas.
@@ -17,6 +18,7 @@ class Project {
     this.devices = const [],
     this.tags = const [],
     this.screens = const [],
+    this.logGroups = const [],
   });
 
   static const int schemaVersion = 1;
@@ -26,11 +28,16 @@ class Project {
   final List<Tag> tags;
   final List<HmiScreen> screens;
 
+  /// Registros de dados (Mais → Registros). A configuração viaja com o
+  /// projeto; o histórico gravado é do aparelho.
+  final List<LogGroup> logGroups;
+
   bool get isEmpty => devices.isEmpty && tags.isEmpty && screens.isEmpty;
 
   Device? device(String id) => _firstWhere(devices, (d) => d.id == id);
   Tag? tag(String id) => _firstWhere(tags, (t) => t.id == id);
   HmiScreen? screen(String id) => _firstWhere(screens, (s) => s.id == id);
+  LogGroup? logGroup(String id) => _firstWhere(logGroups, (g) => g.id == id);
 
   List<Tag> tagsOf(String deviceId) =>
       tags.where((t) => t.deviceId == deviceId).toList();
@@ -44,12 +51,14 @@ class Project {
     List<Device>? devices,
     List<Tag>? tags,
     List<HmiScreen>? screens,
+    List<LogGroup>? logGroups,
   }) =>
       Project(
         name: name ?? this.name,
         devices: devices ?? this.devices,
         tags: tags ?? this.tags,
         screens: screens ?? this.screens,
+        logGroups: logGroups ?? this.logGroups,
       );
 
   // ── Edições (sempre devolvem um projeto novo) ────────────────────────────────
@@ -68,6 +77,8 @@ class Project {
 
   Project removeTag(String id) => copyWith(tags: tags.where((t) => t.id != id).toList());
   Project removeScreen(String id) => copyWith(screens: screens.where((s) => s.id != id).toList());
+  Project upsertLogGroup(LogGroup g) => copyWith(logGroups: _upsert(logGroups, g.normalized(), (x) => x.id));
+  Project removeLogGroup(String id) => copyWith(logGroups: logGroups.where((g) => g.id != id).toList());
 
   Map<String, dynamic> toJson() => {
         'format': 'celiware-ihm',
@@ -76,6 +87,8 @@ class Project {
         'devices': [for (final d in devices) d.toJson()],
         'tags': [for (final t in tags) t.toJson()],
         'screens': [for (final s in screens) s.toJson()],
+        // Só quando há algum: projeto sem registro fica igual ao da 1.3.
+        if (logGroups.isNotEmpty) 'logGroups': [for (final g in logGroups) g.toJson()],
       };
 
   factory Project.fromJson(Map<String, dynamic> j) => Project(
@@ -91,6 +104,10 @@ class Project {
         screens: [
           for (final s in (j['screens'] as List? ?? const []))
             HmiScreen.fromJson(Map<String, dynamic>.from(s as Map)),
+        ],
+        logGroups: [
+          for (final g in (j['logGroups'] as List? ?? const []))
+            if (g is Map) LogGroup.fromJson(Map<String, dynamic>.from(g)),
         ],
       );
 

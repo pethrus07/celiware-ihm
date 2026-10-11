@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backup automático do Android até a versão 11 (android:fullBackupContent).
+     O histórico dos registros (Mais → Registros, pasta app_flutter/registros)
+     é do aparelho e passa fácil de 25 MB — acima disso o Android desiste do
+     backup INTEIRO, inclusive do projeto. Fica de fora; o resto entra. -->
+<full-backup-content>
+    <exclude domain="root" path="app_flutter/registros/" />
+</full-backup-content>

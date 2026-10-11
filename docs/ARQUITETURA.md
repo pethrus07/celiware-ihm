@@ -56,7 +56,7 @@ Script livre (JavaScript) na variável ficou de fora de propósito: a escala lin
 |---|---|
 | Linguagem / framework | Dart 3.13 e Flutter 3.47 (Material 3, tema escuro próprio). |
 | Comunicação industrial | Modbus TCP/IP sobre socket TCP cru, sem biblioteca Modbus externa. |
-| Persistência | JSON num arquivo na pasta privada do app (`path_provider`). |
+| Persistência | JSON num arquivo na pasta privada do app (`path_provider`). Histórico dos registros em SQLite (`sqflite`, o do Android — §6.9). |
 | Arquivos | Exportar/importar projeto e escolher imagem (`file_picker`). |
 | PDF | Página de PDF → imagem, para a imagem por etapa (`printing`, que usa o renderizador do próprio Android). |
 | Marcas por aparelho | "Tutorial já visto" (`shared_preferences`). |
@@ -137,6 +137,7 @@ lib/
 │   │   ├── scan_planner.dart         Agrupa variáveis vizinhas em leituras únicas.
 │   │   ├── tag_codec.dart            Registradores ⇄ valor; formatação pt-BR.
 │   │   └── tag_store.dart            Última leitura por variável + histórico curto.
+│   ├── logging/                      Registro de dados: motor, banco SQLite, CSV (§6.9).
 │   ├── demo/
 │   │   ├── demo_process.dart         "Programa do CLP" da cortadora simulada.
 │   │   └── demo_project.dart         Projeto de demonstração (duas telas).
@@ -148,7 +149,8 @@ lib/
 │   ├── editor/                       Editor, paleta, configuração de elemento.
 │   ├── devices/                      Lista e cadastro de equipamento (Testar conexão).
 │   ├── tags/                         Lista e cadastro de variável (Lendo agora).
-│   ├── more_page.dart                Projeto, tutoriais, sobre.
+│   ├── logs/                         Registros: lista, folha do grupo, histórico.
+│   ├── more_page.dart                Projeto, registros, tutoriais, sobre.
 │   └── tours.dart                    Textos de todas as trilhas de tutorial.
 └── widgets/
     ├── hmi/
@@ -424,6 +426,22 @@ Seguem a ANSI/ISA-18.2 (resumo em `docs/PESQUISA-UI-UX.md` §1.2). O alarme **mo
 
 **Limite desta versão:** com o app em segundo plano a leitura para (bateria), então **não há alarme com o app fechado** nem notificação do Android. Resolver isso pede um serviço em primeiro plano (notificação fixa "vigiando a cortadora") — fica como próximo passo, a decidir.
 
+### 6.9. Registro de dados
+
+Mais → **Registros** (REQUISITOS-ETAPA4 §9.4, RG-1 a RG-6): variáveis gravadas no aparelho para ver o histórico em gráfico e mandar a planilha.
+
+**Grupo** (`LogGroup`, em `Project.logGroups`; só vai para o arquivo quando há algum, `schemaVersion` segue 1): nome, variáveis (número e liga/desliga de valor único; texto e lista não), intervalo de 1 s a 1 h, modo **Sempre** ou **Ao mudar** (banda morta na unidade de cada variável + "gravar ao menos a cada", para valor parado não parecer buraco), retenção (padrão 7 dias) e liga/desliga. À vista na folha: nome, variáveis, ritmo e "Guardar 7 dias" com o tamanho estimado (calibrado pela medição: 13 B por linha + 8,5 B por número); o modo fica em "Mais opções".
+
+**Motor** (`DataLogger`, `lib/services/logging/`): padrão do `AlarmEngine` — mantém inscritas as variáveis dos grupos ligados, em qualquer tela. Conferência a cada segundo, no compasso do intervalo. Sem comunicação, endereço recusado ou leitura parada (mais de 10 s ou 3 varreduras) grava **nulo**, nunca o último valor; ao abrir e ao voltar do segundo plano espera até 10 s pela primeira leitura. Linhas vão para o banco **em lote a cada 10 s**, numa transação, e na ida para segundo plano (gancho em `main.dart`, como o histórico de alarmes). Retenção conferida de hora em hora.
+
+**Banco** (`LogStore`): o SQLite do próprio Android pelo `sqflite` (nenhuma biblioteca nativa no APK); nos testes, `sqflite_common_ffi`, só em `dev_dependencies` — o build release não roda hooks de dependência de desenvolvimento, então o SQLite embutido dele não entra no APK. **Um arquivo por grupo** em `registros/`, ao lado do projeto: o uso de disco é o tamanho do arquivo ("A cada 1 s · 3 variáveis · 2,4 MB") e apagar o grupo devolve o espaço na hora. **Tabela larga**: uma linha por instante (`t` em ms UTC, chave da própria tabela) e uma coluna `REAL` por variável — 15,8 MB/dia para 20 variáveis a 1 s, contra 40,7 na estreita. A tabela `colunas` guarda nome, unidade e casas do momento da gravação, então o histórico sobrevive a renomear ou apagar a variável. WAL (um fsync por lote). Banco de grupo que saiu do projeto vale até a retenção dele e depois some. A pasta fica fora do backup na nuvem (`res/xml/backup_rules.xml`, `data_extraction_rules.xml`): acima de 25 MB o Android desiste do backup inteiro, inclusive do projeto.
+
+**Histórico** (`LogHistoryPage`): Última hora · Hoje · 7 dias · Escolher; até 3 curvas. O gráfico usa a mesma régua da tendência (`TrendScale`: poço, passos redondos, eixo duplo) e recebe do SQLite **no máximo uma fatia por pixel** com mínimo, máximo e média — uma semana a 1 s são 604.800 linhas e o pico de um segundo continua lá. A curva é interrompida onde não há linha (app fechado) e onde a fatia é toda nula (sem comunicação). Pinça aproxima (até 30 s), arrastar anda, tocar mostra hora e valor (exato, ou "mín. a máx." quando a fatia junta várias linhas).
+
+**Planilha** (`LogCsv`): a janela à vista, no jeito do Excel pt-BR — `;`, vírgula decimal, `dd/MM/aaaa HH:mm:ss` local, cabeçalho "Nome (unidade)", UTF-8 com BOM, lacuna = célula vazia, sem `sep=;` (o Excel ignoraria o BOM). Lida em páginas de 5.000 linhas, página grande formatada num isolate, enviada pelo `share_plus`.
+
+**Limite desta versão:** grava só com o app aberto (o histórico mostra o buraco). Com o serviço em primeiro plano basta o `DataLogger.pause` não pausar — ponto de extensão comentado lá.
+
 ## 7. Tutoriais dentro do app
 
 Método do onboarding da Retífica (`sinapse/07-FONTES/onboarding-dentro-do-sistema.md`), portado para Flutter em `lib/widgets/tour/tour.dart`, com os textos centralizados em `lib/screens/tours.dart`.
@@ -570,6 +588,10 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/runtime/alarm_logic_test.dart` | Condição com banda morta (acima/abaixo), liga/desliga, valor inválido, mensagem padrão com unidade, alarmes no JSON, descarte de alarme incompatível com o tipo, prioridades. |
 | `test/runtime/hmi_runtime_test.dart` | Inscrição, isolamento do endereço errado, escrita, queda com último valor, soltura insistente do pulso, variável apagada. |
 | `test/widgets/app_flow_test.dart` | Primeira abertura, valores ao vivo, botão com confirmação ligando a máquina, tela só acompanhamento, editor com paleta, escolha de variável e configuração; escala e texto na tela do líder, troca de tela pelo botão e pelo mostrador, botão com retorno aguardando com a porta aberta; celular deitado com célula no teto e grade centralizada; busca de variável sem acento; troca de aparência no meio do uso; alarme ponta a ponta (não dispara antes de 1 s, faixa no topo, marca no elemento, reconhecer, normalizar, histórico) e alarme que normaliza sem ninguém ver continuando na faixa. |
+| `test/runtime/log_group_test.dart` | Grupo de registro no arquivo (ida e volta, projeto antigo sem grupo, valores impossíveis corrigidos), só número e liga/desliga, estimativa de disco contra a medição (15,8 MB/dia), textos de tamanho e ritmo, limiar de buraco. |
+| `test/runtime/data_logger_test.dart` | SQLite real (ffi) e relógio controlado: periódico, compasso com timer atrasado, "ao mudar" com banda morta e máximo entre amostras, lacuna sem comunicação/endereço recusado/leitura parada, folga da primeira leitura, lote e descarga, segundo plano, retenção, apagar grupo, banco órfão, ponta a ponta com equipamento simulado caindo. |
+| `test/runtime/log_store_test.dart` | Consulta reduzida (mín./máx. por fatia, pico preservado, lacuna com contagem zero, uma linha por fatia quando cabe), colunas que sobrevivem a renomear e sair do grupo; CSV: vírgula decimal, data local, cabeçalho com unidade e aspas, BOM, `;`, CRLF, isolate igual ao caminho direto. |
+| `test/widgets/logs_page_test.dart` | Mais → Registros: criar com aviso sem variável, gravar sem tela aberta, uso de disco na lista, histórico com pinça, arrastar e valor sob o dedo, outro período, desligar; apagar o registro apaga o arquivo. |
 | `test/widgets/trend_axis_test.dart` | Eixo da direita do gráfico de tendência: cobre os dados, mesmo número de passos, passo redondo, sem eixo negativo para grandeza positiva (inclusive valor constante 0). |
 | `test/widgets/tour_test.dart` | Tutorial aparece na primeira visita, "já vi" com versão na chave, rearme por versão nova, "voltar" fecha o tutorial e não a página. |
 
@@ -582,5 +604,5 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
 - **Ideias registradas:** variável calculada/script (só se aparecer caso que a escala linear não cobre), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.
-- **Alarme com o app fechado:** serviço em primeiro plano + notificação do Android (hoje os alarmes só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.
+- **Alarme e registro com o app fechado:** serviço em primeiro plano + notificação do Android (hoje alarmes e registros só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.
 - **Próximas fases do visual:** faixa de status no topo da operação, miniatura real das telas, tablet com barra lateral, comando em 3 fases visíveis.

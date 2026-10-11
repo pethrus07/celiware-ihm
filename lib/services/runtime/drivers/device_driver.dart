@@ -6,6 +6,7 @@ import '../../../models/tag.dart';
 import '../tag_store.dart';
 import 'modbus_driver.dart';
 import 'mqtt_driver.dart';
+import 's7_driver.dart';
 
 /// O que muda de um protocolo para outro, atrás de um contrato só.
 ///
@@ -64,6 +65,8 @@ abstract class DeviceDriver {
         return ModbusDriver(clientFactory(device));
       case DeviceKind.mqtt:
         return MqttDriver(device);
+      case DeviceKind.s7:
+        return S7Driver(device);
     }
   }
 }

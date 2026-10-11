@@ -57,6 +57,7 @@ Script livre (JavaScript) na variável ficou de fora de propósito: a escala lin
 | Linguagem / framework | Dart 3.13 e Flutter 3.47 (Material 3, tema escuro próprio). |
 | Comunicação industrial | Modbus TCP/IP sobre socket TCP cru, sem biblioteca Modbus externa. |
 | MQTT | Cliente MQTT 3.1.1 do pacote `mqtt_client` (Dart puro, MIT) — seção 4.18. |
+| Siemens S7 | Cliente S7 clássico (ISO-on-TCP, PUT/GET) próprio, em Dart puro — seção 4.16. |
 | Persistência | JSON num arquivo na pasta privada do app (`path_provider`). Histórico dos registros em SQLite (`sqflite`, o do Android — §6.10). |
 | Arquivos | Exportar/importar projeto e escolher imagem (`file_picker`). |
 | PDF | Página de PDF → imagem, para a imagem por etapa (`printing`, que usa o renderizador do próprio Android). |
@@ -140,6 +141,7 @@ lib/
 │   ├── tag.dart                      Variável (tipo, área, endereço, ordem de bytes).
 │   ├── vendor_profiles.dart          Perfis de fabricante: "D200" ⇄ área + endereço Modbus.
 │   ├── mqtt_config.dart              Broker do equipamento e tópico da variável (MQTT).
+│   ├── s7_config.dart                Família do CLP (rack/slot) e endereço S7 da variável.
 │   ├── hmi_screen.dart               Tela e elemento posicionado na grade.
 │   └── project.dart                  Projeto inteiro (unidade de arquivo).
 ├── services/
@@ -149,7 +151,8 @@ lib/
 │   │   ├── scan_planner.dart         Agrupa variáveis vizinhas em leituras únicas.
 │   │   ├── tag_codec.dart            Registradores ⇄ valor; formatação pt-BR.
 │   │   ├── mqtt_codec.dart           Mensagem MQTT ⇄ valor (texto, número, JSON com caminho).
-│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver.
+│   │   ├── s7_tag_codec.dart         Variável ⇄ S7 (tipo pelo tamanho do endereço) e itens juntados.
+│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver, s7_driver.
 │   │   └── tag_store.dart            Última leitura por variável + histórico curto.
 │   ├── logging/                      Registro de dados: motor, banco SQLite, CSV (§6.10).
 │   ├── demo/
@@ -328,9 +331,11 @@ Muito inversor e CLP pequeno só fala Modbus **RTU** pela RS-485. Atrás de um c
 
 Testes: `ModbusSerialTcpServer` (escravo RTU/ASCII em Dart, por socket real) e o simulador Python com `--framer rtu|ascii`.
 
-### 4.16. Siemens S7 (núcleo)
+### 4.16. Siemens S7
 
-O S7 "clássico" (PUT/GET) em Dart puro, em `lib/core/s7/`. Sem Snap7, que é LGPL e pede compilar código nativo para quatro ABIs. Por enquanto é só a camada de protocolo: o `S7Driver`, o cadastro do equipamento (rack/slot) e o campo de endereço vêm depois.
+O S7 "clássico" (PUT/GET) em Dart puro: protocolo em `lib/core/s7/`, driver em `lib/services/runtime/drivers/s7_driver.dart`. Sem Snap7, que é LGPL e pede compilar código nativo para quatro ABIs.
+
+**Núcleo**
 
 - **Endereço** (`s7_address.dart`). Aceita `DB1.DBX0.0`, `DB1.DBB2`, `DB1.DBW4`, `DB1.DBD8`, `M10.3`, `MB`/`MW`/`MD`, `I`/`E` e `Q`/`A`. O mnemônico alemão e o internacional dão o mesmo endereço; o texto canônico é o internacional. Também aceita o `%` do TIA e a faixa `P#DB1.DBX10.0 BYTE 22`, usada para STRING e blocos de bytes. O tamanho sugere o tipo, e o erro vem curto, em português: "DB1.DBX0.8: o bit vai de 0 a 7".
 - **Conexão** (`s7_client.dart`). Sequência: TCP na porta 102 → COTP CR/CC, com o TSAP calculado de rack/slot (300 = 0/2, 400 = 0/3, 1200/1500 = 0/1) → Setup Communication. O cliente pede PDU de 960 e o CLP responde com o que aceita (240, 480 ou 960). Tem o mesmo `beforeConnect` do Modbus (4.14). Um pedido por vez, com a resposta casada pela referência da PDU; depois de uma queda, o próximo pedido reconecta sozinho.
@@ -343,10 +348,22 @@ O S7 "clássico" (PUT/GET) em Dart puro, em `lib/core/s7/`. Sem Snap7, que é LG
   - **erro por item** (`S7ItemError`: DB inexistente, fora do DB, acesso negado): vem dentro do resultado da leitura, e o driver marca só a variável errada.
 - **Limites.** Não fala S7CommPlus (DB otimizado, acesso simbólico, S7-1500 com proteção total), nem temporizador e contador. Escrita dividida em vários pedidos não é atômica.
 
+**No app** (S7-1 a S7-4)
+
+- **Equipamento** do tipo `s7`, escolhido em **Na rede → Mais opções → Protocolo → Siemens S7**: a porta vira 102 e somem o ID do escravo e a marca e modelo (perfil de fabricante é mapa Modbus). No lugar, **Família do CLP** em palavras — S7-300 (rack 0, slot 2), S7-400 (0/3), S7-1200/1500 (0/1) — e **Outro**, que mostra rack e slot, para CPU fora do slot de fábrica (comum no 400); "Outro" começa dos números da família que estava escolhida. A configuração mora em `Device.s7` (`S7Config`, `lib/models/s7_config.dart`) e só vai para o arquivo em equipamento S7, com o que difere do padrão: um 1200/1500 de fábrica não grava nada além do `kind`.
+- **Variável.** O endereço é o texto do TIA em `Tag.s7` (`S7TagAddress`): `DB1.DBW4`, `M10.3`, `IW64` ou `EW64`, `%DB1.DBD8`, `P#DB1.DBX10.0 BYTE 22` para STRING. Fica guardado arrumado (`%db1.dbd8` → `DB1.DBD8`) no mnemônico que a pessoa usou, e a lista mostra esse texto. Como no MQTT, `area`/`address` Modbus voltam ao padrão. O bloco de endereço (`lib/screens/tags/s7_tag_fields.dart`) fica no lugar de "Onde fica" e mostra embaixo a prova ("DB1.DBW4 → DB 1, palavra no byte 4") ou o erro curto. O tamanho sugere o tipo quando o de agora não cabe — X → liga/desliga, B/W → número inteiro, D → número com vírgula (REAL, o mais comum num DB), faixa → texto —, e quem troca o REAL de um DBD para DINT não perde a escolha. Tipo que não cabe vem com o endereço certo escrito: "Número com vírgula pede 4 bytes: use DB1.DBD4". Entrada (I/E) é só leitura, como a entrada do Modbus. Somem o endereço em hexadecimal e a ordem dos bytes (o S7 é sempre big-endian), e os formatos raros mostram o nome do TIA (INT, DWORD, DINT). Lista ("quantos valores seguidos") lê os valores em sequência a partir do endereço; lista de bits não.
+- **Driver** (`S7Driver`, modo varredura). Cada variável vira um plano — endereço e tipo S7 — no `S7TagCodec` (`lib/services/runtime/s7_tag_codec.dart`). O `S7ScanPlanner` junta as vizinhas do mesmo DB (ou da mesma área M, I, Q) num item só, com até 32 bytes de buraco e 200 por item: dentro de um DB a memória é contínua, então ler os bytes do meio é sempre seguro. O cliente divide os itens pela PDU. Uma tela com as variáveis de um DB de IHM costuma ser uma ida e volta por varredura (o selo conta os pedidos). Os bytes passam pelo mesmo `TagCodec` do Modbus — palavra big-endian é a ordem ABCD —, então escala, sinal, faixa e passo têm as mesmas mensagens; BYTE e STRING têm caminho próprio. Bit grava com transporte BIT; valor que não cabe vira `TagValueError` antes da rede.
+- **Erros.** Item recusado marca só a variável dele: DB inexistente e fora do DB viram endereço inexistente; acesso negado, erro de configuração com a dica do PUT/GET. Item juntado que volta com erro faz as variáveis dele serem lidas uma a uma até achar a errada (o 4.8 do Modbus); corrigido o endereço, ela volta a ser juntada. Queda, tempo esgotado, rack/slot errados e PUT/GET desligado são `CommError`: sem comunicação com o último valor e a espera crescente. Habilitado o PUT/GET, a leitura volta sozinha.
+- **Testar conexão** = COTP, Setup Communication e leitura de MB0 (`S7Client.ping`). Quando falha, o cartão diz o que conferir conforme o caso: rack e slot ("A família do CLP está certa?"); PUT/GET, com o caminho no TIA (propriedades da CPU → Proteção e segurança → Mecanismos de conexão → "Permitir acesso com comunicação PUT/GET"; em cada DB, desmarcar "Acesso otimizado ao bloco"; carregar no CLP); porta recusada (102? é um CLP Siemens?); ou a rede. Recusa de rack/slot e de PUT/GET conta como "recusou" (`CommError.refused`): o CLP foi achado, e conferir Wi-Fi e IP seria perda de tempo. As mensagens que o cartão reconhece ficam em `S7Hint`.
+- **Lendo agora** lê pela conexão da sessão, como no Modbus, e fechar o cadastro solta a conexão.
+- Variável de outro protocolo num equipamento vira erro de configuração dela: S7 num Modbus não lê o HR 0 no lugar, e variável sem `s7` num CLP S7 avisa "variável sem endereço S7". "Criar várias" ainda é só Modbus.
+
 Testes: o `S7TestServer` é um CLP de mentira em Dart que respeita a PDU como um real (passou dela, volta erro 0x8500). Houve também uma conferência manual contra o servidor do python-snap7 3.2.1. Esse servidor difere de uma CPU real em três pontos:
 - lê bit devolvendo o byte inteiro (o cliente aceita as duas formas);
 - grava bit sobrescrevendo o byte inteiro;
 - só atende um item por pedido de escrita.
+
+O app inteiro passa pelo `S7TestServer` nos testes (`s7_device_test`, `s7_forms_test`, §13). Nada foi conferido num CLP de verdade ainda: o kit S7-1200 é o próximo passo.
 
 ### 4.17. Protocolo cru (Arduino)
 
@@ -391,12 +408,13 @@ Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; 
 
 | Campo | Significado |
 |---|---|
-| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker) ou `demo` (máquina simulada no aparelho). |
-| host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). |
+| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker), `demo` (máquina simulada no aparelho) ou `s7` (CLP Siemens). |
+| host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). Em S7, porta 102; o ID não é usado. |
 | timeoutMs | Tempo máximo por resposta (1500 ms). |
 | pollMs | Intervalo entre varreduras (500 ms). |
 | profile | Perfil de fabricante (`inovance-h3u`, `invt-ivc1`…); ausente = Modbus genérico. Só vai para o arquivo quando existe (4.6). |
 | mqtt | Só em equipamento MQTT, e só o que difere do padrão: tls, username, password, keepAliveSec (10), clientId (vazio = automático), statusTopic e offlinePayload do testamento. |
+| s7 | Só em equipamento S7, e só o que difere do padrão (1200/1500, rack 0, slot 1): family (`s7300`, `s7400`, `s71200`, `other`) e, em `other`, rack e slot. |
 
 ### 5.2. Variável (`Tag`)
 
@@ -415,6 +433,7 @@ Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; 
 | narrations | Narrações por voz (§6.9): lista de {id, kind (equals · above · below), value, text}. Só vai para o arquivo quando há alguma; `normalized()` descarta as sem texto e as que não casam com o tipo (liga/desliga só "valer 1/0"; texto e lista não falam). |
 | memory | A memória como no manual ("D200", "X10", "F3-12"), com perfil de fabricante. Só texto para mostrar e recalcular: `area`/`address` continuam a verdade. Só vai para o arquivo quando existe. |
 | mqtt | Só em variável de equipamento MQTT: topic, jsonPath, commandTopic, qos, retain, validitySec, boolFormat, commandJson. Com ele, area/address voltam ao padrão e ninguém lê. |
+| s7 | Só em variável de CLP S7: address, o texto do TIA ("DB1.DBW4", "EW64", "P#DB1.DBX10.0 BYTE 22"). O tipo continua em dataType e precisa caber no tamanho do endereço. Com ele, area/address voltam ao padrão; entrada (I/E) perde a escrita. |
 
 `Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura e texto tiram a escrita; escala zero volta a 1).
 
@@ -655,7 +674,7 @@ Corrigir uma tabela não muda sozinho o endereço das variáveis já criadas (el
 
 Desde a etapa 4 o motor é dividido em dois. A `DeviceSession` é dona do laço, da espera crescente depois de uma queda e da saúde da conexão — vale para todo protocolo. O que é de protocolo mora num **driver** (`lib/services/runtime/drivers/`), atrás do contrato `DeviceDriver`: `connect`, `scan` (lê as variáveis em uso e publica no `TagStore`), `readOnce`, `write`, `ping` e `tagsChanged`. Falha de comunicação sai como `CommError` (`lib/core/comm/`), que a sessão trata igual para todos: "sem comunicação" com o último valor esmaecido. Falha de uma variável só (endereço inexistente, pedido fora do limite) o driver resolve publicando a qualidade daquela variável.
 
-`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (Siemens S7, OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.16) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
+`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (OPC UA, cru) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.18) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `S7Driver` (4.16) é o terceiro e o modelo para outro protocolo de varredura: planejador e codec ao lado do driver (`s7_tag_codec.dart`), o endereço da variável num objeto opcional da `Tag` (`Tag.s7`, como `Tag.mqtt`), a configuração num da `Device` (`Device.s7`), e os campos dos cadastros em arquivos próprios (`s7_device_fields.dart`, `s7_tag_fields.dart`) com ganchos pequenos nos formulários (`if (s7) … else if (mqtt) … else`). Variável de um protocolo num equipamento de outro vira erro de configuração dela, nunca uma leitura no lugar errado. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
 
 ### 10.4. Mudar o formato do arquivo
 
@@ -724,6 +743,8 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/core/modbus_serial_test.dart` | CRC16 e LRC com vetores conhecidos, fim de quadro pelo código da função; RTU e ASCII sobre TCP por socket real: leitura e escrita, endereço inexistente, adaptador com eco, CRC corrompido, ID errado = sem resposta, porta fechada = recusou. |
 | `test/core/s7_test.dart` | Siemens S7. Endereços (alemão/inglês, `%`, `P#`, erros) e codecs. Vetores de referência: COTP CR, Setup Communication, Read/Write Var. Por socket real contra o `S7TestServer`: vários itens num pedido, divisão por itens e por PDU, item maior que a PDU, bit com transporte BIT, REAL/STRING, item com erro sem derrubar os outros, PUT/GET desligado, tempo esgotado, resposta atrasada descartada, pedidos em paralelo, resposta picada (TCP e COTP), queda e reconexão, porta fechada, rack/slot errados. |
 | `test/core/rawlink_test.dart` | Protocolo cru: os quatro tipos de delimitação, mensagem partida e grudada, lixo, buffer cheio, ressincronização do binário; checksum com vetores conhecidos (CRC16, NMEA), certo/errado, BCC depois do ETX; campos chave=valor, CSV, regex e binário nas quatro ordens; comandos de texto e binários; JSON do perfil ida e volta; cliente contra o Arduino falso por TCP e UDP (streaming, polling, comando, silêncio, queda, porta fechada). |
+| `test/runtime/s7_device_test.dart` | CLP S7 pelo caminho de produção contra o `S7TestServer`: testar conexão, ler na varredura num pedido só (DB juntado, M, I), gravar bit sem mexer nos vizinhos e palavra, entrada só leitura, faixa na unidade da tela; erro por item isolando só a errada (DB inexistente, fora do DB, acesso negado) e voltando ao corrigir; PUT/GET desligado no teste e na varredura, voltando sozinho; família errada, certa e "Outro"; porta recusada; queda e reconexão; "lendo agora" soltando a conexão; tipo que não cabe e variável de outro protocolo; tipo sugerido, mensagens com o endereço certo, lista, byte e escala, item juntado; arquivo ida e volta e projeto antigo idêntico. |
+| `test/widgets/s7_forms_test.dart` | Cadastro com S7: protocolo em Mais opções troca porta e campos, família do CLP e "Outro" com rack e slot, volta ao Modbus; testar conexão com PUT/GET desligado mostrando o passo a passo do TIA e depois respondendo; variável com o endereço do TIA no lugar do Modbus (sem hexadecimal e ordem de bytes), erro curto, tipo pelo tamanho, entrada só leitura, prova da leitura e "lendo agora" contra o CLP de teste; prova e sugestão de tipo como funções puras. |
 | `test/runtime/rtu_device_test.dart` | Equipamento atrás de gateway RS-485 pelo caminho de produção (fábrica → driver → sessão): testar, ler na varredura e gravar em RTU e ASCII; envelope no arquivo do projeto. |
 | `test/runtime/device_driver_test.dart` | Contrato do driver com um driver de mentira (não Modbus): a sessão publica, grava e trata queda igual. |
 | `test/core/mqtt_codec_test.dart` | Curingas `+`/`#` e `$SYS`, filtro válido; mensagem → valor (vírgula, escala, liga/desliga em várias convenções, texto, JSON com caminho e posição de lista, campo que não veio); valor → comando (formatos de liga/desliga, escala, passo, JSON com o campo); campos para o "ouvir". |
@@ -754,7 +775,8 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Etapa 3 — Play Store:** conta de desenvolvedor da Celiware, chave de upload, ficha da loja. Roteiro em `docs/PUBLICACAO.md`.
 - **Perfis de fabricante:** validar em bancada (Inovance H3U/H5U primeiro, o manual da série H não foi aberto).
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
-- **Ideias registradas:** variável calculada/script (só se aparecer caso que a escala linear não cobre), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
+- **Siemens S7:** conferir num S7-1200 de verdade (kit) — PUT/GET, DB não otimizado, família no "Testar conexão" e o tempo da varredura com PDU 240.
+- **Ideias registradas:** variável calculada/script (só se aparecer caso que a escala linear não cobre), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.
 - **Alarme e registro com o app fechado:** serviço em primeiro plano + notificação do Android (hoje alarmes, voz e registros só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.
 - **Próximas fases do visual:** faixa de status no topo da operação, miniatura real das telas, tablet com barra lateral, comando em 3 fases visíveis.

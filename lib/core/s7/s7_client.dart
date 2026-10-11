@@ -186,6 +186,7 @@ class S7Client {
   Completer<bool>? _cotp;
   _Pending? _pending;
   int _ref = 0;
+  int _requests = 0;
   int _pduSize = 0;
   bool _ready = false;
   bool _manualDisconnect = true;
@@ -201,6 +202,10 @@ class S7Client {
 
   /// Tamanho de PDU negociado com o CLP (0 antes de conectar).
   int get pduSize => _pduSize;
+
+  /// Pedidos de leitura e escrita enviados até agora — o driver mostra
+  /// quantos uma varredura custou.
+  int get requests => _requests;
 
   static int _tsap(S7ConnectionType type, int rack, int slot) {
     if (rack < 0 || rack > 7) throw ArgumentError('o rack vai de 0 a 7');
@@ -414,6 +419,7 @@ class S7Client {
   Future<S7Message> _request(Uint8List Function(int ref) build, int function) {
     return _lock.synchronized(() async {
       await _ensureConnected();
+      _requests++;
       return _transact(build, function);
     });
   }

@@ -18,6 +18,14 @@ sealed class S7Error extends CommError {
   const S7Error(super.message);
 }
 
+/// As mensagens que pedem uma ação no CLP. O "Testar conexão" reconhece
+/// estas e mostra o passo a passo certo (família do CLP, TIA Portal).
+abstract final class S7Hint {
+  static const String rackSlot = 'o CLP recusou a conexão: confira rack e slot';
+  static const String putGet = 'o CLP recusou: habilite PUT/GET e desligue o acesso otimizado do DB';
+  static const String accessDenied = 'o CLP negou o acesso: habilite PUT/GET e desligue o acesso otimizado do DB';
+}
+
 /// Por que a conexão foi recusada (quando foi).
 enum S7Refusal {
   /// O IP respondeu "recusado" na hora: nada escuta na porta (porta errada,
@@ -45,7 +53,7 @@ class S7ConnectionError extends S7Error {
   @override
   String get userMessage => switch (refusal) {
         S7Refusal.port => 'o CLP recusou a conexão nesta porta',
-        S7Refusal.rackSlot => 'o CLP recusou a conexão: confira rack e slot',
+        S7Refusal.rackSlot => S7Hint.rackSlot,
         null => 'sem conexão com o CLP',
       };
 }
@@ -95,10 +103,13 @@ class S7RequestRefused extends S7Error {
   /// do CLP; é defeito de quem montou o pedido.
   bool get pduOverflow => errorClass == 0x85 && errorCode == 0x00;
 
+  /// O CLP foi achado e disse não: a rede está certa, não adianta mandar
+  /// conferir Wi-Fi e IP.
   @override
-  String get userMessage => pduOverflow
-      ? 'pedido maior que o CLP aceita'
-      : 'o CLP recusou: habilite PUT/GET e desligue o acesso otimizado do DB';
+  bool get refused => !pduOverflow;
+
+  @override
+  String get userMessage => pduOverflow ? 'pedido maior que o CLP aceita' : S7Hint.putGet;
 }
 
 /// O CLP respondeu ao pedido, mas recusou **um item** dele (código de
@@ -126,6 +137,10 @@ class S7ItemError extends S7Error {
   /// O CLP negou o acesso (proteção, PUT/GET desligado).
   bool get isAccessDenied => code == accessDenied;
 
+  /// Acesso negado é o CLP dizendo não, como no [S7RequestRefused].
+  @override
+  bool get refused => isAccessDenied;
+
   @override
   String get userMessage => _describe(address, code);
 
@@ -135,7 +150,7 @@ class S7ItemError extends S7Error {
       case hardwareFault:
         return 'falha de hardware no CLP';
       case accessDenied:
-        return 'o CLP negou o acesso: habilite PUT/GET e desligue o acesso otimizado do DB';
+        return S7Hint.accessDenied;
       case addressOutOfRange:
         // No 1200/1500, DB com acesso otimizado também cai aqui: o CLP não
         // expõe endereço absoluto dentro dele.

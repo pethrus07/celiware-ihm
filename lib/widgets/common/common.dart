@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/modbus/modbus_client.dart';
@@ -247,6 +248,9 @@ class StepperField extends StatelessWidget {
             key: fieldKey,
             controller: controller,
             keyboardType: TextInputType.number,
+            // O teclado numérico do Android tem "." e ",": num inteiro sem
+            // sinal, só algarismos entram ("5020." virava erro no Salvar).
+            inputFormatters: [if (min >= 0) FilteringTextInputFormatter.digitsOnly],
             style: Ind.number(20),
             decoration: InputDecoration(labelText: label, helperText: helper),
             onChanged: (_) => onChanged?.call(),

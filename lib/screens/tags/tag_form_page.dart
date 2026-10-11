@@ -103,6 +103,9 @@ class _TagFormPageState extends State<TagFormPage> {
   late bool _writable;
   late int _decimals = widget.tag?.decimals ?? 0;
 
+  /// "Aceita escrita por regra" (LG-5): sem ela, nenhuma regra grava aqui.
+  late bool _ruleWritable = widget.tag?.ruleWritable ?? false;
+
   /// Endereço digitado em hexadecimal ("2000" = 8192). Só do formulário.
   bool _hex = false;
 
@@ -234,9 +237,11 @@ class _TagFormPageState extends State<TagFormPage> {
     // Variável nova: o equipamento da tela em montagem ou, fora do editor, o
     // último cadastrado — quem acabou de cadastrar a Prensa quer criar as
     // variáveis dela, não as da demonstração que vem primeiro na lista.
+    // Só equipamento de verdade: o das calculadas tem cadastro próprio.
     final preferred = widget.preferDeviceId;
+    final equipment = project.equipment;
     _deviceId ??= widget.tag?.deviceId ??
-        (preferred != null && project.device(preferred) != null ? preferred : project.devices.lastOrNull?.id);
+        (preferred != null && equipment.any((d) => d.id == preferred) ? preferred : equipment.lastOrNull?.id);
     _initialDeviceId ??= _deviceId;
     _profile = VendorProfiles.of(project.device(_deviceId ?? ''));
     // Variável de antes do perfil: o campo já abre com o nome do endereço dela.
@@ -434,6 +439,7 @@ class _TagFormPageState extends State<TagFormPage> {
       // o cru não tem lista.
       length: _type == TagDataType.bool || (s7 != null && _type == TagDataType.string) || raw != null ? 1 : (int.tryParse(_length.text) ?? 1).clamp(1, 120),
       writable: _writable && !_memoryReadOnly,
+      ruleWritable: _ruleWritable,
       unit: _unit.text.trim(),
       decimals: _decimals,
       scale: _scaleValue,
@@ -531,6 +537,7 @@ class _TagFormPageState extends State<TagFormPage> {
         _where.name,
         _order.name,
         _writable,
+        _ruleWritable,
         _alarmsJson(),
         _mq.build()?.toJson() ?? _mq.topic.text.trim(),
         _s7.address.text.trim(),
@@ -923,13 +930,13 @@ class _TagFormPageState extends State<TagFormPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: FilledButton.icon(
               key: const ValueKey('salvar-variavel'),
-              onPressed: project.devices.isEmpty ? null : _save,
+              onPressed: project.equipment.isEmpty ? null : _save,
               icon: const Icon(Icons.check_rounded),
               label: const Text('Salvar'),
             ),
           ),
         ),
-        body: project.devices.isEmpty
+        body: project.equipment.isEmpty
             ? EmptyState(
                 icon: Icons.router_outlined,
                 title: 'Falta o equipamento',
@@ -1000,10 +1007,10 @@ class _TagFormPageState extends State<TagFormPage> {
                       padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 32),
                       children: [
                         // Um equipamento só (o caso comum): nem pergunta.
-                        if (project.devices.length > 1) ...[
+                        if (project.equipment.length > 1) ...[
                           const SectionHeader('Equipamento', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)),
                           DevicePick(
-                            devices: project.devices,
+                            devices: project.equipment,
                             selectedId: _deviceId,
                             onChanged: (id) {
                               _deviceId = id;
@@ -1391,6 +1398,16 @@ class _TagFormPageState extends State<TagFormPage> {
             ],
             const SizedBox(height: Ind.space),
           ],
+          // LG-5: regra entre máquinas só grava onde a pessoa marcou.
+          if (_writable && _canWrite)
+            SwitchListTile(
+              key: const ValueKey('aceita-regra'),
+              contentPadding: EdgeInsets.zero,
+              value: _ruleWritable,
+              onChanged: (v) => setState(() => _ruleWritable = v),
+              title: const Text('Aceita escrita por regra'),
+              subtitle: const Text('Uma regra de Mais → Regras pode gravar aqui.'),
+            ),
           // Endereço como o manual escreve. A "Memória do CLP" (perfis de
           // fabricante) é a outra opção de endereço que mora aqui.
           if (!_notModbus && !_isS7) SwitchListTile(

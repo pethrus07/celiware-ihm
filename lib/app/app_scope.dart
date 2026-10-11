@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../services/alarms/alarm_engine.dart';
 import '../services/logging/data_logger.dart';
+import '../services/rules/rule_engine.dart';
 import '../services/runtime/hmi_runtime.dart';
 import '../services/voice/voice_announcer.dart';
 import 'project_controller.dart';
@@ -14,8 +15,11 @@ import 'project_controller.dart';
 /// dados com `AppScope.of(context)`. Ouvir mudanças do projeto:
 /// `AppScope.watch(context)` (reconstrói a tela quando o projeto muda).
 class AppScope extends InheritedNotifier<ProjectController> {
-  const AppScope({super.key, required ProjectController controller, required this.runtime, required this.alarms, this.voice, required this.logger, required super.child})
+  const AppScope({super.key, required ProjectController controller, required this.runtime, required this.alarms, this.voice, required this.logger, this.rules, required super.child})
       : super(notifier: controller);
+
+  /// Regras entre máquinas (Mais → Regras). Nulo onde o app é montado sem elas.
+  final RuleEngine? rules;
 
   final HmiRuntime runtime;
   final AlarmEngine alarms;

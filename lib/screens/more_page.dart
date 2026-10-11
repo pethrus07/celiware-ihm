@@ -19,6 +19,7 @@ import 'devices/devices_page.dart';
 import 'editor/screen_editor_page.dart';
 import 'logs/logs_page.dart';
 import 'recipes/recipes_page.dart';
+import 'rules/rules_page.dart';
 import 'screen_run_page.dart';
 import 'screens_page.dart';
 import 'shell.dart';
@@ -97,6 +98,14 @@ class MorePage extends StatelessWidget {
             subtitle: Text(RecipesPage.summary(p)),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipesPage())),
           ),
+          // Regras entre máquinas (§9.5, LG-4 a LG-7): avisam e propõem.
+          ListTile(
+            key: const ValueKey('regras'),
+            leading: const Icon(Icons.rule_rounded),
+            title: const Text('Regras'),
+            subtitle: Text(_rulesSummary(p)),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RulesPage())),
+          ),
           const SectionHeader('Aparência'),
           Padding(
             padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 4),
@@ -162,6 +171,13 @@ class MorePage extends StatelessWidget {
     return '${n == 1 ? '1 registro' : '$n registros'} · ${on == 0 ? 'nenhum ligado' : on == 1 ? '1 ligado' : '$on ligados'}';
   }
 
+  /// "Avisar e propor entre máquinas" ou "2 regras · 1 ligada".
+  static String _rulesSummary(Project p) {
+    final n = p.rules.length, on = p.rules.where((r) => r.enabled).length;
+    if (n == 0) return 'Avisar e propor ação entre máquinas';
+    return '${n == 1 ? '1 regra' : '$n regras'} · ${on == 0 ? 'nenhuma ligada' : on == 1 ? '1 ligada' : '$on ligadas'}';
+  }
+
   static void _openTour(BuildContext context, String id) {
     final project = AppScope.of(context).controller.project;
     final screen = project.screen(DemoProject.operationScreenId) ?? project.screens.firstOrNull;
@@ -224,7 +240,7 @@ class MorePage extends StatelessWidget {
       final project = ProjectRepository.decode(await files.first.readAsBytes());
       if (!context.mounted) return;
       await _replace(context, project,
-          'Importar "${project.name}"? (${project.devices.length} equipamentos · ${project.tags.length} variáveis · ${project.screens.length} telas)');
+          'Importar "${project.name}"? (${project.equipment.length} equipamentos · ${project.tags.length} variáveis · ${project.screens.length} telas)');
     } on ProjectFormatError catch (e) {
       if (context.mounted) WriteActions.toast(context, e.message, error: true);
     } catch (e) {

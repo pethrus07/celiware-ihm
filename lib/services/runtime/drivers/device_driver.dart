@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/modbus/modbus_client.dart';
 import '../../../models/device.dart';
 import '../../../models/tag.dart';
+import '../tag_codec.dart';
 import '../tag_store.dart';
 import 'modbus_driver.dart';
 import 'mqtt_driver.dart';
@@ -70,6 +71,10 @@ abstract class DeviceDriver {
         return S7Driver(device);
       case DeviceKind.raw:
         return RawDriver(device);
+      case DeviceKind.calc:
+        // As contas leem o projeto e o TagStore: quem monta o CalcDriver é o
+        // HmiRuntime, que tem os dois. Aqui só chega um "Testar conexão".
+        throw const TagValueError('Variáveis calculadas não têm conexão para testar');
     }
   }
 }

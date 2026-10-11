@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 import '../models/device.dart';
 import '../models/hmi_screen.dart';
 import '../models/log_group.dart';
+import '../models/logic_rule.dart';
 import '../models/project.dart';
 import '../models/recipe.dart';
 import '../models/tag.dart';
@@ -102,6 +103,8 @@ class ProjectController extends ChangeNotifier {
   void deleteRecipeType(String id) => _commit(_project.removeRecipeType(id));
   void saveRecipe(Recipe r) => _commit(_project.upsertRecipe(r));
   void deleteRecipe(String id) => _commit(_project.removeRecipe(id));
+  void saveRule(LogicRule r) => _commit(_project.upsertRule(r));
+  void deleteRule(String id) => _commit(_project.removeRule(id));
 
   /// Move a tela [id] para a posição [index] na lista.
   void reorderScreen(String id, int index) {

@@ -24,7 +24,8 @@ class _DevicesPageState extends State<DevicesPage> {
   @override
   Widget build(BuildContext context) {
     final project = AppScope.watch(context).controller.project;
-    final devices = project.devices;
+    // O equipamento virtual das calculadas não se cadastra nem se testa.
+    final devices = project.equipment;
 
     return TourHost(
       spec: Tours.equipamentos(list: _listKey, add: _addKey),

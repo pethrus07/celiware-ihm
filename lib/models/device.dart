@@ -31,6 +31,9 @@ enum DeviceKind {
   /// (`T=25.3;P=1`) por TCP ou UDP — sem norma. Como ler a mensagem fica no
   /// perfil, em [Device.raw].
   raw,
+  /// Equipamento virtual das variáveis calculadas ([CalcDevice]): não fala com
+  /// nada, faz as contas com o que as outras variáveis leram.
+  calc,
 }
 
 extension DeviceKindMeta on DeviceKind {
@@ -48,6 +51,8 @@ extension DeviceKindMeta on DeviceKind {
         return 'CLP Siemens S7';
       case DeviceKind.raw:
         return 'Arduino, ESP ou balança (mensagem própria)';
+      case DeviceKind.calc:
+        return 'Variáveis calculadas';
     }
   }
 
@@ -122,6 +127,8 @@ class Device {
   /// ela simula um CLP Modbus). S7, MQTT e os outros têm endereço próprio —
   /// ficam fora do "Criar várias", que gera faixas de memória Modbus.
   bool get usesModbusMemory => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.demo;
+  /// O equipamento virtual das calculadas — fica fora de Equipamentos.
+  bool get isCalc => kind == DeviceKind.calc;
 
   /// Fala com o equipamento pela rede (IP e porta), qualquer que seja o
   /// protocolo.
@@ -131,7 +138,9 @@ class Device {
   /// Descrição curta para listas: "192.168.0.10:502 · ID 1".
   String get addressLabel => isDemo
       ? 'Simulada neste aparelho'
-      : kind == DeviceKind.mqtt
+      : isCalc
+          ? 'Contas feitas neste aparelho'
+          : kind == DeviceKind.mqtt
           ? '$host:$port · MQTT${mqtt.tls ? ' · TLS' : ''}'
           : kind == DeviceKind.s7
           ? '$host:$port · ${s7.label}'

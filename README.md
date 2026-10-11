@@ -56,6 +56,7 @@ tool/             Gerador de ícone, da documentação em Word e do vídeo de ap
 | `docs/ROADMAP.md` | Versões entregues e tudo o que ainda falta fazer. |
 | `docs/REQUISITOS-ETAPA4.md` | Requisitos numerados da etapa 4, com horas e fontes (pesquisas completas em `docs/pesquisa-etapa4/`). |
 | `docs/PESQUISA-UI-UX.md` | Pesquisa que embasou o visual (ISA-101, ISA-18.2, mercado). |
+| `site/README.md` | Site do produto (HTML/CSS estático em `site/`): como publicar no Cloudflare Pages e onde trocar os links da loja e o e-mail. |
 
 Cada arquivo de código abre com um comentário explicando o que a classe faz e por quê.
 

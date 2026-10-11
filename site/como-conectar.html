@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Como conectar o celular no CLP · Ware IoT</title>
+<meta name="description" content="Três jeitos de ligar o Ware IoT na máquina: CLP com rede no mesmo Wi-Fi, CLP RS-485/232 com conversor Wi-Fi e acesso de longe por roteador 4G com VPN. E o que conferir quando não conecta.">
+<link rel="canonical" href="https://ware-iot.pages.dev/como-conectar">
+<meta name="theme-color" content="#e4e6ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/IBMPlexSans-Regular-Latin1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold-Latin1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/site.css">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Ware IoT">
+<meta property="og:title" content="Como conectar o celular no CLP · Ware IoT">
+<meta property="og:description" content="CLP com rede, CLP só RS-485/232 ou máquina longe: veja o que ligar em cada caso.">
+<meta property="og:url" content="https://ware-iot.pages.dev/como-conectar">
+<meta property="og:image" content="https://ware-iot.pages.dev/img/compartilhar.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Ware IoT: seu celular vira a IHM da máquina.">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+<!-- LINKS EXTERNOS: marcadores #LOJA-… e o link da Google Play. Onde trocar: README.md. -->
+<header class="topo">
+  <div class="wrap topo__linha">
+    <a class="marca" href="./">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1A1D22"/><path d="M15.5 43.3A19 19 0 1 1 48.5 43.3" fill="none" stroke="#2B3038" stroke-width="5.4"/><path d="M15.5 43.3A19 19 0 0 1 41.5 17.3" fill="none" stroke="#FFB020" stroke-width="5.4"/><path d="M32 33.7 41.4 17.5" stroke="#E9EDF1" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="33.7" r="3.4" fill="#E9EDF1"/><circle cx="32" cy="51.2" r="5.5" fill="#2FBF71" opacity=".3"/><circle cx="32" cy="51.2" r="3.9" fill="#2FBF71"/></svg>
+      Ware IoT
+    </a>
+    <nav class="nav" aria-label="Principal">
+      <a href="como-conectar" aria-current="page">Como conectar</a>
+      <a href="recursos">Recursos</a>
+      <a href="tutoriais">Tutoriais</a>
+      <a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=como-conectar&amp;utm_campaign=ware-iot&amp;utm_content=menu">Loja</a>
+      <a class="botao" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dcomo-conectar%26utm_content%3Dmenu">Baixar grátis</a>
+    </nav>
+    <details class="menu">
+      <summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</summary>
+      <ul class="menu__lista">
+        <li><a href="./">Início</a></li>
+        <li><a href="como-conectar" aria-current="page">Como conectar</a></li>
+        <li><a href="recursos">Recursos</a></li>
+        <li><a href="tutoriais">Tutoriais</a></li>
+        <li><a href="contato">Contato</a></li>
+        <li><a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=como-conectar&amp;utm_campaign=ware-iot&amp;utm_content=menu">Loja Celiware</a></li>
+      </ul>
+    </details>
+  </div>
+</header>
+
+<main id="conteudo">
+  <div class="wrap cabeca">
+    <h1>Como conectar</h1>
+    <p class="lead">Três jeitos de ligar o celular na máquina. Escolha o que parece com a sua.</p>
+    <ul class="atalhos">
+      <li><a href="#rede">1 · CLP com rede</a></li>
+      <li><a href="#rs485">2 · Só RS-485/232</a></li>
+      <li><a href="#longe">3 · De longe, pelo 4G</a></li>
+      <li><a href="#nao-conecta">Não conecta?</a></li>
+    </ul>
+  </div>
+
+  <section class="secao secao--alto" aria-label="Os três cenários">
+    <div class="wrap">
+
+      <article class="cenario bloco" id="rede" aria-labelledby="t-rede">
+        <div class="bloco__texto">
+          <span class="cenario__numero" aria-hidden="true">1</span>
+          <h2 id="t-rede">O CLP tem porta de rede</h2>
+          <p>O caso mais simples: o CLP, inversor ou IHM já fala Modbus TCP.</p>
+          <ol>
+            <li>Ligue o CLP no roteador ou switch da fábrica, com cabo de rede.</li>
+            <li>Conecte o celular no mesmo Wi-Fi.</li>
+            <li>No app, cadastre o IP do CLP e toque em Testar conexão.</li>
+          </ol>
+          <p class="dim">O Wi-Fi não chega forte no painel? Um repetidor resolve.</p>
+        </div>
+        <div class="diagrama">
+          <svg viewBox="0 0 300 352" role="group" aria-label="Diagrama: celular no Wi-Fi da fábrica, que chega ao CLP por cabo de rede.">
+            <rect class="d-caixa" x="20" y="4" width="260" height="64" rx="12"/>
+            <g class="d-icone" transform="translate(34 23)"><rect width="16" height="26" rx="3"/><path d="M6 22h4"/></g>
+            <text class="d-titulo" x="68" y="32">Celular com Ware IoT</text>
+            <text class="d-sub" x="68" y="51">Android 7 ou mais novo</text>
+
+            <path class="d-fio d-fio--sem" d="M150 70v56"/>
+            <text class="d-rotulo" x="162" y="102">WI-FI</text>
+
+            <a class="d-loja" href="#LOJA-REPETIDOR?utm_source=site&amp;utm_medium=como-conectar&amp;utm_campaign=ware-iot&amp;utm_content=cenario-1">
+              <rect class="d-caixa" x="20" y="128" width="260" height="96" rx="12"/>
+              <g class="d-icone" transform="translate(30 150)"><path d="M2 8a14 14 0 0 1 20 0M6 12a8 8 0 0 1 12 0M10 16a2.5 2.5 0 0 1 4 0"/></g>
+              <text class="d-titulo" x="68" y="156">Wi-Fi da fábrica</text>
+              <text class="d-sub" x="68" y="175">Sinal fraco? Use um repetidor.</text>
+              <rect class="d-botao" x="68" y="188" width="108" height="26" rx="13"/>
+              <text class="d-botao-texto" x="122" y="205" text-anchor="middle">Ver na loja ›</text>
+            </a>
+
+            <path class="d-fio" d="M150 226v56"/>
+            <text class="d-rotulo" x="162" y="258">CABO DE REDE</text>
+
+            <rect class="d-caixa" x="20" y="284" width="260" height="64" rx="12"/>
+            <g class="d-icone" transform="translate(31 305)"><rect width="22" height="22" rx="3"/><path d="M5 0v-4M11 0v-4M17 0v-4M5 22v4M11 22v4M17 22v4"/></g>
+            <text class="d-titulo" x="68" y="312">CLP com porta de rede</text>
+            <text class="d-sub" x="68" y="331">Modbus TCP · porta 502</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="cenario bloco" id="rs485" aria-labelledby="t-rs485">
+        <div class="bloco__texto">
+          <span class="cenario__numero" aria-hidden="true">2</span>
+          <h2 id="t-rs485">O CLP só tem <span class="nw">RS-485</span> ou <span class="nw">RS-232</span></h2>
+          <p>Muito inversor e CLP pequeno não tem porta de rede. Um conversor faz a ponte até o Wi-Fi.</p>
+          <ol>
+            <li>Ligue o conversor nos fios <span class="nw">RS-485</span> (ou <span class="nw">RS-232</span>) do CLP ou inversor.</li>
+            <li>No conversor, use a mesma velocidade e paridade do equipamento (estão no manual) e conecte-o ao Wi-Fi.</li>
+            <li>No app, cadastre o IP do conversor. No campo ID, use o endereço do equipamento na linha RS-485.</li>
+          </ol>
+          <p class="dim">O conversor só repassa os dados, sem traduzir para Modbus TCP? No app, escolha RTU em Mais opções → Protocolo.</p>
+        </div>
+        <div class="diagrama">
+          <svg viewBox="0 0 300 352" role="group" aria-label="Diagrama: celular no Wi-Fi, conversor RS-485 para Wi-Fi no painel e fio RS-485 até o CLP ou inversor.">
+            <rect class="d-caixa" x="20" y="4" width="260" height="64" rx="12"/>
+            <g class="d-icone" transform="translate(34 23)"><rect width="16" height="26" rx="3"/><path d="M6 22h4"/></g>
+            <text class="d-titulo" x="68" y="32">Celular com Ware IoT</text>
+            <text class="d-sub" x="68" y="51">No mesmo Wi-Fi do conversor</text>
+
+            <path class="d-fio d-fio--sem" d="M150 70v56"/>
+            <text class="d-rotulo" x="162" y="102">WI-FI</text>
+
+            <a class="d-loja" href="#LOJA-CONVERSOR?utm_source=site&amp;utm_medium=como-conectar&amp;utm_campaign=ware-iot&amp;utm_content=cenario-2">
+              <rect class="d-caixa" x="20" y="128" width="260" height="96" rx="12"/>
+              <g class="d-icone" transform="translate(30 148)"><rect x="1" y="8" width="22" height="13" rx="3"/><path d="M6 21v3M10 21v3M14 21v3M15 3.5a5 5 0 0 1 6 0M16.8 5.8a2 2 0 0 1 2.4 0"/></g>
+              <text class="d-titulo" x="68" y="156">Conversor RS-485 → Wi-Fi</text>
+              <text class="d-sub" x="68" y="175">Também RS-232. Fica no painel.</text>
+              <rect class="d-botao" x="68" y="188" width="108" height="26" rx="13"/>
+              <text class="d-botao-texto" x="122" y="205" text-anchor="middle">Ver na loja ›</text>
+            </a>
+
+            <path class="d-fio" d="M150 226v56"/>
+            <text class="d-rotulo" x="162" y="258">FIO RS-485 / RS-232</text>
+
+            <rect class="d-caixa" x="20" y="284" width="260" height="64" rx="12"/>
+            <g class="d-icone" transform="translate(31 305)"><rect width="22" height="22" rx="3"/><path d="M5 0v-4M11 0v-4M17 0v-4M5 22v4M11 22v4M17 22v4"/></g>
+            <text class="d-titulo" x="68" y="312">CLP ou inversor</text>
+            <text class="d-sub" x="68" y="331">Modbus RTU</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="cenario bloco" id="longe" aria-labelledby="t-longe">
+        <div class="bloco__texto">
+          <span class="cenario__numero" aria-hidden="true">3</span>
+          <h2 id="t-longe">A máquina está longe</h2>
+          <p>Para acompanhar de casa, do escritório ou de outra cidade.</p>
+          <ol>
+            <li>Instale o roteador 4G na máquina, com um chip de dados, e ligue o CLP nele.</li>
+            <li>Configure a VPN do roteador, seguindo as instruções dele, e ative a VPN no celular.</li>
+            <li>No app, cadastre o IP do CLP, como se você estivesse do lado da máquina.</li>
+          </ol>
+          <p class="aviso"><strong>De longe, prefira telas só de acompanhamento.</strong> Quem liga uma máquina precisa ver quem está perto dela. O Ware IoT não substitui intertravamentos nem o botão de emergência.</p>
+        </div>
+        <div class="diagrama">
+          <svg viewBox="0 0 300 352" role="group" aria-label="Diagrama: celular em qualquer lugar, pela internet e VPN, até o roteador 4G na máquina, ligado ao CLP por cabo de rede.">
+            <rect class="d-caixa" x="20" y="4" width="260" height="64" rx="12"/>
+            <g class="d-icone" transform="translate(34 23)"><rect width="16" height="26" rx="3"/><path d="M6 22h4"/></g>
+            <text class="d-titulo" x="68" y="32">Celular com Ware IoT</text>
+            <text class="d-sub" x="68" y="51">Em qualquer lugar, com a VPN</text>
+
+            <path class="d-fio d-fio--vpn" d="M150 72v52"/>
+            <text class="d-rotulo" x="162" y="102">INTERNET + VPN</text>
+
+            <a class="d-loja" href="#LOJA-ROTEADOR-4G?utm_source=site&amp;utm_medium=como-conectar&amp;utm_campaign=ware-iot&amp;utm_content=cenario-3">
+              <rect class="d-caixa" x="20" y="128" width="260" height="96" rx="12"/>
+              <g class="d-icone" transform="translate(30 146)"><rect x="1" y="12" width="22" height="10" rx="3"/><path d="M6 12V3M18 12V3M6 17h.01M10 17h7"/></g>
+              <text class="d-titulo" x="68" y="156">Roteador 4G com VPN</text>
+              <text class="d-sub" x="68" y="175">Na máquina, com chip de dados.</text>
+              <rect class="d-botao" x="68" y="188" width="108" height="26" rx="13"/>
+              <text class="d-botao-texto" x="122" y="205" text-anchor="middle">Ver na loja ›</text>
+            </a>
+
+            <path class="d-fio" d="M150 226v56"/>
+            <text class="d-rotulo" x="162" y="258">CABO DE REDE</text>
+
+            <rect class="d-caixa" x="20" y="284" width="260" height="64" rx="12"/>
+            <g class="d-icone" transform="translate(31 305)"><rect width="22" height="22" rx="3"/><path d="M5 0v-4M11 0v-4M17 0v-4M5 22v4M11 22v4M17 22v4"/></g>
+            <text class="d-titulo" x="68" y="312">CLP da máquina</text>
+            <text class="d-sub" x="68" y="331">Ou um conversor RS-485</text>
+          </svg>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="secao faixa" id="nao-conecta" aria-labelledby="t-nao-conecta">
+    <div class="wrap bloco">
+      <div class="quadro">
+        <h2 id="t-nao-conecta">Por que não conecta?</h2>
+        <p class="lead">Confira nesta ordem. Quase sempre é um destes cinco.</p>
+        <ol class="checklist">
+          <li><strong>Mesmo Wi-Fi</strong><span>O celular precisa estar no Wi-Fi da máquina, não em outra rede da fábrica.</span></li>
+          <li><strong>Faixa de IP</strong><span>Celular em 192.168.0.x e CLP em 192.168.1.x não se falam: na maioria das redes, os três primeiros números precisam ser iguais. O app avisa quando a faixa é diferente.</span></li>
+          <li><strong>Dados móveis</strong><span>Com o Wi-Fi da máquina sem internet, o Android tende a usar o 4G. O Ware IoT usa o Wi-Fi da máquina mesmo assim. Se ainda falhar, desligue os dados móveis ou toque em “manter conexão” no aviso de Wi-Fi sem internet.</span></li>
+          <li><strong>Porta 502</strong><span>É a porta do Modbus TCP. Se o equipamento usa outra, ajuste em Mais opções. Confira também se o Modbus TCP está ligado nele: alguns vêm desligados de fábrica.</span></li>
+          <li><strong>ID do equipamento</strong><span>Costuma ser 1. Atrás de um conversor RS-485, use o endereço configurado no CLP ou inversor.</span></li>
+        </ol>
+      </div>
+      <figure class="bloco__midia">
+        <div class="celular celular--p">
+          <img src="img/testar-conexao.webp" width="540" height="1200" loading="lazy" alt="Testar conexão no Ware IoT: não conectou, e o app explica que o celular e o equipamento estão em redes diferentes, com a lista do que conferir.">
+        </div>
+        <figcaption class="legenda">O teste de conexão diz o que achou. Aqui: celular e equipamento em redes diferentes.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="secao" aria-labelledby="t-teste">
+    <div class="wrap cta-final">
+      <h2 id="t-teste">Sem equipamento por perto?</h2>
+      <p class="lead">O app já vem com uma máquina de demonstração. Dá para conhecer tudo antes de ligar no CLP.</p>
+      <div class="acoes">
+        <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dcomo-conectar%26utm_content%3Dfim">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
+          <span><small>Baixar grátis na</small><strong>Google Play</strong></span>
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="rodape">
+  <div class="wrap rodape__linha">
+    <div class="rodape__marca">
+      <a class="marca" href="./">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1A1D22"/><path d="M15.5 43.3A19 19 0 1 1 48.5 43.3" fill="none" stroke="#2B3038" stroke-width="5.4"/><path d="M15.5 43.3A19 19 0 0 1 41.5 17.3" fill="none" stroke="#FFB020" stroke-width="5.4"/><path d="M32 33.7 41.4 17.5" stroke="#E9EDF1" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="33.7" r="3.4" fill="#E9EDF1"/><circle cx="32" cy="51.2" r="5.5" fill="#2FBF71" opacity=".3"/><circle cx="32" cy="51.2" r="3.9" fill="#2FBF71"/></svg>
+        Ware IoT
+      </a>
+      <span class="powered">Powered by Celiware</span>
+    </div>
+    <nav aria-label="Rodapé">
+      <ul>
+        <li><a href="como-conectar" aria-current="page">Como conectar</a></li>
+        <li><a href="recursos">Recursos</a></li>
+        <li><a href="tutoriais">Tutoriais</a></li>
+        <li><a href="privacidade">Privacidade</a></li>
+        <li><a href="contato">Contato</a></li>
+        <li><a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=como-conectar&amp;utm_campaign=ware-iot&amp;utm_content=rodape">Loja Celiware</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

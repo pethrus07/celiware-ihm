@@ -29,10 +29,13 @@ import '../tags/tag_form_page.dart';
 /// só as compatíveis (o botão de pulso não oferece variável numérica) e tem
 /// "Criar variável" ali mesmo, para não precisar sair do editor.
 class ElementConfigSheet extends StatelessWidget {
-  const ElementConfigSheet({super.key, required this.screenId, required this.elementId});
+  const ElementConfigSheet({super.key, required this.screenId, required this.elementId, this.panel = false});
 
   final String screenId;
   final String elementId;
+
+  /// No painel lateral fixo do editor (tablet, TB-4) em vez da folha que sobe.
+  final bool panel;
 
   static Future<void> show(BuildContext context, {required String screenId, required String elementId}) =>
       showModalBottomSheet<void>(
@@ -61,15 +64,17 @@ class ElementConfigSheet extends StatelessWidget {
 
     // Todas as variáveis ao vivo enquanto a folha está aberta: a lista de
     // escolha mostra o valor de cada uma, o que ajuda a achar a certa.
+    // No painel lateral (tablet) a folha fica parada, do tamanho do painel.
     return LiveTags(
       tagIds: {for (final t in project.tags) t.id},
       child: DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.86,
-      maxChildSize: 0.96,
+      expand: panel,
+      initialChildSize: panel ? 1 : 0.86,
+      minChildSize: panel ? 1 : 0.25,
+      maxChildSize: panel ? 1 : 0.96,
       builder: (context, scroll) => ListView(
         controller: scroll,
-        padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 40),
+        padding: EdgeInsets.fromLTRB(Ind.page, panel ? Ind.page : 0, Ind.page, 40),
         children: [
           Row(children: [
             Icon(info.icon, color: Ind.accent),

@@ -9,6 +9,7 @@ import '../../services/runtime/tag_codec.dart';
 import '../../services/runtime/tag_store.dart';
 import '../../services/alarms/alarm_engine.dart';
 import '../../widgets/alarms/alarm_widgets.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/hmi_frame.dart';
 import '../../widgets/hmi/live_tags.dart';
@@ -26,6 +27,9 @@ import 'tag_form_page.dart';
 /// (`ListView.builder`) e só as linhas à vista ficam sendo lidas
 /// ([VisibleLiveTags]). Antes ela montava e inscrevia todas — com mil
 /// variáveis, abrir a aba varria o CLP inteiro.
+///
+/// No tablet deitado o cadastro abre ao lado da lista ([ListDetail], TB-2):
+/// dá para conferir o valor ao vivo na lista enquanto acerta o endereço.
 class TagsPage extends StatefulWidget {
   const TagsPage({super.key, this.startTour = false});
   final bool startTour;
@@ -37,6 +41,10 @@ class TagsPage extends StatefulWidget {
 class _TagsPageState extends State<TagsPage> {
   final _listKey = GlobalKey();
   final _addKey = GlobalKey();
+  final _panes = GlobalKey<ListDetailState>();
+
+  /// Item do painel para o cadastro novo (não colide com id de variável).
+  static const _nova = '+nova';
 
   Future<void> _createMany(BuildContext context) async {
     final message = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) => const BulkTagsPage()));
@@ -61,45 +69,55 @@ class _TagsPageState extends State<TagsPage> {
         // Só pelo "?" ou por Mais → Tutoriais (ver DevicesPage).
         autoStart: false,
         forceStart: widget.startTour,
-        child: Scaffold(
-          appBar: AppBar(title: const Text('Variáveis'), actions: [
-            IconButton(
-              key: const ValueKey('criar-varias'),
-              tooltip: 'Criar várias',
-              icon: const Icon(Icons.playlist_add_rounded),
-              onPressed: project.devices.isEmpty ? null : () => _createMany(context),
+        child: ListDetail(
+          key: _panes,
+          placeholder: const Scaffold(
+            body: EmptyState(
+              icon: Icons.data_object_rounded,
+              title: 'Escolha uma variável',
+              body: 'Toque numa variável da lista para ver e editar, ou crie uma nova.',
             ),
-            const HelpButton(),
-          ]),
-          floatingActionButton: FloatingActionButton.extended(
-            key: _addKey,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TagFormPage())),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Nova variável'),
           ),
-          body: project.tags.isEmpty
-              ? KeyedSubtree(
-                  key: _listKey,
-                  child: EmptyState(
-                    icon: Icons.data_object_rounded,
-                    title: 'Nenhuma variável',
-                    body: project.devices.isEmpty
-                        ? 'Primeiro cadastre um equipamento (aba Equipamentos). Depois dê nome às memórias dele aqui.'
-                        : 'Dê nome a uma memória do equipamento: "Velocidade" = registrador 2.',
+          list: Scaffold(
+            appBar: AppBar(title: const Text('Variáveis'), actions: [
+              IconButton(
+                key: const ValueKey('criar-varias'),
+                tooltip: 'Criar várias',
+                icon: const Icon(Icons.playlist_add_rounded),
+                onPressed: project.devices.isEmpty ? null : () => _createMany(context),
+              ),
+              const HelpButton(),
+            ]),
+            floatingActionButton: FloatingActionButton.extended(
+              key: _addKey,
+              onPressed: () => _panes.currentState?.open(_nova, (_) => const TagFormPage()),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Nova variável'),
+            ),
+            body: project.tags.isEmpty
+                ? KeyedSubtree(
+                    key: _listKey,
+                    child: EmptyState(
+                      icon: Icons.data_object_rounded,
+                      title: 'Nenhuma variável',
+                      body: project.devices.isEmpty
+                          ? 'Primeiro cadastre um equipamento (aba Equipamentos). Depois dê nome às memórias dele aqui.'
+                          : 'Dê nome a uma memória do equipamento: "Velocidade" = registrador 2.',
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 100),
+                    itemCount: rows.length,
+                    itemBuilder: (context, i) => switch (rows[i]) {
+                      (final Device d, null) => SectionHeader(d.name, key: ValueKey('secao-${d.id}'), trailing: LinkChip(device: d)),
+                      (_, final Tag t) => KeyedSubtree(
+                          // O tutorial realça a primeira variável, não a lista inteira.
+                          key: t.id == firstId ? _listKey : ValueKey('linha-${t.id}'),
+                          child: LiveTagItem(tagId: t.id, child: _TagTile(tag: t)),
+                        ),
+                    },
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 100),
-                  itemCount: rows.length,
-                  itemBuilder: (context, i) => switch (rows[i]) {
-                    (final Device d, null) => SectionHeader(d.name, key: ValueKey('secao-${d.id}'), trailing: LinkChip(device: d)),
-                    (_, final Tag t) => KeyedSubtree(
-                        // O tutorial realça a primeira variável, não a lista inteira.
-                        key: t.id == firstId ? _listKey : ValueKey('linha-${t.id}'),
-                        child: LiveTagItem(tagId: t.id, child: _TagTile(tag: t)),
-                      ),
-                  },
-                ),
+          ),
         ),
       ),
     );
@@ -131,6 +149,9 @@ class _TagTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       key: ValueKey('var-${tag.id}'),
+      // Aberta no painel ao lado (tablet): a linha fica marcada.
+      selected: ListDetail.selectedOf(context) == tag.id,
+      selectedTileColor: Ind.accent.withValues(alpha: 0.12),
       leading: Icon(
         tag.dataType == TagDataType.bool
             ? Icons.toggle_on_outlined
@@ -179,7 +200,7 @@ class _TagTile extends StatelessWidget {
           );
         },
       ),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TagFormPage(tag: tag))),
+      onTap: () => ListDetail.of(context).open(tag.id, (_) => TagFormPage(tag: tag)),
     );
   }
 

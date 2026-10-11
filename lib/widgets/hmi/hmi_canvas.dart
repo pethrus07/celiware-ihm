@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/hmi_screen.dart';
+import '../common/adaptive.dart';
 import 'element_catalog.dart';
 import 'elements/chart_elements.dart';
 import 'elements/control_elements.dart';
@@ -106,7 +107,9 @@ class HmiCanvas extends StatelessWidget {
   static const double maxCell = 96;
 
   /// Na grade fina o teto é a largura (até 1.200 dp): é a grade de quem quer
-  /// muita variável, e no tablet ela usa a tela inteira.
+  /// muita variável, e no tablet ela usa a tela inteira (TB-5). Por isso o
+  /// teto pela altura não vale para ela fora do celular deitado: no tablet
+  /// deitado ele encolhia a grade para ~850 dp e sobrava um terço da tela.
   static const double maxFineWidth = 1200;
 
   static double maxCellFor(int columns) => columns >= HmiScreen.fineColumns ? maxFineWidth / columns : maxCell;
@@ -122,16 +125,19 @@ class HmiCanvas extends StatelessWidget {
         final available = box.maxWidth - padding.horizontal;
         // Segundo teto, pela altura: celular deitado tem ~290 dp úteis, e com
         // 96 dp por célula só apareciam duas linhas e meia. Pelo menos ~4,5
-        // linhas à vista; tablet e celular em pé nem chegam nesse limite.
+        // linhas à vista; tablet e celular em pé nem chegam nesse limite na
+        // grade normal. Na fina ele só vale no celular deitado (TB-5).
         final k = HmiScreen.scaleOf(screen.columns);
-        final byHeight = box.maxHeight.isFinite ? math.max(56.0 / k, box.maxHeight / (4.5 * k)) : maxCellFor(screen.columns);
+        final heightCap = box.maxHeight.isFinite && (k == 1 || WindowClass.isCompactHeight(context));
+        final byHeight = heightCap ? math.max(56.0 / k, box.maxHeight / (4.5 * k)) : maxCellFor(screen.columns);
         final cell = math.min(math.min(available / screen.columns, maxCellFor(screen.columns)), byHeight);
         final g = gapFor(cell);
         final width = cell * screen.columns;
         final rows = math.max(screen.rows + (editMode ? 4 : 0), editMode ? 8 : 1);
         final height = rows * cell;
 
-        return SingleChildScrollView(
+        return _GridScroll(
+          cell: cell,
           padding: padding,
           child: Align(
             alignment: Alignment.topCenter,
@@ -183,6 +189,45 @@ class HmiCanvas extends StatelessWidget {
       }),
     );
   }
+}
+
+/// Rolagem da grade que atravessa girar e redimensionar (TB-6): quando a
+/// célula muda de tamanho, a posição é refeita em linhas da grade — a mesma
+/// linha continua no topo, em vez de a tela pular para outro trecho.
+class _GridScroll extends StatefulWidget {
+  const _GridScroll({required this.cell, required this.padding, required this.child});
+  final double cell;
+  final EdgeInsets padding;
+  final Widget child;
+
+  @override
+  State<_GridScroll> createState() => _GridScrollState();
+}
+
+class _GridScrollState extends State<_GridScroll> {
+  final _scroll = ScrollController();
+
+  @override
+  void didUpdateWidget(_GridScroll old) {
+    super.didUpdateWidget(old);
+    if (old.cell == widget.cell || old.cell <= 0 || !_scroll.hasClients) return;
+    final rows = _scroll.offset / old.cell;
+    // Depois do quadro: só então a altura nova da grade está medida.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final p = _scroll.position;
+      _scroll.jumpTo((rows * widget.cell).clamp(p.minScrollExtent, p.maxScrollExtent));
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(controller: _scroll, padding: widget.padding, child: widget.child);
 }
 
 /// Elemento em operação com "ao tocar, abrir tela" (`goTo`): o toque abre a

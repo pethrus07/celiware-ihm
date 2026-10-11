@@ -11,6 +11,7 @@ import '../../models/project.dart';
 import '../../models/tag.dart';
 import '../../models/vendor_profiles.dart';
 import '../../services/import/tag_batch.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 
 /// Arquivo escolhido para importar: o nome (para mostrar) e o conteúdo.
@@ -208,7 +209,8 @@ class _BulkTagsPageState extends State<BulkTagsPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Criar várias')),
-      bottomNavigationBar: SafeArea(
+      // No tablet, no máximo 640 dp de campo (TB-3).
+      bottomNavigationBar: FormWidth(child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: FilledButton.icon(
@@ -222,8 +224,8 @@ class _BulkTagsPageState extends State<BulkTagsPage> {
                     : 'Criar ${toCreate.length} ${toCreate.length == 1 ? 'variável' : 'variáveis'}'),
           ),
         ),
-      ),
-      body: ListView(
+      )),
+      body: FormWidth(child: ListView(
         padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 32),
         children: [
           // Um equipamento só (o caso comum): nem pergunta.
@@ -259,7 +261,7 @@ class _BulkTagsPageState extends State<BulkTagsPage> {
             _Preview(batch: batch, policy: _policy, device: device, onPolicy: (p) => setState(() => _policy = p)),
           ],
         ],
-      ),
+      )),
     );
   }
 

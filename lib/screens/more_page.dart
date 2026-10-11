@@ -12,6 +12,7 @@ import '../core/theme/app_theme.dart';
 import '../models/project.dart';
 import '../services/demo/demo_project.dart';
 import '../services/storage/project_repository.dart';
+import '../widgets/common/adaptive.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/write_actions.dart';
 import '../widgets/tour/tour.dart';
@@ -36,7 +37,8 @@ class MorePage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mais')),
-      body: ListView(
+      // No tablet, a coluna dos ajustes não estica até a borda (TB-3).
+      body: FormWidth(child: ListView(
         padding: const EdgeInsets.only(bottom: 32),
         children: [
           const SectionHeader('Projeto'),
@@ -143,7 +145,7 @@ class MorePage extends StatelessWidget {
             onTap: () => showLicensePage(context: context, applicationName: AppInfo.name, applicationVersion: AppInfo.version),
           ),
         ],
-      ),
+      )),
     );
   }
 

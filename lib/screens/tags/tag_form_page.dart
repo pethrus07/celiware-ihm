@@ -19,6 +19,7 @@ import '../../models/vendor_profiles.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../services/runtime/mqtt_codec.dart';
 import '../../services/runtime/tag_codec.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/element_catalog.dart';
 import '../devices/device_form_page.dart';
@@ -842,7 +843,8 @@ class _TagFormPageState extends State<TagFormPage> {
             if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
           ],
         ),
-        bottomNavigationBar: SafeArea(
+        // No tablet, campos e Salvar com no máximo 640 dp (TB-3).
+        bottomNavigationBar: FormWidth(child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: FilledButton.icon(
@@ -852,8 +854,8 @@ class _TagFormPageState extends State<TagFormPage> {
               label: const Text('Salvar'),
             ),
           ),
-        ),
-        body: project.devices.isEmpty
+        )),
+        body: FormWidth(child: project.devices.isEmpty
             ? EmptyState(
                 icon: Icons.router_outlined,
                 title: 'Falta o equipamento',
@@ -1035,7 +1037,7 @@ class _TagFormPageState extends State<TagFormPage> {
                     ),
                   ),
                 ]),
-              ),
+              )),
       ),
     );
   }

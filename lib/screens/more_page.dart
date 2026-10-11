@@ -18,6 +18,7 @@ import '../widgets/tour/tour.dart';
 import 'devices/devices_page.dart';
 import 'editor/screen_editor_page.dart';
 import 'logs/logs_page.dart';
+import 'recipes/recipes_page.dart';
 import 'screen_run_page.dart';
 import 'screens_page.dart';
 import 'shell.dart';
@@ -88,6 +89,13 @@ class MorePage extends StatelessWidget {
             title: const Text('Registros'),
             subtitle: Text(_logsSummary(p)),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LogsPage())),
+          ),
+          ListTile(
+            key: const ValueKey('receitas'),
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('Receitas'),
+            subtitle: Text(RecipesPage.summary(p)),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipesPage())),
           ),
           const SectionHeader('Aparência'),
           Padding(

@@ -268,6 +268,15 @@ Padrão de IHM de mercado: "comando liga" numa memória, "motor ligado" em outra
 
 Por que o toque segue o comando e não o retorno: se seguisse o retorno, com a máquina travada o operador tocaria "desligar" e o app gravaria "ligar" de novo no comando que já estava ligado — o botão nunca desligaria.
 
+### 4.14. Rede local no Android
+
+A rede da máquina quase nunca tem internet. Com os dados móveis ligados, o Android elege o 4G como rede padrão e todo socket sem vínculo sai por ele: o pedido para `192.168.1.10` vai para a operadora e morre em tempo esgotado (comportamento do `NetworkRanker`/`RouteController` do AOSP). Foi o caso do primeiro cliente que "não conectava".
+
+Antes de cada conexão, `ModbusClientTcp` chama `beforeConnect` → `LocalNetwork.prepare(host)` (`lib/services/net/`). Se o IP é privado e cai na faixa de uma rede Wi-Fi/cabo conectada, o canal `celiware/rede` (`RedeLocal.kt`) vincula o **processo** a essa rede (`bindProcessToNetwork`) e pede ao sistema que a mantenha de pé (`requestNetwork` sem exigir internet). Todo socket criado depois, inclusive o do Dart, sai por ela; compartilhar, imprimir e abrir links rodam em outros processos e não são afetados. Equipamento fora de rede local (VPN, 4G) não mexe no vínculo. Se a rede vinculada cai, o vínculo é desfeito e a próxima reconexão escolhe de novo.
+
+O "Testar conexão" usa a mesma informação: mostra por onde a conexão sai ("Wi-Fi 192.168.1.23/24 · sem internet") e, quando falha, diz o que achou ("O celular está em 192.168.0.x e o equipamento em 192.168.1.10: são redes diferentes" ou "não está em nenhum Wi-Fi"). Fora do Android tudo isso é inofensivo e calado.
+
+`targetSdk` está **fixo em 36** no `build.gradle.kts`: com alvo 37 o Android exige a permissão `ACCESS_LOCAL_NETWORK` e, sem pedi-la, toda conexão com CLP falha. Subir o alvo só numa versão que já peça essa permissão.
 ## 5. Modelo de dados
 
 ### 5.1. Equipamento (`Device`)
@@ -546,6 +555,7 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/core/modbus_pdu_test.dart` | Montagem de pedidos, limites, respostas de exceção, lógica do escravo. |
 | `test/core/modbus_client_tcp_test.dart` | Cliente TCP real × escravo Dart por socket: leitura/escrita, endereço inexistente, 50 pedidos paralelos, timeout, queda e reconexão, desconexão manual, IP morto, porta fechada = "recusou nesta porta". |
 | `test/runtime/tag_codec_test.dart` | 4 ordens de 32 bits, float, sinal, bit em registrador, listas, faixa, vírgula brasileira, formatação; escala ida e volta (÷ 10, deslocamento 4–20 mA, lista), passo e faixa na unidade da tela, casas implícitas, JSON; texto ASCII (zero final, bytes trocados, caractere inválido, só leitura). |
+| `test/core/local_network_test.dart` | Faixa de IP, rede privada, diagnóstico do teste de conexão ("redes diferentes", "sem Wi-Fi"), rótulo da rede e leitura do mapa vindo do Android. |
 | `test/runtime/scan_planner_test.dart` | Agrupamento, buracos, limite de 125, áreas separadas, isolamento. |
 | `test/runtime/alarm_logic_test.dart` | Condição com banda morta (acima/abaixo), liga/desliga, valor inválido, mensagem padrão com unidade, alarmes no JSON, descarte de alarme incompatível com o tipo, prioridades. |
 | `test/runtime/hmi_runtime_test.dart` | Inscrição, isolamento do endereço errado, escrita, queda com último valor, soltura insistente do pulso, variável apagada. |

@@ -227,8 +227,21 @@ class _ProbeCard extends StatelessWidget {
               ),
             ),
           ]),
+          // Por onde a conexão sai: "Wi-Fi 192.168.1.23/24 · sem internet".
+          if (result.network != null) ...[
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 34),
+              child: Text(result.network!, key: const ValueKey('teste-rede'), style: TextStyle(color: Ind.textDim, fontSize: 13)),
+            ),
+          ],
           if (!ok && tcp) ...[
             const SizedBox(height: 10),
+            // O celular já sabe a própria rede: diz o que achou antes da lista.
+            if (result.hint != null) ...[
+              Text(result.hint!, key: const ValueKey('teste-dica'), style: const TextStyle(fontWeight: FontWeight.w600, height: 1.35)),
+              const SizedBox(height: 10),
+            ],
             Text(result.refused ? 'O equipamento está na rede, mas não aceitou nesta porta:' : 'Confira, nesta ordem:',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
@@ -239,8 +252,8 @@ class _ProbeCard extends StatelessWidget {
                     'A porta está certa? Modbus TCP usa 502 — confira em "Mais opções".',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
                   ]
-                : const [
-                    'O celular está no mesmo Wi-Fi da máquina?',
+                : [
+                    if (result.hint == null) 'O celular está no mesmo Wi-Fi da máquina?',
                     'O IP está certo? (um número trocado é o erro mais comum)',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
                     'A porta é 502? O ID é 1?',

@@ -17,6 +17,7 @@ Tag `v1.3.1`. É a versão para apresentar e instalar
 | 1.2.0 | Sistema visual novo pela pesquisa de UI/UX: tema Claro/Escuro/Auto, interação verde-água, lâmpada alto desempenho, elementos redesenhados. |
 | 1.3.0 | Alarmes ISA-18.2: prioridade por cor + forma + número, faixa no topo, marca no elemento, lista, histórico, editor na variável, falta de comunicação como alarme. |
 | 1.3.1 | QA do APK instalado: botão com retorno vira "SEM RETORNO" após 5 s; faixa sem valor congelado e em uma linha com o celular deitado; tutorial explica cores e alarmes; "ligado" sem verde na lista de variáveis; alarme "Máquina parada" (média) na demonstração; tirado o "Vídeos · Em breve"; textos. |
+| 1.3.2 | Conexão amarrada à rede local: com Wi-Fi da máquina sem internet e dados móveis ligados, o app vincula as conexões ao Wi-Fi (`RedeLocal.kt`); teste de conexão mostra a rede usada e avisa faixa de IP diferente ou celular fora do Wi-Fi; `targetSdk` fixo em 36. |
 
 ## Etapa 4 — escopo fechado em 11/10/2026
 
@@ -52,7 +53,7 @@ upgrade de R$ [valor].
 | 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | o app não amarra a conexão ao Wi-Fi |
 | 1 | Publicação na Play Store | reunião | roteiro em `PUBLICACAO.md` |
 | 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | não existe |
-| 3 | Versão para Windows do **próprio app** (sem função de servidor) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
+| 3 | ~~Versão para Windows do próprio app~~ — **adiada em 11/10/2026** (decisão do Pedro) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
 | 4 | Grade maior e mais variáveis por tela | reunião | grade atual do editor |
 | 5 | Correções no "editar memória" | 2, 11 · reunião | — |
 | 6 | Tela de tablet | reunião | item 3 de "Próximo" |

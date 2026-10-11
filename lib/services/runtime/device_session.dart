@@ -11,6 +11,7 @@ import '../../core/modbus/modbus_memory.dart';
 import '../../models/device.dart';
 import '../../models/tag.dart';
 import '../demo/demo_process.dart';
+import '../net/local_network.dart';
 import 'scan_planner.dart';
 import 'tag_codec.dart';
 import 'tag_store.dart';
@@ -100,6 +101,9 @@ class DeviceSession {
       port: d.port,
       unitId: d.unitId,
       responseTimeout: Duration(milliseconds: d.timeoutMs),
+      // Wi-Fi da máquina sem internet + dados móveis ligados: sem isto a
+      // conexão sairia pelo 4G (ver LocalNetwork).
+      beforeConnect: LocalNetwork.prepare,
     );
   }
 

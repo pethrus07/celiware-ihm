@@ -31,7 +31,12 @@ android {
         // depois é permanente (outro ID = outro app na loja).
         applicationId = "com.celiware.ihm"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // FIXO em 36, de propósito. `flutter.targetSdkVersion` sobe sozinho a cada
+        // `flutter upgrade`; com alvo 37 o Android exige a permissão
+        // ACCESS_LOCAL_NETWORK (pedida em tempo de execução) e, sem ela, TODA
+        // conexão com CLP falha em tempo esgotado. Subir para 37 só numa versão
+        // que já peça essa permissão (docs/REQUISITOS-ETAPA4.md §2).
+        targetSdk = 36
         // Vêm do pubspec.yaml (version: nome+código).
         versionCode = flutter.versionCode
         versionName = flutter.versionName

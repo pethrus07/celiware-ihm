@@ -12,6 +12,7 @@ import '../../models/device.dart';
 import '../../models/project.dart';
 import '../../models/tag.dart';
 import '../demo/demo_process.dart';
+import '../net/local_network.dart';
 import 'device_session.dart';
 import 'tag_codec.dart';
 import 'tag_store.dart';
@@ -32,7 +33,7 @@ class TagSubscription {
 
 /// Resultado do botão "Testar conexão".
 class ProbeResult {
-  const ProbeResult({required this.ok, required this.message, this.elapsedMs, this.value, this.refused = false});
+  const ProbeResult({required this.ok, required this.message, this.elapsedMs, this.value, this.refused = false, this.hint, this.network});
   final bool ok;
   final String message;
   final int? elapsedMs;
@@ -43,6 +44,13 @@ class ProbeResult {
 
   /// Valor lido, quando o teste inclui uma variável.
   final Object? value;
+
+  /// Diagnóstico da rede do celular quando falha ("redes diferentes", "sem
+  /// Wi-Fi"). Nulo quando não há o que acrescentar.
+  final String? hint;
+
+  /// Por qual rede local a conexão sai ("Wi-Fi 192.168.1.23/24 · sem internet").
+  final String? network;
 }
 
 /// O motor da IHM em execução — dono das conexões e das leituras.
@@ -292,10 +300,16 @@ class HmiRuntime {
           await client.fn03ReadHoldingRegisters(startAddress: 0, quantity: 1);
         } on ModbusExceptionResponse {/* respondeu: está vivo */}
       }
-      return ProbeResult(ok: true, message: 'Conectado', elapsedMs: sw.elapsedMilliseconds, value: value);
+      final nets = device.isDemo ? null : await LocalNetwork.list();
+      return ProbeResult(ok: true, message: 'Conectado', elapsedMs: sw.elapsedMilliseconds, value: value,
+          network: LocalNetwork.routeTo(device.host, nets)?.label);
     } on ModbusError catch (e) {
-      return ProbeResult(ok: false, message: e.userMessage, elapsedMs: sw.elapsedMilliseconds,
-          refused: e is ModbusConnectionError && e.refused);
+      final refused = e is ModbusConnectionError && e.refused;
+      final nets = device.isDemo ? null : await LocalNetwork.list();
+      return ProbeResult(ok: false, message: e.userMessage, elapsedMs: sw.elapsedMilliseconds, refused: refused,
+          // Recusou = achou o aparelho; a rede está certa, não vale diagnosticar.
+          hint: refused ? null : LocalNetwork.diagnose(device.host, nets),
+          network: LocalNetwork.routeTo(device.host, nets)?.label);
     } on TagValueError catch (e) {
       return ProbeResult(ok: false, message: e.message);
     } finally {

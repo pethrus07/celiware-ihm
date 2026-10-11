@@ -32,6 +32,7 @@ class ModbusClientTcp extends ModbusClient {
     super.unitId,
     this.responseTimeout = const Duration(seconds: 2),
     this.connectionTimeout = const Duration(seconds: 5),
+    this.beforeConnect,
   });
 
   static final Logger _log = Logger('ModbusClientTcp');
@@ -40,6 +41,11 @@ class ModbusClientTcp extends ModbusClient {
   final int port;
   Duration responseTimeout;
   Duration connectionTimeout;
+
+  /// Chamado antes de abrir o socket — o app usa para fazer a conexão sair
+  /// pela rede local certa (ver `LocalNetwork.prepare`). Falha aqui não
+  /// impede a tentativa: só fica no log.
+  final Future<void> Function(String host)? beforeConnect;
 
   Socket? _socket;
   StreamSubscription<Uint8List>? _socketSub;
@@ -61,6 +67,14 @@ class ModbusClientTcp extends ModbusClient {
     linkState = ModbusLinkState.connecting;
     try {
       _log.info('Conectando a $_label...');
+      final hook = beforeConnect;
+      if (hook != null) {
+        try {
+          await hook(host);
+        } catch (e) {
+          _log.warning('$_label: preparo da rede falhou: $e');
+        }
+      }
       final socket =
           await Socket.connect(host, port, timeout: connectionTimeout);
       socket.setOption(SocketOption.tcpNoDelay, true);

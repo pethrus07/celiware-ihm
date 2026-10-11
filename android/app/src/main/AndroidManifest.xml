@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Saber se o Wi-Fi caiu, para a mensagem certa ao operador. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Vincular as conexões à rede Wi-Fi/cabo da máquina quando ela não tem
+         internet e os dados móveis estão ligados (RedeLocal.kt). Permissão
+         normal: o Android não pergunta nada ao usuário. -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
 
     <application
         android:label="Celiware IHM"

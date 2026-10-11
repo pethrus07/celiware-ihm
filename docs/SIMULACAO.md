@@ -51,7 +51,7 @@ O `requirements.txt` trava o pymodbus em 3.8.6: da 3.9 em diante a API de memór
 .venv\Scripts\python simulador.py --painel
 ```
 
-Uma janela "Simulador Modbus TCP — Celiware IHM" mostra, ao vivo, o que o CLP simulado tem na memória e o que o app está pedindo:
+Uma janela "Simulador Modbus TCP — Ware IoT" mostra, ao vivo, o que o CLP simulado tem na memória e o que o app está pedindo:
 
 | Parte | O que mostra |
 |---|---|

@@ -47,7 +47,7 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# ── Celiware IHM ────────────────────────────────────────────────────────────
+# ── Ware IoT ────────────────────────────────────────────────────────────
 # Chave de assinatura da Play Store e suas senhas: NUNCA no git. Perder a
 # chave de upload = pedir redefinição ao Google; vazar = alguém publica como
 # a Celiware. Guardar no cofre (ver docs/PUBLICACAO.md).

@@ -1,4 +1,4 @@
-# Celiware IHM
+# Ware IoT
 
 IHM portátil no celular: o usuário cadastra o equipamento pelo IP, dá nome às
 memórias que interessam e monta telas de operação arrastando botões,

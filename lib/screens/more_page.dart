@@ -126,6 +126,7 @@ class MorePage extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.info_outline_rounded),
             title: const Text('${AppInfo.name} · versão ${AppInfo.version}'),
+            subtitle: const Text('Powered by ${AppInfo.company}'),
             onTap: () => showLicensePage(context: context, applicationName: AppInfo.name, applicationVersion: AppInfo.version),
           ),
         ],

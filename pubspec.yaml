@@ -1,5 +1,5 @@
 name: ihm
-description: "Celiware IHM — IHM portátil Modbus TCP: monte telas de operação no celular."
+description: "Ware IoT — IHM portátil Modbus TCP: monte telas de operação no celular."
 publish_to: 'none'
 
 # versionName+versionCode do Android. O número depois do + sobe a cada envio

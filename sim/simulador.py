@@ -1,4 +1,4 @@
-"""Simulador Modbus TCP para testar o Celiware IHM sem equipamento.
+"""Simulador Modbus TCP para testar o Ware IoT sem equipamento.
 
 Sobe um escravo Modbus TCP no PC. O app (no emulador ou no celular) conecta
 nele como se fosse um CLP de verdade — mesmo caminho de rede, socket, MBAP.
@@ -207,7 +207,7 @@ async def servir_terminal(args, ctx) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Simulador Modbus TCP do Celiware IHM")
+    ap = argparse.ArgumentParser(description="Simulador Modbus TCP do Ware IoT")
     ap.add_argument("--cenario", choices=["cortadora", "vazio"], default="cortadora")
     ap.add_argument("--host", default="0.0.0.0", help="0.0.0.0 = aceita conexões da rede")
     ap.add_argument("--porta", type=int, default=5020)

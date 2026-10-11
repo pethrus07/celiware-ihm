@@ -1,13 +1,13 @@
-# Roadmap — Celiware IHM
+# Roadmap — Ware IoT
 
 O que já está entregue, o que falta e o que ficou de fora de propósito.
 A documentação técnica do que existe está em `ARQUITETURA.md`; este arquivo é
 só a lista de trabalho.
 
-## Versão estável atual: 1.3.1
+## Versão estável atual: 1.3.2
 
-Tag `v1.3.1`. É a versão para apresentar e instalar
-(`celiware-ihm-1.3.1-arm64.apk`, celulares Android de 2017 para cá).
+Tag `v1.3.2`. É a versão para apresentar e instalar
+(`celiware-ihm-1.3.2-arm64.apk`, celulares Android de 2017 para cá). A próxima já sai com o nome **Ware IoT**.
 
 | Versão | O que trouxe |
 |---|---|
@@ -46,7 +46,7 @@ upgrade de R$ [valor].
 
 ### Entra
 
-**Requisitos detalhados, horas e fontes:** `docs/REQUISITOS-ETAPA4.md` (levantamento de 11/10/2026: [estimativa interna] no total, mais da metade em protocolos).
+**Requisitos detalhados, horas e fontes:** `docs/REQUISITOS-ETAPA4.md`. **Conferência item a item da lista do cliente (205 itens):** `docs/RASTREABILIDADE-LISTA-CLIENTE.md` — 16 itens dentro do app ainda para decidir. (levantamento de 11/10/2026: [estimativa interna] no total, mais da metade em protocolos).
 
 | # | Item | Da lista dele / da reunião | Hoje (código em 11/10) |
 |---|---|---|---|
@@ -93,7 +93,7 @@ várias máquinas numa tela (61).
   8, 24, 92–154). Não pedem nada externo, mas cada um é um módulo; ficam para
   depois desta etapa.
 
-**Do lado do cliente:** nome comercial, marca e domínio do app; lista do hardware
+**Do lado do cliente:** ~~nome comercial~~ — **definido em 11/10/2026: Ware IoT** (app, site e tudo o mais; "WARE" já era o nome dos padrões de dados da Celiware); marca e domínio; lista do hardware
 e cadastro na Shopify; uma peça de cada para os testes; testes nas máquinas
 reais com as marcas parceiras.
 
@@ -104,7 +104,7 @@ reais com as marcas parceiras.
 - Público (leigo ou técnico): em aberto, decidir junto da lista dele.
 - Nomes com `.com.br` livre em 06/10: MáquinaNaMão, IHM no Bolso,
   MonitoraMáquina, LigaMáquina, PainelNaMão, MáquinaConectada, ConectaPLC.
-  "Conecta Fácil" já é registrado. A decisão é dele.
+  "Conecta Fácil" já é registrado. **Decidido em 11/10: Ware IoT.**
 
 ## Próximo — visual e operação
 

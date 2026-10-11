@@ -1,10 +1,10 @@
-# Celiware IHM — Documentação Técnica
+# Ware IoT — Documentação Técnica
 
 IHM portátil Modbus TCP · Flutter / Dart · Versão 1.0
 
 ## 1. Visão geral
 
-O Celiware IHM transforma o celular numa **IHM (interface homem-máquina) montada pelo próprio usuário**. A pessoa cadastra o equipamento (CLP, inversor, IHM, conversor) pelo IP, dá nome às memórias que interessam (as **variáveis**) e monta **telas** arrastando elementos gráficos — botões, lâmpadas, mostradores, gráficos — ligados a essas variáveis. A tela fica salva no aparelho e pode ser exportada como arquivo para outro celular.
+O Ware IoT transforma o celular numa **IHM (interface homem-máquina) montada pelo próprio usuário**. A pessoa cadastra o equipamento (CLP, inversor, IHM, conversor) pelo IP, dá nome às memórias que interessam (as **variáveis**) e monta **telas** arrastando elementos gráficos — botões, lâmpadas, mostradores, gráficos — ligados a essas variáveis. A tela fica salva no aparelho e pode ser exportada como arquivo para outro celular.
 
 O app nasce **genérico**: fala Modbus TCP com qualquer equipamento. Perfis de fabricante (começando pela Inovance) entram depois, sem mudar o resto do sistema, porque entre marcas o protocolo é o mesmo — muda só onde cada área de memória começa.
 

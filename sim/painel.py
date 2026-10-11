@@ -38,7 +38,7 @@ FONT = "Segoe UI"
 MONO = "Consolas"
 
 COIL, DI, HR, IR = 1, 2, 3, 4
-TITULO_JANELA = "Simulador Modbus TCP — Celiware IHM"
+TITULO_JANELA = "Simulador Modbus TCP — Ware IoT"
 ARQUIVO_COMANDO = Path(__file__).with_name(".comando")
 
 NOMES_FC = {1: "lê coils", 2: "lê entradas", 3: "lê registradores", 4: "lê input reg.",

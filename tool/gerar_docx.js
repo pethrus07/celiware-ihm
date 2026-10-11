@@ -245,7 +245,7 @@ const doc = new Document({
         children: [new Paragraph({
           alignment: AlignmentType.RIGHT,
           children: [
-            new TextRun({ text: `Celiware IHM · Documentação Técnica · Versão ${VERSION}    `, size: 16, color: C.dim }),
+            new TextRun({ text: `Ware IoT · Documentação Técnica · Versão ${VERSION}    `, size: 16, color: C.dim }),
             new TextRun({ children: [PageNumber.CURRENT], size: 16, color: C.dim }),
           ],
         })],

@@ -125,7 +125,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
       runtime: widget.runtime,
       alarms: _alarms,
       child: MaterialApp(
-        title: 'Celiware IHM',
+        title: 'Ware IoT',
         debugShowCheckedModeBanner: false,
         theme: Ind.theme,
         navigatorKey: _navigator,

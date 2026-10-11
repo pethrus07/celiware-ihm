@@ -77,7 +77,7 @@ class ProjectRepository {
       throw const ProjectFormatError('O arquivo não é um projeto válido (JSON ilegível).');
     }
     if (raw is! Map || raw['format'] != 'celiware-ihm') {
-      throw const ProjectFormatError('Este arquivo não é um projeto do Celiware IHM.');
+      throw const ProjectFormatError('Este arquivo não é um projeto do Ware IoT.');
     }
     final version = raw['schemaVersion'];
     if (version is! int || version > Project.schemaVersion) {

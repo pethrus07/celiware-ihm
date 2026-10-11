@@ -2,7 +2,7 @@
 class AppInfo {
   AppInfo._();
 
-  static const name = 'Celiware IHM';
+  static const name = 'Ware IoT';
   static const company = 'Celiware';
 
   /// Manter igual ao `version:` do pubspec.yaml (o build de loja lê de lá).

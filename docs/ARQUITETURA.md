@@ -123,6 +123,13 @@ lib/
 │   │   ├── modbus_client_simulated.dart  Transporte para a máquina de demonstração.
 │   │   ├── modbus_memory.dart        Memória Modbus em RAM + lógica de escravo.
 │   │   └── modbus_tcp_server.dart    Escravo TCP em Dart (testes de integração).
+│   ├── s7/
+│   │   ├── s7_address.dart           Endereço do TIA (DB1.DBW4, M10.3, IW64 = EW64).
+│   │   ├── s7_codec.dart             Bytes ⇄ valor (big-endian, STRING do S7).
+│   │   ├── s7_pdu.dart               TPKT/COTP/S7: montagem e leitura (funções puras).
+│   │   ├── s7_error.dart             Erros tipados, inclusive por item.
+│   │   ├── s7_client.dart            Cliente ISO-on-TCP (um pedido por vez, PDU, reconexão).
+│   │   └── s7_test_server.dart       CLP S7 em Dart (testes de integração).
 │   ├── theme/app_theme.dart          Tokens de cor, tipografia, tema Material.
 │   └── utils/                        ids, validação de IP, redução de imagem.
 ├── models/
@@ -282,6 +289,27 @@ O "Testar conexão" usa a mesma informação: mostra por onde a conexão sai ("W
 Muito inversor e CLP pequeno só fala Modbus **RTU** pela RS-485. Atrás de um conversor RS-485 → Ethernet que repassa os bytes sem converter, o app fala RTU (ou ASCII) "cru" pelo TCP: equipamento do tipo `modbusRtuTcp`, escolhido em **Na rede → Mais opções → Protocolo**. As funções Modbus são as mesmas (vêm de `ModbusClient`); muda só o envelope (`ModbusFrames`: CRC16 no RTU, LRC no ASCII) e como se acha o fim da resposta — pelo código da função, porque serial não tem cabeçalho de tamanho e o silêncio de 3,5 caracteres da norma não é confiável atrás de USB e de gateways. `ModbusClientSerial` roda sobre um `ByteLink` (TCP hoje; USB-OTG é o próximo), um pedido por vez, com opção de descartar o eco de adaptadores que devolvem o que foi enviado. Resposta de outro escravo é ignorada; CRC/LRC errado vira "resposta inválida".
 
 Testes: `ModbusSerialTcpServer` (escravo RTU/ASCII em Dart, por socket real) e o simulador Python com `--framer rtu|ascii`.
+
+### 4.16. Siemens S7 (núcleo)
+
+O S7 "clássico" (PUT/GET) em Dart puro, em `lib/core/s7/`. Sem Snap7, que é LGPL e pede compilar código nativo para quatro ABIs. Por enquanto é só a camada de protocolo: o `S7Driver`, o cadastro do equipamento (rack/slot) e o campo de endereço vêm depois.
+
+- **Endereço** (`s7_address.dart`). Aceita `DB1.DBX0.0`, `DB1.DBB2`, `DB1.DBW4`, `DB1.DBD8`, `M10.3`, `MB`/`MW`/`MD`, `I`/`E` e `Q`/`A`. O mnemônico alemão e o internacional dão o mesmo endereço; o texto canônico é o internacional. Também aceita o `%` do TIA e a faixa `P#DB1.DBX10.0 BYTE 22`, usada para STRING e blocos de bytes. O tamanho sugere o tipo, e o erro vem curto, em português: "DB1.DBX0.8: o bit vai de 0 a 7".
+- **Conexão** (`s7_client.dart`). Sequência: TCP na porta 102 → COTP CR/CC, com o TSAP calculado de rack/slot (300 = 0/2, 400 = 0/3, 1200/1500 = 0/1) → Setup Communication. O cliente pede PDU de 960 e o CLP responde com o que aceita (240, 480 ou 960). Tem o mesmo `beforeConnect` do Modbus (4.14). Um pedido por vez, com a resposta casada pela referência da PDU; depois de uma queda, o próximo pedido reconecta sozinho.
+- **Vários itens por pedido.** A lista de endereços vira o menor número de pedidos que cabe na PDU negociada, contando o pedido (12 + 12 por item) e a resposta (14 + 4 + dado por item, com o byte de enchimento), com no máximo 20 itens. Item maior que a PDU é lido em pedaços e remontado. Com PDU 240, um pedido leva até 19 itens ou 222 bytes. Bit é lido e gravado com transporte BIT: só aquele bit muda no CLP, sem ler, modificar e regravar o byte.
+- **Codec** (`s7_codec.dart`). Sempre big-endian: BOOL, BYTE, WORD, INT, DWORD, DINT, REAL e STRING (2 bytes de cabeçalho com capacidade e tamanho).
+- **Erros** (`s7_error.dart`, todos `CommError`):
+  - **conexão**: `S7Refusal.port` quando a porta recusa; `rackSlot` quando o CLP recusa a conexão ISO ("confira rack e slot");
+  - **tempo esgotado**, **protocolo** e **pedido fora do limite**;
+  - **pedido recusado inteiro** (`S7RequestRefused`): no 1200/1500 é o sintoma do PUT/GET desligado, e a mensagem diz o que fazer: "o CLP recusou: habilite PUT/GET e desligue o acesso otimizado do DB";
+  - **erro por item** (`S7ItemError`: DB inexistente, fora do DB, acesso negado): vem dentro do resultado da leitura, e o driver marca só a variável errada.
+- **Limites.** Não fala S7CommPlus (DB otimizado, acesso simbólico, S7-1500 com proteção total), nem temporizador e contador. Escrita dividida em vários pedidos não é atômica.
+
+Testes: o `S7TestServer` é um CLP de mentira em Dart que respeita a PDU como um real (passou dela, volta erro 0x8500). Houve também uma conferência manual contra o servidor do python-snap7 3.2.1. Esse servidor difere de uma CPU real em três pontos:
+- lê bit devolvendo o byte inteiro (o cliente aceita as duas formas);
+- grava bit sobrescrevendo o byte inteiro;
+- só atende um item por pedido de escrita.
+
 ## 5. Modelo de dados
 
 ### 5.1. Equipamento (`Device`)
@@ -564,6 +592,7 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/runtime/tag_codec_test.dart` | 4 ordens de 32 bits, float, sinal, bit em registrador, listas, faixa, vírgula brasileira, formatação; escala ida e volta (÷ 10, deslocamento 4–20 mA, lista), passo e faixa na unidade da tela, casas implícitas, JSON; texto ASCII (zero final, bytes trocados, caractere inválido, só leitura). |
 | `test/core/local_network_test.dart` | Faixa de IP, rede privada, diagnóstico do teste de conexão ("redes diferentes", "sem Wi-Fi"), rótulo da rede e leitura do mapa vindo do Android. |
 | `test/core/modbus_serial_test.dart` | CRC16 e LRC com vetores conhecidos, fim de quadro pelo código da função; RTU e ASCII sobre TCP por socket real: leitura e escrita, endereço inexistente, adaptador com eco, CRC corrompido, ID errado = sem resposta, porta fechada = recusou. |
+| `test/core/s7_test.dart` | Siemens S7. Endereços (alemão/inglês, `%`, `P#`, erros) e codecs. Vetores de referência: COTP CR, Setup Communication, Read/Write Var. Por socket real contra o `S7TestServer`: vários itens num pedido, divisão por itens e por PDU, item maior que a PDU, bit com transporte BIT, REAL/STRING, item com erro sem derrubar os outros, PUT/GET desligado, tempo esgotado, resposta atrasada descartada, pedidos em paralelo, resposta picada (TCP e COTP), queda e reconexão, porta fechada, rack/slot errados. |
 | `test/runtime/rtu_device_test.dart` | Equipamento atrás de gateway RS-485 pelo caminho de produção (fábrica → driver → sessão): testar, ler na varredura e gravar em RTU e ASCII; envelope no arquivo do projeto. |
 | `test/runtime/device_driver_test.dart` | Contrato do driver com um driver de mentira (não Modbus): a sessão publica, grava e trata queda igual. |
 | `test/runtime/scan_planner_test.dart` | Agrupamento, buracos, limite de 125, áreas separadas, isolamento. |

@@ -1,0 +1,22 @@
+# Cabeçalhos do Cloudflare Pages (https://developers.cloudflare.com/pages/configuration/headers/)
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# Fontes nunca mudam de nome: cache de 1 ano.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Imagem nova = nome novo. Trocou o conteúdo com o mesmo nome? Espere até 7 dias ou renomeie.
+/img/*
+  Cache-Control: public, max-age=604800
+
+/css/*
+  Cache-Control: public, max-age=86400
+
+# Documentação do repositório publicada junto: fora dos buscadores.
+/README.md
+  X-Robots-Tag: noindex

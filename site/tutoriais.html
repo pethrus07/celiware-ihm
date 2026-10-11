@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutoriais: equipamento, variável, tela e alarme · Ware IoT</title>
+<meta name="description" content="Passo a passo com prints: cadastrar o CLP pelo IP, criar uma variável, montar a tela de operação e configurar alarmes no Ware IoT.">
+<link rel="canonical" href="https://ware-iot.pages.dev/tutoriais">
+<meta name="theme-color" content="#e4e6ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/IBMPlexSans-Regular-Latin1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold-Latin1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/site.css">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Ware IoT">
+<meta property="og:title" content="Tutoriais do Ware IoT">
+<meta property="og:description" content="Cadastrar equipamento, criar variável, montar tela e configurar alarmes, passo a passo.">
+<meta property="og:url" content="https://ware-iot.pages.dev/tutoriais">
+<meta property="og:image" content="https://ware-iot.pages.dev/img/compartilhar.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Ware IoT: seu celular vira a IHM da máquina.">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+<!-- LINKS EXTERNOS: marcadores #LOJA-… e o link da Google Play. Onde trocar: README.md. -->
+<header class="topo">
+  <div class="wrap topo__linha">
+    <a class="marca" href="./">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1A1D22"/><path d="M15.5 43.3A19 19 0 1 1 48.5 43.3" fill="none" stroke="#2B3038" stroke-width="5.4"/><path d="M15.5 43.3A19 19 0 0 1 41.5 17.3" fill="none" stroke="#FFB020" stroke-width="5.4"/><path d="M32 33.7 41.4 17.5" stroke="#E9EDF1" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="33.7" r="3.4" fill="#E9EDF1"/><circle cx="32" cy="51.2" r="5.5" fill="#2FBF71" opacity=".3"/><circle cx="32" cy="51.2" r="3.9" fill="#2FBF71"/></svg>
+      Ware IoT
+    </a>
+    <nav class="nav" aria-label="Principal">
+      <a href="como-conectar">Como conectar</a>
+      <a href="recursos">Recursos</a>
+      <a href="tutoriais" aria-current="page">Tutoriais</a>
+      <a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=tutoriais&amp;utm_campaign=ware-iot&amp;utm_content=menu">Loja</a>
+      <a class="botao" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dtutoriais%26utm_content%3Dmenu">Baixar grátis</a>
+    </nav>
+    <details class="menu">
+      <summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</summary>
+      <ul class="menu__lista">
+        <li><a href="./">Início</a></li>
+        <li><a href="como-conectar">Como conectar</a></li>
+        <li><a href="recursos">Recursos</a></li>
+        <li><a href="tutoriais" aria-current="page">Tutoriais</a></li>
+        <li><a href="contato">Contato</a></li>
+        <li><a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=tutoriais&amp;utm_campaign=ware-iot&amp;utm_content=menu">Loja Celiware</a></li>
+      </ul>
+    </details>
+  </div>
+</header>
+
+<main id="conteudo">
+  <div class="wrap cabeca">
+    <h1>Tutoriais</h1>
+    <p class="lead">Do equipamento ao alarme, em quatro passos curtos. Dentro do app, o botão “?” explica cada tela.</p>
+    <ul class="atalhos">
+      <li><a href="#equipamento">Equipamento</a></li>
+      <li><a href="#variavel">Variável</a></li>
+      <li><a href="#tela">Tela</a></li>
+      <li><a href="#alarme">Alarme</a></li>
+    </ul>
+  </div>
+
+  <section class="secao secao--alto" aria-label="Passo a passo">
+    <div class="wrap">
+
+      <article class="tutorial bloco" id="equipamento" aria-labelledby="t-equipamento">
+        <div class="bloco__texto">
+          <p class="sobre">Tutorial 1</p>
+          <h2 id="t-equipamento">Cadastrar um equipamento</h2>
+          <ol class="numerada">
+            <li>Abra a aba Equipamentos e toque em <strong>Novo equipamento</strong>.</li>
+            <li>Deixe <strong>Na rede</strong> marcado. Dê um nome, como Prensa 2, e digite o IP do equipamento.</li>
+            <li>Toque em <strong>Testar conexão</strong>.</li>
+            <li>Respondeu? Toque em <strong>Salvar</strong>. Não respondeu? O app diz o que conferir, na ordem em que os problemas costumam acontecer.</li>
+          </ol>
+          <p class="dica">Porta, ID e protocolo ficam em Mais opções. Quer só conhecer o app? Escolha <strong>Demonstração</strong>: uma máquina simulada, sem nada na rede.</p>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/novo-equipamento.webp" width="540" height="1200" loading="lazy" alt="Novo equipamento: escolha entre Na rede (Modbus TCP) e Demonstração, campos Nome e IP do equipamento e o botão Testar conexão."></div>
+          <div class="celular"><img src="img/testar-conexao.webp" width="540" height="1200" loading="lazy" alt="Teste de conexão que falhou: o app mostra que celular e equipamento estão em redes diferentes e lista o que conferir."></div>
+        </div>
+      </article>
+
+      <article class="tutorial bloco bloco--inverso" id="variavel" aria-labelledby="t-variavel">
+        <div class="bloco__texto">
+          <p class="sobre">Tutorial 2</p>
+          <h2 id="t-variavel">Criar uma variável</h2>
+          <p>A variável é o nome de uma memória do CLP. A tela usa o nome, nunca o endereço.</p>
+          <ol class="numerada">
+            <li>Abra a aba Variáveis e toque em <strong>Nova variável</strong>.</li>
+            <li>Dê um nome que o operador entende: Velocidade, Temperatura do forno.</li>
+            <li>Escolha <strong>o que é</strong> (liga/desliga, número inteiro ou número com vírgula) e <strong>onde fica</strong> (lê e grava, ou só leitura).</li>
+            <li>Digite o endereço. O valor lido aparece no topo na hora. Endereço que não existe no equipamento também avisa na hora.</li>
+            <li>A tela vai gravar nessa memória? Ligue <strong>Pode ser alterada pela tela</strong>.</li>
+            <li>Toque em <strong>Salvar</strong>.</li>
+          </ol>
+          <p class="dica">Copiou o endereço do manual, como 40002? O app reconhece e oferece o endereço certo com um toque. Escala, unidade e decimais ficam em Mais opções.</p>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/variavel-lendo.webp" width="540" height="1200" loading="lazy" alt="Nova variável Ajuste de velocidade, número inteiro em registrador, endereço 1: o painel do topo lê 80 do equipamento."></div>
+          <div class="celular"><img src="img/variavel-notacao.webp" width="540" height="1200" loading="lazy" alt="Endereço 40002: o topo avisa endereço inexistente e o app sugere usar o endereço 1, da notação de manual."></div>
+        </div>
+      </article>
+
+      <article class="tutorial bloco" id="tela" aria-labelledby="t-tela">
+        <div class="bloco__texto">
+          <p class="sobre">Tutorial 3</p>
+          <h2 id="t-tela">Montar uma tela</h2>
+          <ol class="numerada">
+            <li>Na aba Telas, toque em <strong>Nova tela</strong> e dê um nome.</li>
+            <li>Toque em <strong>+ Elemento</strong> e escolha: botão, lâmpada, mostrador, medidor, gráfico…</li>
+            <li>A configuração abre sozinha. Escolha a variável e o texto. A prévia mostra o valor ao vivo.</li>
+            <li>Toque no elemento para selecionar. Arraste para mover e puxe a bolinha do canto para aumentar.</li>
+            <li>Toque em <strong>Concluir</strong>. Não precisa salvar: tudo já está salvo.</li>
+          </ol>
+          <p class="dica">Nas regras da tela você escolhe se ela é só de acompanhamento e se pede confirmação antes de gravar.</p>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/editor.webp" width="540" height="1200" loading="lazy" alt="Editor com grade pontilhada: o botão Liga está selecionado, com a bolinha de redimensionar no canto."></div>
+          <div class="celular"><img src="img/configurar-elemento.webp" width="540" height="1200" loading="lazy" alt="Configuração do botão Liga: variável Liga máquina, rótulo e modo Liga/desliga escolhido entre seis."></div>
+        </div>
+      </article>
+
+      <article class="tutorial bloco bloco--inverso" id="alarme" aria-labelledby="t-alarme">
+        <div class="bloco__texto">
+          <p class="sobre">Tutorial 4</p>
+          <h2 id="t-alarme">Configurar um alarme</h2>
+          <p>O alarme mora na variável. Viaja junto quando você envia o projeto.</p>
+          <ol class="numerada">
+            <li>Abra a variável na aba Variáveis e toque em <strong>Alarmes</strong>, depois em <strong>Criar alarme</strong>.</li>
+            <li>Escolha <strong>quando</strong>: acima ou abaixo de um limite, para números; ao ligar ou ao desligar, para liga/desliga.</li>
+            <li>Digite o <strong>limite</strong>, na unidade da tela.</li>
+            <li>Escolha a <strong>prioridade</strong>: 1 Alta (agir agora), 2 Média (agir logo) ou 3 Baixa (ficar atento).</li>
+            <li>Se quiser, escreva a mensagem para o operador. Em branco, o app escreve uma.</li>
+            <li>Toque em <strong>Pronto</strong> e salve a variável.</li>
+          </ol>
+          <p class="dica">Quando a condição dura 1 segundo, o alarme sobe na faixa do topo, marca o elemento da tela e o celular vibra. Toque na faixa para ver a lista e reconhecer. Os alarmes são vigiados com o app aberto.</p>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/alarme-criar.webp" width="540" height="1200" loading="lazy" alt="Criar alarme: acima de 120, prioridade média (triângulo 2) escolhida entre alta, média e baixa, e campo de mensagem."></div>
+          <div class="celular"><img src="img/alarme-na-tela.webp" width="540" height="1200" loading="lazy" alt="Alarme na operação: faixa no topo com Motor superaquecido e marcas de prioridade nos elementos."></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="secao faixa" aria-labelledby="t-mais">
+    <div class="wrap cta-final">
+      <h2 id="t-mais">Ainda não conecta?</h2>
+      <p class="lead">Veja os três jeitos de ligar o celular na máquina e o que conferir quando não responde.</p>
+      <div class="acoes">
+        <a class="botao" href="como-conectar">Como conectar</a>
+        <a class="link-seta" href="contato">Falar com a gente</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="rodape">
+  <div class="wrap rodape__linha">
+    <div class="rodape__marca">
+      <a class="marca" href="./">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1A1D22"/><path d="M15.5 43.3A19 19 0 1 1 48.5 43.3" fill="none" stroke="#2B3038" stroke-width="5.4"/><path d="M15.5 43.3A19 19 0 0 1 41.5 17.3" fill="none" stroke="#FFB020" stroke-width="5.4"/><path d="M32 33.7 41.4 17.5" stroke="#E9EDF1" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="33.7" r="3.4" fill="#E9EDF1"/><circle cx="32" cy="51.2" r="5.5" fill="#2FBF71" opacity=".3"/><circle cx="32" cy="51.2" r="3.9" fill="#2FBF71"/></svg>
+        Ware IoT
+      </a>
+      <span class="powered">Powered by Celiware</span>
+    </div>
+    <nav aria-label="Rodapé">
+      <ul>
+        <li><a href="como-conectar">Como conectar</a></li>
+        <li><a href="recursos">Recursos</a></li>
+        <li><a href="tutoriais" aria-current="page">Tutoriais</a></li>
+        <li><a href="privacidade">Privacidade</a></li>
+        <li><a href="contato">Contato</a></li>
+        <li><a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=tutoriais&amp;utm_campaign=ware-iot&amp;utm_content=rodape">Loja Celiware</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

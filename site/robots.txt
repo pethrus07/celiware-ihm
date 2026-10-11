@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ware-iot.pages.dev/sitemap.xml

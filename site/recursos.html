@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recursos: telas, alarmes ISA-18.2 e editor no celular · Ware IoT</title>
+<meta name="description" content="Opere a máquina pelo celular com valores ao vivo, alarmes no padrão ISA-18.2 e telas montadas no próprio aparelho, em grade. Modbus TCP e RTU, grátis e sem nuvem.">
+<link rel="canonical" href="https://ware-iot.pages.dev/recursos">
+<meta name="theme-color" content="#e4e6ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/IBMPlexSans-Regular-Latin1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold-Latin1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/site.css">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Ware IoT">
+<meta property="og:title" content="Recursos do Ware IoT">
+<meta property="og:description" content="Valores ao vivo, alarmes ISA-18.2 e telas montadas no próprio celular.">
+<meta property="og:url" content="https://ware-iot.pages.dev/recursos">
+<meta property="og:image" content="https://ware-iot.pages.dev/img/compartilhar.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Ware IoT: seu celular vira a IHM da máquina.">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+<!-- LINKS EXTERNOS: marcadores #LOJA-… e o link da Google Play. Onde trocar: README.md. -->
+<header class="topo">
+  <div class="wrap topo__linha">
+    <a class="marca" href="./">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1A1D22"/><path d="M15.5 43.3A19 19 0 1 1 48.5 43.3" fill="none" stroke="#2B3038" stroke-width="5.4"/><path d="M15.5 43.3A19 19 0 0 1 41.5 17.3" fill="none" stroke="#FFB020" stroke-width="5.4"/><path d="M32 33.7 41.4 17.5" stroke="#E9EDF1" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="33.7" r="3.4" fill="#E9EDF1"/><circle cx="32" cy="51.2" r="5.5" fill="#2FBF71" opacity=".3"/><circle cx="32" cy="51.2" r="3.9" fill="#2FBF71"/></svg>
+      Ware IoT
+    </a>
+    <nav class="nav" aria-label="Principal">
+      <a href="como-conectar">Como conectar</a>
+      <a href="recursos" aria-current="page">Recursos</a>
+      <a href="tutoriais">Tutoriais</a>
+      <a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=recursos&amp;utm_campaign=ware-iot&amp;utm_content=menu">Loja</a>
+      <a class="botao" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Drecursos%26utm_content%3Dmenu">Baixar grátis</a>
+    </nav>
+    <details class="menu">
+      <summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</summary>
+      <ul class="menu__lista">
+        <li><a href="./">Início</a></li>
+        <li><a href="como-conectar">Como conectar</a></li>
+        <li><a href="recursos" aria-current="page">Recursos</a></li>
+        <li><a href="tutoriais">Tutoriais</a></li>
+        <li><a href="contato">Contato</a></li>
+        <li><a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=recursos&amp;utm_campaign=ware-iot&amp;utm_content=menu">Loja Celiware</a></li>
+      </ul>
+    </details>
+  </div>
+</header>
+
+<main id="conteudo">
+  <div class="wrap cabeca">
+    <h1>Tudo o que a IHM da máquina precisa</h1>
+    <p class="lead">Prints reais do app, com a máquina de demonstração que vem dentro dele.</p>
+  </div>
+
+  <section class="secao secao--alto" aria-label="Recursos">
+    <div class="wrap">
+
+      <article class="bloco" aria-labelledby="r-operar">
+        <div class="bloco__texto">
+          <h2 id="r-operar">Opere a máquina pelo celular</h2>
+          <p class="lead">Botões, ajustes, lâmpadas e mostradores com o valor de agora.</p>
+          <ul>
+            <li>O botão acende quando a máquina confirma, não quando você toca.</li>
+            <li>Sem comunicação, a tela mostra o último valor esmaecido. Nunca um zero falso.</li>
+            <li>Gráfico dos últimos minutos e produção por hora.</li>
+            <li>Ajuste com limites e confirmação antes de gravar.</li>
+          </ul>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/operacao.webp" width="540" height="1200" loading="lazy" alt="Tela de operação: status em ciclo, velocidade, botões Liga e Reset, produção, medidor do motor e lâmpadas de porta, faca e papel."></div>
+          <div class="celular"><img src="img/graficos.webp" width="540" height="1200" loading="lazy" alt="Mesma tela mais abaixo: barra de tensão do papel, tendência dos últimos 2 minutos e produção por hora."></div>
+        </div>
+      </article>
+
+      <article class="bloco bloco--inverso" aria-labelledby="r-alarmes">
+        <div class="bloco__texto">
+          <h2 id="r-alarmes">Alarmes que ninguém deixa passar</h2>
+          <p class="lead">No padrão ISA-18.2: cada prioridade tem cor, forma e número. Dá para entender de relance, até para quem não distingue cores.</p>
+          <ul class="prioridades">
+            <li><svg viewBox="0 0 30 30" aria-hidden="true"><path class="p-alta" d="M15 1 29 15 15 29 1 15z"/><text class="p-num p-num--claro" x="15" y="19.5" text-anchor="middle">1</text></svg><span><strong>Alta</strong> · agir agora</span></li>
+            <li><svg viewBox="0 0 30 30" aria-hidden="true"><path class="p-media" d="M15 2 29 27H1z"/><text class="p-num p-num--escuro" x="15" y="23" text-anchor="middle">2</text></svg><span><strong>Média</strong> · agir logo</span></li>
+            <li><svg viewBox="0 0 30 30" aria-hidden="true"><rect class="p-baixa" x="3" y="3" width="24" height="24" rx="4"/><text class="p-num p-num--escuro" x="15" y="19.5" text-anchor="middle">3</text></svg><span><strong>Baixa</strong> · ficar atento</span></li>
+          </ul>
+          <ul>
+            <li>Faixa fixa no topo, em qualquer tela.</li>
+            <li>Marca no próprio elemento, onde o valor está.</li>
+            <li>O celular vibra quando entra um alarme novo.</li>
+            <li>Histórico com a hora de cada evento.</li>
+          </ul>
+          <p class="dim">Os alarmes são vigiados com o app aberto.</p>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/alarme-na-tela.webp" width="540" height="1200" loading="lazy" alt="Tela de operação em alarme: faixa vermelha no topo com Motor superaquecido, prioridade 1, e marcas de alarme nos elementos da tela."></div>
+          <div class="celular"><img src="img/alarmes.webp" width="540" height="1200" loading="lazy" alt="Lista de alarmes ativos: Motor superaquecido (alta), Máquina parada (média) e Motor esquentando (baixa), cada um com Reconhecer."></div>
+        </div>
+      </article>
+
+      <article class="bloco" aria-labelledby="r-editor">
+        <div class="bloco__texto">
+          <h2 id="r-editor">Monte a tela no próprio celular</h2>
+          <p class="lead">Sem computador e sem programar.</p>
+          <ul>
+            <li>11 elementos: botão, lâmpada, mostrador, ajuste de valor, indicador de estado, barra, medidor, gráfico de tendência, gráfico de barras, texto e imagem.</li>
+            <li>Tudo encaixa na grade. Nada fica por cima de nada.</li>
+            <li>Botão com seis jeitos de agir: liga/desliga, pulso, só liga, só desliga, grava valor e ir para outra tela.</li>
+            <li>Não existe botão Salvar: tudo fica salvo na hora.</li>
+          </ul>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/editor.webp" width="540" height="1200" loading="lazy" alt="Editor em grade no tema claro, com o botão Liga selecionado e a barra Configurar, duplicar, tirar e acrescentar."></div>
+          <div class="celular"><img src="img/configurar-elemento.webp" width="540" height="1200" loading="lazy" alt="Configuração do botão: prévia, variável Liga máquina, rótulo e os seis modos de agir."></div>
+        </div>
+      </article>
+
+      <article class="bloco bloco--inverso" aria-labelledby="r-variaveis">
+        <div class="bloco__texto">
+          <h2 id="r-variaveis">Memórias com nome de gente</h2>
+          <p class="lead">A tela aponta para “Velocidade”, não para “HR 2”.</p>
+          <ul>
+            <li>Enquanto você digita o endereço, o valor lido aparece no topo.</li>
+            <li>Copiou do manual (40002)? O app oferece o endereço certo com um toque.</li>
+            <li>Escala e unidade: o CLP manda 752, a tela mostra 75,2 °C.</li>
+            <li>Números inteiros, com vírgula, de 32 bits e texto.</li>
+          </ul>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/variavel-lendo.webp" width="540" height="1200" loading="lazy" alt="Nova variável Ajuste de velocidade: o painel Lendo agora do equipamento mostra 80 no endereço 1."></div>
+          <div class="celular"><img src="img/variavel-notacao.webp" width="540" height="1200" loading="lazy" alt="Endereço 40002 digitado: o app avisa que é a notação de manual e oferece o endereço 1."></div>
+        </div>
+      </article>
+
+      <article class="bloco" aria-labelledby="r-telas">
+        <div class="bloco__texto">
+          <h2 id="r-telas">Várias telas, várias máquinas</h2>
+          <ul>
+            <li>Uma tela pode juntar dados de várias máquinas.</li>
+            <li>Tela só de acompanhamento, para quem só precisa olhar.</li>
+            <li>Envie o projeto por WhatsApp ou e-mail para outro celular.</li>
+            <li>Tutorial em cada tela, no botão “?”.</li>
+          </ul>
+        </div>
+        <div class="bloco__midia bloco__midia--dupla">
+          <div class="celular"><img src="img/telas.webp" width="540" height="1200" loading="lazy" alt="Lista de telas: Cortadora operação, com 14 elementos, e Resumo do líder, só de acompanhamento, com 8 elementos."></div>
+          <div class="celular"><img src="img/tutorial.webp" width="540" height="1200" loading="lazy" alt="Tutorial de primeiros passos: Bem-vindo, aqui você monta as telas das suas máquinas."></div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="secao faixa" aria-labelledby="r-mais">
+    <div class="wrap">
+      <div class="secao__cabeca">
+        <h2 id="r-mais">Também tem</h2>
+      </div>
+      <ul class="lista-curta">
+        <li><strong>Tema claro e escuro</strong><span>Claro para o sol, escuro para a noite. Ou automático.</span></li>
+        <li><strong>Máquina de demonstração</strong><span>Conheça tudo sem nada ligado na rede.</span></li>
+        <li><strong>Testar conexão</strong><span>Diz o que conferir quando não conecta.</span></li>
+        <li><strong>Imagem por etapa</strong><span>Uma imagem para cada etapa da máquina, até tirada de um PDF.</span></li>
+        <li><strong>Texto do CLP</strong><span>Nome da receita, lote ou mensagem.</span></li>
+        <li><strong>Troca de tela</strong><span>Um toque leva para outra tela.</span></li>
+      </ul>
+
+      <h3 class="sobre sobre--espaco">Protocolos</h3>
+      <ul class="selos">
+        <li>Modbus TCP</li>
+        <li>Modbus RTU e ASCII, por conversor</li>
+        <li class="breve">MQTT · em breve</li>
+        <li class="breve">Siemens S7 · em breve</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="secao" aria-labelledby="r-baixar">
+    <div class="wrap cta-final">
+      <h2 id="r-baixar">Experimente com a máquina de demonstração</h2>
+      <p class="lead">Grátis, sem cadastro e sem nuvem.</p>
+      <div class="acoes">
+        <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Drecursos%26utm_content%3Dfim">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
+          <span><small>Baixar grátis na</small><strong>Google Play</strong></span>
+        </a>
+      </div>
+      <p class="nota">O Ware IoT é uma IHM, não um sistema de segurança. Não substitui intertravamentos nem o botão de emergência.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="rodape">
+  <div class="wrap rodape__linha">
+    <div class="rodape__marca">
+      <a class="marca" href="./">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1A1D22"/><path d="M15.5 43.3A19 19 0 1 1 48.5 43.3" fill="none" stroke="#2B3038" stroke-width="5.4"/><path d="M15.5 43.3A19 19 0 0 1 41.5 17.3" fill="none" stroke="#FFB020" stroke-width="5.4"/><path d="M32 33.7 41.4 17.5" stroke="#E9EDF1" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="33.7" r="3.4" fill="#E9EDF1"/><circle cx="32" cy="51.2" r="5.5" fill="#2FBF71" opacity=".3"/><circle cx="32" cy="51.2" r="3.9" fill="#2FBF71"/></svg>
+        Ware IoT
+      </a>
+      <span class="powered">Powered by Celiware</span>
+    </div>
+    <nav aria-label="Rodapé">
+      <ul>
+        <li><a href="como-conectar">Como conectar</a></li>
+        <li><a href="recursos" aria-current="page">Recursos</a></li>
+        <li><a href="tutoriais">Tutoriais</a></li>
+        <li><a href="privacidade">Privacidade</a></li>
+        <li><a href="contato">Contato</a></li>
+        <li><a class="externo" href="#LOJA-INICIO?utm_source=site&amp;utm_medium=recursos&amp;utm_campaign=ware-iot&amp;utm_content=rodape">Loja Celiware</a></li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

@@ -7,6 +7,7 @@ import 'package:ihm/models/device.dart';
 import 'package:ihm/models/project.dart';
 import 'package:ihm/models/tag.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
+import 'package:ihm/services/runtime/tag_codec.dart';
 import 'package:ihm/services/runtime/tag_store.dart';
 
 /// Runtime inteiro sobre memória simulada: varredura, agrupamento, isolamento
@@ -91,6 +92,21 @@ void main() {
     client.failureRate = 0; // rede volta
     await Future<void>.delayed(const Duration(milliseconds: 1500));
     expect(memory.bit(ModbusArea.coil, 0), isFalse); // o runtime soltou sozinho
+  });
+
+  test('bit de registrador de entrada: lê pela FC04, na varredura e no "Lendo agora", e recusa gravar', () async {
+    const status = Tag(id: 'st', name: 'Falha', deviceId: 'd1', area: ModbusArea.inputRegister, address: 3,
+        dataType: TagDataType.bool, bitIndex: 2, writable: true);
+    await runtime.apply(const Project(devices: [device], tags: [speed, run, wrong, status]));
+    expect(status.normalized().canWrite, isFalse, reason: 'registrador de entrada é só leitura');
+    memory.pokeRegister(ModbusArea.inputRegister, 3, 1 << 2);
+    memory.pokeRegister(ModbusArea.holdingRegister, 3, 0); // mesmo número no holding: não pode confundir
+    runtime.subscribe(['st']);
+    expect((await until('st', (r) => r.isGood)).value, isTrue);
+    memory.pokeRegister(ModbusArea.inputRegister, 3, 1 << 1); // outro bit da palavra
+    expect((await until('st', (r) => r.value == false)).value, isFalse);
+    expect(await runtime.readNow(status.normalized()), isFalse);
+    await expectLater(runtime.write('st', true), throwsA(isA<TagValueError>()));
   });
 
   test('variável apagada vira erro de configuração, não trava', () async {

@@ -68,7 +68,9 @@ class _BulkTagsPageState extends State<BulkTagsPage> {
     super.didChangeDependencies();
     final project = AppScope.of(context).controller.project;
     final preferred = widget.preferDeviceId;
-    _deviceId ??= preferred != null && project.device(preferred) != null ? preferred : project.devices.lastOrNull?.id;
+    // Faixa de memória só existe em equipamento de verdade (não nas calculadas).
+    final equipment = project.equipment;
+    _deviceId ??= preferred != null && equipment.any((d) => d.id == preferred) ? preferred : equipment.lastOrNull?.id;
   }
 
   @override
@@ -227,11 +229,11 @@ class _BulkTagsPageState extends State<BulkTagsPage> {
         padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 32),
         children: [
           // Um equipamento só (o caso comum): nem pergunta.
-          if (project.devices.length > 1) ...[
+          if (project.equipment.length > 1) ...[
             const SectionHeader('Equipamento', padding: EdgeInsets.fromLTRB(0, 16, 0, 12)),
             ChoiceCards<String>(
               options: [
-                for (final d in project.devices) ChoiceOption(value: d.id, title: d.name, icon: d.isDemo ? Icons.smart_toy_outlined : Icons.router_outlined),
+                for (final d in project.equipment) ChoiceOption(value: d.id, title: d.name, icon: d.isDemo ? Icons.smart_toy_outlined : Icons.router_outlined),
               ],
               selected: device.id,
               onChanged: (id) => setState(() => _deviceId = id),

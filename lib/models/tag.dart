@@ -8,6 +8,7 @@
 
 import '../core/modbus/modbus_memory.dart';
 import 'alarm.dart';
+import 'calc.dart';
 import 'narration.dart';
 import 'mqtt_config.dart';
 
@@ -159,6 +160,8 @@ class Tag {
     this.narrations = const [],
     this.memory,
     this.mqtt,
+    this.calc,
+    this.ruleWritable = false,
   });
 
   final String id;
@@ -221,6 +224,20 @@ class Tag {
   /// equipamento MQTT; aí área e endereço Modbus ficam no padrão e ninguém lê.
   final MqttAddress? mqtt;
 
+  /// A conta, quando a variável é calculada (§9.5, LG-1). Mora no equipamento
+  /// virtual [CalcDevice]; é sempre só leitura.
+  final CalcSpec? calc;
+
+  /// "Aceita escrita por regra" (LG-5): uma regra entre máquinas só grava
+  /// aqui se a pessoa marcou. Vale de fato só se a variável pode ser gravada
+  /// ([acceptsRuleWrite]).
+  final bool ruleWritable;
+
+  bool get isCalc => calc != null;
+
+  /// Uma regra pode gravar aqui: marcada **e** gravável de fato.
+  bool get acceptsRuleWrite => ruleWritable && canWrite;
+
   /// Variável lida de um bit dentro de um registrador.
   bool get isBitOfRegister => dataType == TagDataType.bool && !area.isBit;
 
@@ -247,7 +264,7 @@ class Tag {
 
   /// Pode escrever de fato: marcado pelo usuário **e** a área permite (no
   /// MQTT, **e** há tópico onde publicar — curinga não serve).
-  bool get canWrite => writable && (mqtt?.canPublish ?? area.isWritable);
+  bool get canWrite => writable && calc == null && (mqtt?.canPublish ?? area.isWritable);
 
   /// Quantas posições da área a variável ocupa (bits ou registradores).
   int get span => area.isBit ? length : dataType.registerCount * length;
@@ -257,6 +274,9 @@ class Tag {
 
   /// "HR 100" / "HR 100.3" / "COIL 5" / "HR 10..17" / "cortadora/estado · temp".
   String get addressLabel {
+    // A conta, com os nomes de agora, só quem tem o projeto mostra
+    // (`CalcText.display`).
+    if (calc != null) return 'Calculada';
     final m = mqtt;
     if (m != null) return m.label;
     final base = '${area.shortLabel} $address';
@@ -283,6 +303,8 @@ class Tag {
     List<AlarmRule>? alarms,
     List<EventNarration>? narrations,
     MqttAddress? mqtt,
+    CalcSpec? calc,
+    bool? ruleWritable,
   }) =>
       Tag(
         id: id,
@@ -304,6 +326,8 @@ class Tag {
         mqtt: mqtt ?? this.mqtt,
         narrations: narrations ?? this.narrations,
         memory: memory,
+        calc: calc ?? this.calc,
+        ruleWritable: ruleWritable ?? this.ruleWritable,
       );
 
   /// Troca o texto da memória — inclusive para nulo (endereço digitado à mão),
@@ -328,6 +352,8 @@ class Tag {
         narrations: narrations,
         memory: memory,
         mqtt: mqtt,
+        calc: calc,
+        ruleWritable: ruleWritable,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -337,8 +363,16 @@ class Tag {
     var t = this;
     // MQTT: os campos Modbus voltam ao padrão, para nenhuma regra de área
     // (bit força liga/desliga, entrada tira a escrita) valer sem querer.
-    if (t.mqtt != null && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
+    if ((t.mqtt != null || t.calc != null) && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
       t = t.copyWith(area: ModbusArea.holdingRegister, address: 0, bitIndex: 0, byteOrder: ByteOrder.abcd);
+    }
+    // Calculada: só leitura, um valor só, número com vírgula ou liga/desliga
+    // (a conta decide), sem escala (a conta já faz a conta).
+    if (t.calc != null) {
+      if (t.writable) t = t.copyWith(writable: false);
+      if (t.dataType != TagDataType.bool && t.dataType != TagDataType.float32) t = t.copyWith(dataType: TagDataType.float32);
+      if (t.length != 1) t = t.copyWith(length: 1);
+      if (t.scale != 1 || t.offset != 0) t = t.copyWith(scale: 1, offset: 0);
     }
     if (t.area.isBit && t.dataType != TagDataType.bool) {
       t = t.copyWith(dataType: TagDataType.bool);
@@ -393,6 +427,9 @@ class Tag {
         // Só com perfil de fabricante: projeto genérico fica igual ao de antes.
         if (memory != null) 'memory': memory,
         if (mqtt != null) 'mqtt': mqtt!.toJson(),
+        // Como o MQTT: só quando existe (projeto sem calculada fica igual).
+        if (calc != null) 'calc': calc!.toJson(),
+        if (ruleWritable) 'ruleWritable': true,
       };
 
   factory Tag.fromJson(Map<String, dynamic> j) => Tag(
@@ -422,5 +459,7 @@ class Tag {
         ],
         memory: j['memory'] as String?,
         mqtt: j['mqtt'] is Map ? MqttAddress.fromJson(Map<String, dynamic>.from(j['mqtt'] as Map)) : null,
+        calc: j['calc'] is Map ? CalcSpec.fromJson(Map<String, dynamic>.from(j['calc'] as Map)) : null,
+        ruleWritable: (j['ruleWritable'] as bool?) ?? false,
       ).normalized();
 }

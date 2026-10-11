@@ -8,6 +8,7 @@ import '../../models/tag.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../services/runtime/tag_store.dart';
 import '../../services/alarms/alarm_engine.dart';
+import '../../services/calc/calc_graph.dart';
 import '../../widgets/alarms/alarm_widgets.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/hmi_frame.dart';
@@ -15,6 +16,7 @@ import '../../widgets/hmi/live_tags.dart';
 import '../../widgets/tour/tour.dart';
 import '../tours.dart';
 import 'bulk_tags_page.dart';
+import 'calc_tag_form_page.dart';
 import 'tag_form_page.dart';
 
 /// Lista de variáveis, agrupadas por equipamento, com o valor **ao vivo**.
@@ -63,11 +65,19 @@ class _TagsPageState extends State<TagsPage> {
         forceStart: widget.startTour,
         child: Scaffold(
           appBar: AppBar(title: const Text('Variáveis'), actions: [
+            // Variável que sai de uma conta com outras (§9.5): mora num
+            // cadastro próprio, sem endereço.
+            IconButton(
+              key: const ValueKey('nova-calculada'),
+              tooltip: 'Nova variável calculada',
+              icon: const Icon(Icons.functions_rounded),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalcTagFormPage())),
+            ),
             IconButton(
               key: const ValueKey('criar-varias'),
               tooltip: 'Criar várias',
               icon: const Icon(Icons.playlist_add_rounded),
-              onPressed: project.devices.isEmpty ? null : () => _createMany(context),
+              onPressed: project.equipment.isEmpty ? null : () => _createMany(context),
             ),
             const HelpButton(),
           ]),
@@ -83,7 +93,7 @@ class _TagsPageState extends State<TagsPage> {
                   child: EmptyState(
                     icon: Icons.data_object_rounded,
                     title: 'Nenhuma variável',
-                    body: project.devices.isEmpty
+                    body: project.equipment.isEmpty
                         ? 'Primeiro cadastre um equipamento (aba Equipamentos). Depois dê nome às memórias dele aqui.'
                         : 'Dê nome a uma memória do equipamento: "Velocidade" = registrador 2.',
                   ),
@@ -92,7 +102,8 @@ class _TagsPageState extends State<TagsPage> {
                   padding: const EdgeInsets.only(bottom: 100),
                   itemCount: rows.length,
                   itemBuilder: (context, i) => switch (rows[i]) {
-                    (final Device d, null) => SectionHeader(d.name, key: ValueKey('secao-${d.id}'), trailing: LinkChip(device: d)),
+                    // As calculadas não têm conexão: o selo diria "Ocioso" ou "Online" à toa.
+                    (final Device d, null) => SectionHeader(d.name, key: ValueKey('secao-${d.id}'), trailing: d.isCalc ? null : LinkChip(device: d)),
                     (_, final Tag t) => KeyedSubtree(
                         // O tutorial realça a primeira variável, não a lista inteira.
                         key: t.id == firstId ? _listKey : ValueKey('linha-${t.id}'),
@@ -129,14 +140,17 @@ class _TagTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final calc = tag.calc;
     return ListTile(
       key: ValueKey('var-${tag.id}'),
       leading: Icon(
-        tag.dataType == TagDataType.bool
-            ? Icons.toggle_on_outlined
-            : tag.isText
-                ? Icons.text_fields_rounded
-                : (tag.isArray ? Icons.view_week_outlined : Icons.pin_outlined),
+        calc != null
+            ? Icons.functions_rounded
+            : tag.dataType == TagDataType.bool
+                ? Icons.toggle_on_outlined
+                : tag.isText
+                    ? Icons.text_fields_rounded
+                    : (tag.isArray ? Icons.view_week_outlined : Icons.pin_outlined),
         color: Ind.textDim,
       ),
       title: Text(tag.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
@@ -146,7 +160,14 @@ class _TagTile extends StatelessWidget {
         padding: const EdgeInsets.only(top: 3),
         child: Row(children: [
           // Com perfil de fabricante, a memória do manual vem antes: "D200 · HR 200".
-          Flexible(child: Text(tag.memoryLabel, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textMuted, fontSize: 13))),
+          // Calculada: a conta, com os nomes de agora.
+          Flexible(
+            child: Text(
+              calc != null ? '= ${CalcGraph.display(calc, AppScope.of(context).controller.project)}' : tag.memoryLabel,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Ind.textMuted, fontSize: 13),
+            ),
+          ),
           // Tem alarme configurado: sino discreto; em alarme agora: a forma
           // da prioridade (piscando se ninguém reconheceu).
           if (tag.alarms.isNotEmpty) ...[
@@ -179,7 +200,7 @@ class _TagTile extends StatelessWidget {
           );
         },
       ),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TagFormPage(tag: tag))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => calc != null ? CalcTagFormPage(tag: tag) : TagFormPage(tag: tag))),
     );
   }
 

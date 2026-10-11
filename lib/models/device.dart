@@ -21,6 +21,10 @@ enum DeviceKind {
   /// Máquina simulada dentro do próprio app — modo demonstração. Tem um
   /// "programa" rodando (ver [DemoProcess]) para os valores se mexerem.
   demo,
+
+  /// Equipamento virtual das variáveis calculadas ([CalcDevice]): não fala com
+  /// nada, faz as contas com o que as outras variáveis leram.
+  calc,
 }
 
 extension DeviceKindMeta on DeviceKind {
@@ -34,6 +38,8 @@ extension DeviceKindMeta on DeviceKind {
         return 'Equipamento num broker MQTT';
       case DeviceKind.demo:
         return 'Máquina de demonstração';
+      case DeviceKind.calc:
+        return 'Variáveis calculadas';
     }
   }
 
@@ -97,6 +103,9 @@ class Device {
 
   bool get isDemo => kind == DeviceKind.demo;
 
+  /// O equipamento virtual das calculadas — fica fora de Equipamentos.
+  bool get isCalc => kind == DeviceKind.calc;
+
   /// Fala com o equipamento pela rede (IP e porta), qualquer que seja o
   /// protocolo.
   bool get isNetwork => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt;
@@ -104,7 +113,9 @@ class Device {
   /// Descrição curta para listas: "192.168.0.10:502 · ID 1".
   String get addressLabel => isDemo
       ? 'Simulada neste aparelho'
-      : kind == DeviceKind.mqtt
+      : isCalc
+          ? 'Contas feitas neste aparelho'
+          : kind == DeviceKind.mqtt
           ? '$host:$port · MQTT${mqtt.tls ? ' · TLS' : ''}'
           : '$host:$port · ${kind == DeviceKind.modbusRtuTcp ? '${framing.label} · ' : ''}ID $unitId';
 

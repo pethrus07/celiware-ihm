@@ -105,7 +105,7 @@ toque no elemento ──> WriteActions (só leitura? confirmação?) ──> Hmi
 
 ### 2.4. Ciclo de vida
 
-Quando o app vai para segundo plano, `main.dart` solta todos os botões de pulso, para a varredura (rede e bateria), cala a voz (§6.9) e grava o que estiver pendente. Ao voltar, a varredura religa com as mesmas inscrições.
+Quando o app vai para segundo plano, `main.dart` solta todos os botões de pulso, para a varredura (rede e bateria), cala a voz (§6.9), para as regras entre máquinas (a pergunta pendente sai, §6.11) e grava o que estiver pendente. Ao voltar, a varredura religa com as mesmas inscrições.
 
 ## 3. Estrutura de pastas
 
@@ -138,6 +138,8 @@ lib/
 ├── models/
 │   ├── device.dart                   Equipamento.
 │   ├── tag.dart                      Variável (tipo, área, endereço, ordem de bytes).
+│   ├── calc.dart                     Variável calculada: a conta (CalcSpec) e o equipamento virtual.
+│   ├── logic_rule.dart               Regra entre máquinas (quando… durar… gravar…).
 │   ├── vendor_profiles.dart          Perfis de fabricante: "D200" ⇄ área + endereço Modbus.
 │   ├── mqtt_config.dart              Broker do equipamento e tópico da variável (MQTT).
 │   ├── hmi_screen.dart               Tela e elemento posicionado na grade.
@@ -149,8 +151,10 @@ lib/
 │   │   ├── scan_planner.dart         Agrupa variáveis vizinhas em leituras únicas.
 │   │   ├── tag_codec.dart            Registradores ⇄ valor; formatação pt-BR.
 │   │   ├── mqtt_codec.dart           Mensagem MQTT ⇄ valor (texto, número, JSON com caminho).
-│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver.
+│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver; calc_driver (contas).
 │   │   └── tag_store.dart            Última leitura por variável + histórico curto.
+│   ├── calc/                         Linguagem das contas, avaliador, quem cita quem (§6.11).
+│   ├── rules/rule_engine.dart        Motor das regras entre máquinas (§6.11).
 │   ├── logging/                      Registro de dados: motor, banco SQLite, CSV (§6.10).
 │   ├── demo/
 │   │   ├── demo_process.dart         "Programa do CLP" da cortadora simulada.
@@ -163,8 +167,9 @@ lib/
 │   ├── screen_run_page.dart          Tela em operação.
 │   ├── editor/                       Editor, paleta, configuração de elemento.
 │   ├── devices/                      Lista e cadastro de equipamento (Testar conexão).
-│   ├── tags/                         Lista e cadastro de variável (Lendo agora).
+│   ├── tags/                         Lista e cadastro de variável (Lendo agora); cadastro de calculada.
 │   ├── logs/                         Registros: lista, folha do grupo, histórico.
+│   ├── rules/                        Regras: lista com o estado de cada uma e cadastro.
 │   ├── more_page.dart                Projeto, registros, tutoriais, sobre.
 │   └── tours.dart                    Textos de todas as trilhas de tutorial.
 └── widgets/
@@ -391,7 +396,7 @@ Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; 
 
 | Campo | Significado |
 |---|---|
-| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker) ou `demo` (máquina simulada no aparelho). |
+| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker), `demo` (máquina simulada no aparelho) ou `calc` (o equipamento virtual "Cálculos", das variáveis calculadas — §6.11; fica fora de `Project.equipment`). |
 | host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). |
 | timeoutMs | Tempo máximo por resposta (1500 ms). |
 | pollMs | Intervalo entre varreduras (500 ms). |
@@ -415,6 +420,8 @@ Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; 
 | narrations | Narrações por voz (§6.9): lista de {id, kind (equals · above · below), value, text}. Só vai para o arquivo quando há alguma; `normalized()` descarta as sem texto e as que não casam com o tipo (liga/desliga só "valer 1/0"; texto e lista não falam). |
 | memory | A memória como no manual ("D200", "X10", "F3-12"), com perfil de fabricante. Só texto para mostrar e recalcular: `area`/`address` continuam a verdade. Só vai para o arquivo quando existe. |
 | mqtt | Só em variável de equipamento MQTT: topic, jsonPath, commandTopic, qos, retain, validitySec, boolFormat, commandJson. Com ele, area/address voltam ao padrão e ninguém lê. |
+| calc | Só em variável calculada (§6.11): `expr`, a conta canônica com `{id}` no lugar de cada variável citada, e `names`, o nome de cada citada no dia em que foi salva. Com ele, `normalized()` deixa só leitura, um valor, sem escala, tipo liga/desliga ou número com vírgula. Só vai para o arquivo quando existe. |
+| ruleWritable | "Aceita escrita por regra" (LG-5): sem ela nenhuma regra grava aqui. Vale só com a variável gravável (`acceptsRuleWrite`). Só vai para o arquivo quando marcada. |
 
 `Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura e texto tiram a escrita; escala zero volta a 1).
 
@@ -459,6 +466,20 @@ O projeto inteiro é um JSON (`projeto.ihm.json` na pasta privada; `nome-data.ih
 
 A gravação é atômica (grava `.tmp` e renomeia): se a bateria acabar no meio, sobra o arquivo anterior inteiro. Arquivo ilegível é guardado como cópia `.corrompido-…` em vez de apagado. Arquivo de versão mais nova é recusado com mensagem pedindo para atualizar o app.
 
+### 5.5. Regra entre máquinas (`LogicRule`)
+
+Em `Project.rules` (chave `rules`, só vai para o arquivo quando há alguma; `schemaVersion` segue 1). §6.11.
+
+| Campo | Significado |
+|---|---|
+| id, name | `name` é o que a regra faz ("Parar a prensa") e vira a pergunta ("Parar a prensa?"). |
+| condition | A condição, no mesmo formato da variável calculada (`expr` canônica + `names`); precisa dar liga/desliga. |
+| holdSec | Quanto a condição precisa durar seguido (0 = na hora; até 3600). Só vai para o arquivo quando diferente de 0. |
+| target | Id da variável onde gravar (precisa de `ruleWritable`). |
+| value | O valor na unidade da tela (liga/desliga: 1 ou 0). |
+| mode | `propose` (padrão, não vai para o arquivo) ou `automatic` — só com valor 0; `normalized()` devolve a "propor" a automática que ligaria, e modo desconhecido (versão mais nova) também cai em "propor". |
+| enabled | Ligada (padrão; só `false` vai para o arquivo). |
+
 ## 6. Funcionalidades por tela
 
 ### 6.1. Telas (início)
@@ -494,7 +515,7 @@ Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à
 
 ### 6.6. Variáveis
 
-Lista agrupada por equipamento: nome, endereço (com perfil, "D200 · HR 200") e o valor ao vivo. A lista é montada sob demanda (`ListView.builder`) e só as linhas à vista ficam sendo lidas (`VisibleLiveTags` em `live_tags.dart`): com 2.000 variáveis, abrir a aba lê umas vinte, não o CLP inteiro. O ícone no topo abre **Criar várias** (4.6). O cadastro cabe numa tela: equipamento (só aparece se houver mais de um), nome, o que é (liga/desliga, número inteiro, número com vírgula), onde fica (lê e grava / só leitura), endereço com − / + e "pode ser alterada pela tela". Escala, unidade, decimais, lista, formatos raros (INT16, 32 bits, texto), ordem de bytes e observação ficam em "Mais opções", que abre sozinho quando algum deles está em uso; fechado, o resumo mostra o que está valendo ("÷ 10 · °C · 1 decimais"). A escala tem atalhos — Sem escala, ÷ 10, ÷ 100, ÷ 1000, × 10 — e "Outra", que abre fator e soma. Escolher ÷ 100 já acerta as casas decimais para 2. Texto mostra à vista o tamanho em registradores ("8 = até 16 letras"). No topo, **Lendo agora do equipamento**: o endereço digitado é lido a cada segundo, pela mesma conexão da varredura. O painel fica **preso no topo** enquanto o formulário rola — é a resposta de cada campo mexido, inclusive da escala lá embaixo. Variável nova já vem com o equipamento da tela em montagem ou, fora do editor, com o último cadastrado.
+Lista agrupada por equipamento: nome, endereço (com perfil, "D200 · HR 200") e o valor ao vivo. A lista é montada sob demanda (`ListView.builder`) e só as linhas à vista ficam sendo lidas (`VisibleLiveTags` em `live_tags.dart`): com 2.000 variáveis, abrir a aba lê umas vinte, não o CLP inteiro. O ícone no topo abre **Criar várias** (4.6); o **ƒ** ao lado, o cadastro de **variável calculada** (§6.11). O cadastro cabe numa tela: equipamento (só aparece se houver mais de um), nome, o que é (liga/desliga, número inteiro, número com vírgula), onde fica (lê e grava / só leitura), endereço com − / + e "pode ser alterada pela tela". Escala, unidade, decimais, lista, formatos raros (INT16, 32 bits, texto), ordem de bytes e observação ficam em "Mais opções", que abre sozinho quando algum deles está em uso; fechado, o resumo mostra o que está valendo ("÷ 10 · °C · 1 decimais"). A escala tem atalhos — Sem escala, ÷ 10, ÷ 100, ÷ 1000, × 10 — e "Outra", que abre fator e soma. Escolher ÷ 100 já acerta as casas decimais para 2. Texto mostra à vista o tamanho em registradores ("8 = até 16 letras"). No topo, **Lendo agora do equipamento**: o endereço digitado é lido a cada segundo, pela mesma conexão da varredura. O painel fica **preso no topo** enquanto o formulário rola — é a resposta de cada campo mexido, inclusive da escala lá embaixo. Variável nova já vem com o equipamento da tela em montagem ou, fora do editor, com o último cadastrado.
 
 **Nada se perde calado** (etapa 4, EM-1 a EM-12). Voltar com alteração pendente — inclusive alarme recém-configurado — pergunta "Descartar alterações?" (Salvar · Descartar · Continuar editando); sem alteração, sai direto. Trocar o tipo avisa na hora os alarmes que deixam de valer (ficam guardados até o Salvar; voltando ao tipo, voltam) e os elementos que deixam de funcionar ("Usada em: Cortadora — operação (Medidor)"); se "Onde fica" muda junto, o campo acende por 2 s, e o "só leitura" se mantém. Sair de Texto devolve "Pode ser alterada pela tela" e o tamanho. O "Lendo agora" sugere com um toque **Inteiro com sinal** (sem sinal acima de 32767) e **palavras trocadas (CDAB)** quando um valor de 32 bits vem absurdo (NaN, acima de 10⁹, abaixo de 10⁻⁶), sem repetir ordem que já falhou. Endereço acima de 65535 tem erro próprio; hexadecimal (`0x2000`, `2000h`) é aceito e mostra "= 8192", e **Mais opções → Endereço em hexadecimal** dá o teclado com A–F. Bit de palavra pode vir de registrador de entrada (só leitura, FC04). Erro de validação abre "Mais opções" se preciso e rola até o campo. Decimais viram − / + (0 a 6) e a unidade ganha atalhos (°C, %, bar, rpm, m/min, A, V, Hz). Com 4 ou mais equipamentos, a escolha vira uma linha que abre a lista (busca a partir de 8). O bloco de endereço mora em `address_field.dart` (`AddressInput` + `AddressField`).
 
@@ -508,7 +529,7 @@ Na escolha de variável do editor, a lista é **agrupada por equipamento** (os q
 
 ### 6.7. Mais
 
-Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças.
+Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Dados: Registros (§6.10) e **Regras** (§6.11). Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças.
 
 ### 6.8. Alarmes
 
@@ -572,6 +593,50 @@ Mais → **Registros** (REQUISITOS-ETAPA4 §9.4, RG-1 a RG-6): variáveis gravad
 **Planilha** (`LogCsv`): a janela à vista, no jeito do Excel pt-BR — `;`, vírgula decimal, `dd/MM/aaaa HH:mm:ss` local, cabeçalho "Nome (unidade)", UTF-8 com BOM, lacuna = célula vazia, sem `sep=;` (o Excel ignoraria o BOM). Lida em páginas de 5.000 linhas, página grande formatada num isolate, enviada pelo `share_plus`.
 
 **Limite desta versão:** grava só com o app aberto (o histórico mostra o buraco). Com o serviço em primeiro plano basta o `DataLogger.pause` não pausar — ponto de extensão comentado lá.
+
+### 6.11. Cálculos e regras entre máquinas
+
+REQUISITOS-ETAPA4 §9.5. A regra de ouro do ROADMAP vale para tudo aqui: **o app nunca é função de segurança da máquina** — celular lendo por Wi-Fi tem latência sem limite (Wi-Fi caiu, app fechado, Android matou o processo) e não atende NR-12 nem ISO 13849. Isso está escrito no topo da página de regras e no termo do modo automático.
+
+**Variável calculada (LG-1 a LG-3).** O valor sai de uma conta com outras variáveis, de qualquer equipamento: "Rótulos por minuto = [Velocidade desejada] × 1000 ÷ [Comprimento do rótulo]". Lista de variáveis → ícone **ƒ** no topo → cadastro próprio (`calc_tag_form_page.dart`): nome, a conta e, preso no topo, o **Lendo agora** com o resultado ao vivo — as entradas da conta ficam sendo lidas enquanto o cadastro está aberto e cada letra refaz a conta. Debaixo do campo, **Variável** cita por toque (lista agrupada por equipamento, com o valor de agora e busca a partir de 8; sem digitar nome exato) e **Função ou sinal** traz as seis funções, cada uma com uma frase, e os sinais que o teclado do celular esconde (`calc_expression_field.dart`, usado também pela condição das regras). Alarme e narração como em qualquer variável; em Mais opções, unidade, casas e observação. É sempre só leitura: aparece em qualquer elemento (no botão e no ajuste, com o aviso de só leitura de sempre), tem alarme e entra no registro de dados. Na lista, o grupo "Cálculos" mostra a conta com os nomes de agora ("= [Velocidade] * 60").
+
+**A linguagem** (`lib/services/calc/calc_expression.dart`):
+
+| O quê | Como se escreve |
+|---|---|
+| Contas | `+ − × ÷ ( )` (também `-`, `*`, `/`) e o sinal de menos |
+| Comparações | `=  ≠  >  <  ≥  ≤` (também `<>`, `!=`, `>=`, `<=`, `==`) |
+| Lógica | `e`, `ou`, `não`; `verdadeiro`, `falso` |
+| Funções | `se(condição; se sim; se não)`, `mín(a; b; …)`, `máx(a; b; …)`, `abs(x)`, `arred(x; casas)`, `taxa([contador])` — sem diferenciar maiúscula e acento |
+| Números | vírgula decimal (`0,5`; ponto também vale); `;` separa os valores das funções, como no Excel em português |
+| Variáveis | `[Nome com espaço]`, `Nome` solto, `[Equipamento: Nome]` quando o nome se repete em dois equipamentos |
+
+Da ligação mais fraca para a mais forte: `ou` · `e` · `não` · comparação (uma por vez — `a < b < c` é recusado com "junte com e") · `+ −` · `× ÷` · sinal. Liga/desliga entra em conta como 1/0 e número vale como condição se for diferente de zero. Igualdade tem folga para o ponto flutuante (0,1 + 0,2 = 0,3). O tipo sai da conta: comparação e lógica dão liga/desliga; o resto, número com vírgula (`Tag.dataType` `bool` ou `float32`). `se`, `e` e `ou` só calculam o lado que decide.
+
+Avaliador próprio, sem `eval`, JavaScript nem `petitparser`: léxico → árvore por descida recursiva → conferência das variáveis e dos tipos → cálculo. Não há laço nem atribuição, então uma conta não trava o app. Erro em português, com o trecho (`CalcError.start/end`) marcado em vermelho debaixo do campo: "Falta fechar o parêntese", "Não existe variável "Temp"", "Nome com espaço vai entre colchetes: [Velocidade da faca]", "Separe os valores com ponto e vírgula (;)", "máx( ) compara 2 ou mais valores", "Há 2 variáveis "Temperatura" (Cortadora, Prensa): escreva [Cortadora: Temperatura]", "Compare dois valores de cada vez", texto e lista "não entram em conta". Divisão por zero na hora de calcular é erro ("divisão por zero"), nunca um número.
+
+**Texto canônico.** `Tag.calc` (`CalcSpec`) guarda a conta com `{id}` no lugar de cada citação, mais o nome de cada uma no dia em que foi salva. Renomear a entrada não quebra nada — a tela mostra o nome de agora (`CalcGraph.display`) —, e apagar dá "A variável "Temperatura" foi apagada" em vez de um id. **Sem círculo:** "A usa B que usa A" é recusado ao salvar, na hora em que é digitado ("A conta fica em círculo: Eficiência → Meta → Eficiência"; "A conta não pode usar a própria variável"); círculo vindo de arquivo editado à mão vira erro "a conta fica em círculo", não trava.
+
+**Taxa de contador.** `taxa([Rótulos cortados])` é quanto o contador sobe por hora (divida por 60 para por minuto), numa janela deslizante de 5 min (`RateTracker`): rápida para ver a máquina parar, lenta o bastante para uma máquina de 1 peça por minuto não pular entre 0 e 60/h. Precisa de 10 s de histórico antes de dar número ("calculando a taxa") e, se o contador voltar (zerou na troca de turno), recomeça a janela em vez de dar taxa negativa.
+
+**No motor: equipamento virtual.** As calculadas moram no equipamento `DeviceKind.calc` "Cálculos" (`CalcDevice`, id `calculos`), que nasce com a primeira calculada salva e não aparece em Equipamentos, no "Criar várias" nem na escolha de equipamento do cadastro de variável (`Project.equipment`). O `HmiRuntime` dá à sessão dele o `CalcDriver` no lugar da rede (`_newSession`); o resto do motor não muda — inscrição, pausa em segundo plano, "lendo agora" e escrita (recusada: "é calculada: só leitura") passam pelo caminho de sempre. Por que assim, e não um `Tag.calc` solto num equipamento qualquer: (1) as listas agrupadas por equipamento (variáveis, escolha do editor, registros) mostram o grupo "Cálculos" sem mudar nada; (2) alarme, narração e registro leem o `TagStore` e não sabem a diferença; (3) a calculada não depende de qual equipamento está em uso, e as contas de várias máquinas ficam juntas.
+
+- **Entradas em uso.** Calculada inscrita põe as entradas dela em uso também, em qualquer profundidade (`CalcGraph.expand` no `_refreshSessions`): a tela com "Eficiência" faz a cortadora ser lida; o que a conta não usa continua sem ler.
+- **Modo assinatura**, como o MQTT. O driver ouve as entradas no `TagStore`: entrada nova recalcula na hora (as que chegam no mesmo bloco de leitura viram uma conta só, numa microtarefa) e publica só o que mudou; a cada `pollMs` (500 ms) recalcula e publica tudo, para a taxa andar com o relógio e o registro ver leitura fresca. Calculada que cita calculada: ordem topológica (`CalcGraph.order`).
+- **Qualidade (LG-2)**, no `CalcEvaluator` — o mesmo código no motor, no "Lendo agora" e nas regras: entrada **sem comunicação** → calculada sem comunicação, com o último valor dela esmaecido ("sem comunicação com Cortadora de rótulos"), nunca uma conta com dado velho; entrada esperando a primeira leitura → esperando; entrada com erro → "erro na entrada "X"". O alarme de falta de comunicação de uma calculada com alarme é o do equipamento da entrada que caiu ("Sem comunicação com Cortadora de rótulos"), nunca "com Cálculos" (`AlarmEngine._lostDevice`).
+
+**Regras entre máquinas (LG-4 a LG-7).** Mais → **Regras**: "Quando [condição] durar [T s], então gravar [valor] em [variável]". A lista mostra, por regra, o que vigia, o que faz e como está agora (vigiando · condição presente, 4 de 10 s · agiu · parada: motivo · desligada), com a chave de ligar; o ícone do topo abre o histórico.
+
+| Requisito | Como ficou |
+|---|---|
+| LG-4 | Condição na mesma linguagem das calculadas (precisa dar liga/desliga), com o estado ao vivo no cadastro ("Agora: a condição está presente"); tempo Na hora · 5 s · 10 s · 30 s · 1 min · 5 min. Age **uma vez** por passagem e só volta a valer quando a condição some — nunca em laço. |
+| LG-5 | O destino precisa de "Aceita escrita por regra" (`Tag.ruleWritable`, em Mais opções do cadastro de variável). Escolher no cadastro da regra um destino sem a marca pergunta "Permitir que regras gravem em …?" antes de marcar. Sem a marca, a regra fica parada e vira alarme; tirar a marca com uma pergunta na tela retira a pergunta. |
+| LG-6 | Padrão **perguntar antes**: a pergunta ("Parar a cortadora?", "Grava DESLIGADO em "Liga máquina" (Cortadora de rótulos)", Ignorar · Desligar) aparece por cima de qualquer tela (`RuleProposalHost`, acima do Navigator, como a faixa de alarme), o celular vibra, e nada é gravado sem o toque. Condição que passa antes da resposta retira a pergunta. **Gravar sozinha** só depois do termo ("o app não é intertravamento de segurança…") e só para parar — valor desligado ou zero; regra que ligaria sempre pergunta, até vinda de arquivo editado à mão. |
+| LG-7 | Sem comunicação (na condição ou no destino), condição com erro ou destino sem permissão: a regra **não roda** (não conta tempo), a pergunta pendente sai e vira alarme médio "Regra "X" parada: motivo", que normaliza quando volta. App em segundo plano: nada roda, a pergunta pendente é retirada — gravar depois, com a situação já outra, seria pior que não gravar — e, na volta, se ficou parado 10 s ou mais, alarme baixo "As regras ficaram paradas 2 min: app em segundo plano". Automática que não conseguiu gravar também vira alarme. Todo disparo, pergunta, gravação, recusa, retirada e parada vai para o histórico (`historico-regras.json`, ao lado do projeto, últimos 300; do aparelho, não vai na exportação). |
+
+O `RuleEngine` (`lib/services/rules/`) segue o padrão do `AlarmEngine`: mantém inscritas as entradas das condições e os destinos das regras ligadas, em qualquer tela; avalia a cada entrada nova e a cada segundo (o tempo da condição); e levanta alarme pelo `AlarmEngine.raise/clear`, os alarmes que não vêm de variável. `main.dart` chama `pause`/`resume` no ciclo de vida.
+
+**Limite desta versão:** calculadas e regras só rodam com o app aberto, como alarmes e registro (o serviço em primeiro plano é a entrega separada da §9.6 dos requisitos). JavaScript continua fora (§1.2).
 
 ## 7. Tutoriais dentro do app
 
@@ -655,7 +720,7 @@ Corrigir uma tabela não muda sozinho o endereço das variáveis já criadas (el
 
 Desde a etapa 4 o motor é dividido em dois. A `DeviceSession` é dona do laço, da espera crescente depois de uma queda e da saúde da conexão — vale para todo protocolo. O que é de protocolo mora num **driver** (`lib/services/runtime/drivers/`), atrás do contrato `DeviceDriver`: `connect`, `scan` (lê as variáveis em uso e publica no `TagStore`), `readOnce`, `write`, `ping` e `tagsChanged`. Falha de comunicação sai como `CommError` (`lib/core/comm/`), que a sessão trata igual para todos: "sem comunicação" com o último valor esmaecido. Falha de uma variável só (endereço inexistente, pedido fora do limite) o driver resolve publicando a qualidade daquela variável.
 
-`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (Siemens S7, OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.16) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
+`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (Siemens S7, OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.16) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. O `CalcDriver` (§6.11) é o driver sem rede: lê o `TagStore` e publica o resultado das contas, e o `HmiRuntime` o entrega à sessão do equipamento virtual pelo `driverFactory`. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
 
 ### 10.4. Mudar o formato do arquivo
 
@@ -746,6 +811,12 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/models/profile_json_test.dart` | `Device.profile` e `Tag.memory` no JSON: ida e volta, ausentes no genérico, arquivo antigo, id de perfil desconhecido preservado, `schemaVersion` 1. |
 | `test/services/tag_batch_test.dart` | Criar várias: faixa (contagem, nomes, passo de 32 bits, octal, contador de 32 bits, buraco entre trechos, par de 32 bits), limites 256/1000, leituras por ciclo, conflitos pular/substituir, parâmetros e modelos de inversor; CSV (separadores, aspas, BOM, Latin-1, cabeçalho opcional, erro por linha, contato × valor); `saveTags` com um aviso e uma gravação. |
 | `test/widgets/bulk_tags_test.dart` | Criar várias pela interface (faixa em 32 bits, prévia, criar e substituir; X8 recusado; CSV com linha ruim), marca e modelo no equipamento com recalcular endereços, lista com 2.000 variáveis montando e lendo só as visíveis e rolando até a última. |
+| `test/services/calc_expression_test.dart` | Linguagem das calculadas: tabela de precedência e associatividade (vírgula decimal, × ÷ −, ≥ ≠, e/ou/não), funções, variáveis pelo nome (solto, colchete, sem acento, [Equipamento: Nome]), tipo do resultado, divisão por zero; erros com o trecho exato (parêntese, colchete, valor e sinal que faltam, variável que não existe, nome com espaço, nome repetido, texto e lista, função desconhecida, partes erradas, vírgula no lugar de ";", comparação encadeada); texto canônico, renomear e apagar; círculo, ordem e entradas em qualquer profundidade; taxa de contador (janela, zerou, pouco histórico); qualidade das entradas (sem comunicação com o último valor, esperando, erro). |
+| `test/runtime/calc_runtime_test.dart` | Calculadas pelo caminho de produção com a máquina de demonstração: calculada em uso põe as entradas em uso e acompanha a gravação de uma delas; calculada de calculada; alarme numa calculada; entrada sem comunicação → calculada sem comunicação com o último valor e alarme do equipamento de verdade, voltando depois; só leitura e "lendo agora"; círculo de arquivo; entrada apagada. |
+| `test/models/calc_json_test.dart` | `Tag.calc`, `ruleWritable`, equipamento `calc` e `LogicRule` no arquivo: ida e volta, padrões fora do arquivo, normalização (calculada só leitura; automática que ligaria volta a propor; modo desconhecido), projeto antigo igual byte a byte, projeto com calculada e regra. |
+| `test/widgets/calc_form_test.dart` | Cadastro de calculada: citar por toque com busca, resultado ao vivo, erro com o trecho, função com o cursor dentro, salvar (equipamento virtual nasce), grupo "Cálculos" na lista com a conta e o valor, fora de Equipamentos; editar com o nome de agora, círculo recusado, resultado liga/desliga; calculada num elemento de tela; descartar alterações. |
+| `test/runtime/rule_engine_test.dart` | Regras com relógio simulado (`fake_async`) sobre o caminho de produção: propõe só depois do tempo, confirmar grava, uma vez por passagem, ignorar não grava, condição que passa retira a pergunta; destino sem permissão recusado e em alarme, marcado volta a valer, permissão tirada retira a pergunta; automático só para parar; sem comunicação não roda e vira alarme; segundo plano retira a pergunta, nada grava e avisa na volta. |
+| `test/widgets/rules_page_test.dart` | Regras pela interface: aviso de segurança, condição ao vivo, destino pede permissão, automático pede termo e recusa "Ligar", pergunta aparece em outra tela só depois do tempo e grava com o toque, histórico; regra parada na lista e chave de ligar; "Aceita escrita por regra" no cadastro de variável e marca preservada ao salvar outra coisa. |
 
 Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstração e animações avançam por passos, sem depender da velocidade da máquina. Toque que não acerta o alvo é falha, não aviso (`hitTestWarningShouldBeFatal`). Eles já pegaram seis defeitos reais antes do aparelho: quatro transbordos de layout (cartão de tela, legenda do gráfico, lâmpada estreita em dois tamanhos), leitura publicando depois do encerramento e toque sem retorno em tela só acompanhamento.
 
@@ -754,7 +825,7 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Etapa 3 — Play Store:** conta de desenvolvedor da Celiware, chave de upload, ficha da loja. Roteiro em `docs/PUBLICACAO.md`.
 - **Perfis de fabricante:** validar em bancada (Inovance H3U/H5U primeiro, o manual da série H não foi aberto).
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
-- **Ideias registradas:** variável calculada/script (só se aparecer caso que a escala linear não cobre), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
+- **Ideias registradas:** script livre na variável (as calculadas da §6.11 cobrem as contas; JavaScript segue fora), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.
 - **Alarme e registro com o app fechado:** serviço em primeiro plano + notificação do Android (hoje alarmes, voz e registros só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.
 - **Próximas fases do visual:** faixa de status no topo da operação, miniatura real das telas, tablet com barra lateral, comando em 3 fases visíveis.

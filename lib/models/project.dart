@@ -1,6 +1,7 @@
 import 'device.dart';
 import 'hmi_screen.dart';
 import 'log_group.dart';
+import 'logic_rule.dart';
 import 'tag.dart';
 
 /// O projeto inteiro: equipamentos, variáveis e telas.
@@ -19,6 +20,7 @@ class Project {
     this.tags = const [],
     this.screens = const [],
     this.logGroups = const [],
+    this.rules = const [],
   });
 
   static const int schemaVersion = 1;
@@ -32,12 +34,20 @@ class Project {
   /// projeto; o histórico gravado é do aparelho.
   final List<LogGroup> logGroups;
 
+  /// Regras entre máquinas (Mais → Regras, LG-4 a LG-7).
+  final List<LogicRule> rules;
+
   bool get isEmpty => devices.isEmpty && tags.isEmpty && screens.isEmpty;
+
+  /// Os equipamentos de verdade — sem o virtual das calculadas
+  /// (`CalcDevice`), que não se cadastra nem recebe variável com endereço.
+  List<Device> get equipment => devices.where((d) => !d.isCalc).toList();
 
   Device? device(String id) => _firstWhere(devices, (d) => d.id == id);
   Tag? tag(String id) => _firstWhere(tags, (t) => t.id == id);
   HmiScreen? screen(String id) => _firstWhere(screens, (s) => s.id == id);
   LogGroup? logGroup(String id) => _firstWhere(logGroups, (g) => g.id == id);
+  LogicRule? rule(String id) => _firstWhere(rules, (r) => r.id == id);
 
   List<Tag> tagsOf(String deviceId) =>
       tags.where((t) => t.deviceId == deviceId).toList();
@@ -52,6 +62,7 @@ class Project {
     List<Tag>? tags,
     List<HmiScreen>? screens,
     List<LogGroup>? logGroups,
+    List<LogicRule>? rules,
   }) =>
       Project(
         name: name ?? this.name,
@@ -59,6 +70,7 @@ class Project {
         tags: tags ?? this.tags,
         screens: screens ?? this.screens,
         logGroups: logGroups ?? this.logGroups,
+        rules: rules ?? this.rules,
       );
 
   // ── Edições (sempre devolvem um projeto novo) ────────────────────────────────
@@ -97,6 +109,8 @@ class Project {
   Project removeScreen(String id) => copyWith(screens: screens.where((s) => s.id != id).toList());
   Project upsertLogGroup(LogGroup g) => copyWith(logGroups: _upsert(logGroups, g.normalized(), (x) => x.id));
   Project removeLogGroup(String id) => copyWith(logGroups: logGroups.where((g) => g.id != id).toList());
+  Project upsertRule(LogicRule r) => copyWith(rules: _upsert(rules, r.normalized(), (x) => x.id));
+  Project removeRule(String id) => copyWith(rules: rules.where((r) => r.id != id).toList());
 
   Map<String, dynamic> toJson() => {
         'format': 'celiware-ihm',
@@ -107,6 +121,8 @@ class Project {
         'screens': [for (final s in screens) s.toJson()],
         // Só quando há algum: projeto sem registro fica igual ao da 1.3.
         if (logGroups.isNotEmpty) 'logGroups': [for (final g in logGroups) g.toJson()],
+        // Idem: projeto sem regra fica igual ao de antes.
+        if (rules.isNotEmpty) 'rules': [for (final r in rules) r.toJson()],
       };
 
   factory Project.fromJson(Map<String, dynamic> j) => Project(
@@ -126,6 +142,10 @@ class Project {
         logGroups: [
           for (final g in (j['logGroups'] as List? ?? const []))
             if (g is Map) LogGroup.fromJson(Map<String, dynamic>.from(g)),
+        ],
+        rules: [
+          for (final r in (j['rules'] as List? ?? const []))
+            if (r is Map && r['id'] is String) LogicRule.fromJson(Map<String, dynamic>.from(r)),
         ],
       );
 

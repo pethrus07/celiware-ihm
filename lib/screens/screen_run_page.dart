@@ -5,6 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../models/device.dart';
 import '../models/hmi_screen.dart';
 import '../models/project.dart';
+import '../services/calc/calc_graph.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/hmi_canvas.dart';
 import '../widgets/hmi/live_tags.dart';
@@ -59,8 +60,12 @@ class _ScreenRunPageState extends State<ScreenRunPage> {
       return Scaffold(appBar: AppBar(), body: const EmptyState(icon: Icons.search_off_rounded, title: 'Tela não encontrada', body: 'Ela pode ter sido apagada.'));
     }
 
+    // Calculada mostra o selo dos equipamentos das entradas, não o de "Cálculos".
     final devices = <Device>[
-      for (final id in {for (final t in screen.tagIds) project.tag(t)?.deviceId}.whereType<String>())
+      for (final id in {
+        for (final t in screen.tagIds)
+          if (project.tag(t) case final tag?) ...CalcGraph.devicesOf(project, tag),
+      })
         ?project.device(id),
     ];
 

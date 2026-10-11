@@ -9,9 +9,11 @@ import '../../core/modbus/modbus_exception.dart';
 import '../../models/device.dart';
 import '../../models/project.dart';
 import '../../models/tag.dart';
+import '../calc/calc_graph.dart';
 import '../demo/demo_process.dart';
 import '../net/local_network.dart';
 import 'device_session.dart';
+import 'drivers/calc_driver.dart';
 import 'drivers/device_driver.dart';
 import 'tag_codec.dart';
 import 'tag_store.dart';
@@ -158,7 +160,8 @@ class HmiRuntime {
     // pode recriar sessão num runtime já descartado.
     if (_disposed) return;
     final byDevice = <String, List<Tag>>{};
-    for (final id in _refs.keys) {
+    // Calculada em uso põe as entradas dela em uso também (§6.11).
+    for (final id in CalcGraph.expand(_project, _refs.keys)) {
       final tag = _project.tag(id);
       if (tag == null) {
         store.publish(id, const TagReading(quality: TagQuality.configError, message: 'variável apagada'));
@@ -176,7 +179,7 @@ class HmiRuntime {
       var session = _sessions[d.id];
       if (session == null && tags.isEmpty) continue;
       if (session == null) {
-        session = _sessions[d.id] = DeviceSession(device: d, store: store, clientFactory: _clientFactory);
+        session = _sessions[d.id] = _newSession(d);
         _sessionsRevision.value++;
       }
       session.setTags(tags);
@@ -253,11 +256,20 @@ class HmiRuntime {
     if (device == null) throw const TagValueError('Equipamento não encontrado');
     var s = _sessions[device.id];
     if (s == null) {
-      s = _sessions[device.id] = DeviceSession(device: device, store: store, clientFactory: _clientFactory);
+      s = _sessions[device.id] = _newSession(device);
       _sessionsRevision.value++;
     }
     return s;
   }
+
+  /// Sessão nova. O equipamento das calculadas ganha o [CalcDriver], que lê
+  /// o projeto e o [TagStore] em vez da rede.
+  DeviceSession _newSession(Device d) => DeviceSession(
+        device: d,
+        store: store,
+        clientFactory: _clientFactory,
+        driverFactory: d.isCalc ? (_) => CalcDriver(store: store, project: () => _project) : null,
+      );
 
   // ── Ciclo de vida do app ─────────────────────────────────────────────────────
 

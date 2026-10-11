@@ -9,7 +9,9 @@ import 'app/appearance.dart';
 import 'services/alarms/alarm_engine.dart';
 import 'services/logging/data_logger.dart';
 import 'services/logging/log_store.dart';
+import 'services/rules/rule_engine.dart';
 import 'widgets/alarms/alarm_widgets.dart';
+import 'widgets/rules/rule_proposal_host.dart';
 import 'app/project_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/shell.dart';
@@ -59,6 +61,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
   late final AlarmEngine _alarms;
   late final VoiceAnnouncer _voice;
   late final DataLogger _logger;
+  late final RuleEngine _rules;
 
   /// Navegação a partir da faixa de alarme (que fica acima do Navigator).
   final _navigator = GlobalKey<NavigatorState>();
@@ -80,6 +83,13 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
     );
     // Registro de dados: banco por grupo em `registros/`, ao lado do projeto.
     _logger = DataLogger(controller: widget.controller, runtime: widget.runtime, store: LogStore.beside(widget.controller.repository));
+    // Regras entre máquinas: propõem em qualquer tela; parada vira alarme.
+    _rules = RuleEngine(
+      controller: widget.controller,
+      runtime: widget.runtime,
+      alarms: _alarms,
+      historyFile: () => widget.controller.repository.sidecar('historico-regras.json'),
+    );
     WidgetsBinding.instance.addObserver(this);
     AppearanceController.instance.addListener(_applyAppearance);
     _applySystemBars();
@@ -90,6 +100,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
     AppearanceController.instance.removeListener(_applyAppearance);
     WidgetsBinding.instance.removeObserver(this);
     _voice.dispose();
+    _rules.dispose();
     _alarms.dispose();
     _logger.dispose();
     super.dispose();
@@ -137,10 +148,14 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
         _voice.pause();
         // O registro descarrega o lote e marca a lacuna (§6.10).
         unawaited(_logger.pause());
+        // Regras param: proposta pendente sai, nada é gravado depois (§6.11).
+        _rules.pause();
+        unawaited(_rules.flush());
       case AppLifecycleState.resumed:
         widget.runtime.resume();
         _voice.resume();
         _logger.resume();
+        _rules.resume();
       default:
         break;
     }
@@ -154,6 +169,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
       alarms: _alarms,
       voice: _voice,
       logger: _logger,
+      rules: _rules,
       child: MaterialApp(
         title: 'Ware IoT',
         debugShowCheckedModeBanner: false,
@@ -162,7 +178,8 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
         navigatorObservers: [AlarmBannerHost.observer],
         // Faixa de alarme acima de TODAS as telas: alarme só na tela que
         // ninguém está olhando não é alarme (ISA-18.2 §11.3.4).
-        builder: (context, child) => AlarmBannerHost(navigator: _navigator, child: child ?? const SizedBox()),
+        // A pergunta de uma regra ("Parar a prensa?") também, embaixo.
+        builder: (context, child) => AlarmBannerHost(navigator: _navigator, child: RuleProposalHost(rules: _rules, child: child ?? const SizedBox())),
         home: const Shell(),
       ),
     );

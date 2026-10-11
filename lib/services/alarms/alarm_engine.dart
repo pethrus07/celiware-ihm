@@ -9,6 +9,7 @@ import 'package:logging/logging.dart';
 import '../../app/project_controller.dart';
 import '../../models/alarm.dart';
 import '../../models/tag.dart';
+import '../calc/calc_graph.dart';
 import '../runtime/hmi_runtime.dart';
 import '../runtime/tag_codec.dart';
 import '../runtime/tag_store.dart';
@@ -274,6 +275,29 @@ class AlarmEngine extends ChangeNotifier {
     _changed();
   }
 
+  // ── Alarmes de fora das variáveis ───────────────────────────────────────────
+
+  /// Chaves de alarmes que não vêm de variável — regra entre máquinas que não
+  /// pode rodar (LG-7). Valem até alguém reconhecer.
+  final Set<String> _external = {};
+
+  /// Levanta um alarme que não vem de variável (regra parada por falta de
+  /// comunicação, app em segundo plano). Com ele já ativo, não faz nada.
+  void raise(String key, {required AlarmPriority priority, required String message}) {
+    if (_disposed) return;
+    _external.add(key);
+    if (_entries[key]?.phase.active == true) return;
+    _activate(AlarmEntry(key: key, priority: priority, message: message, phase: AlarmPhase.activeUnack, since: clock.now()));
+    _changed();
+  }
+
+  /// A causa do alarme de fora sumiu: normaliza (não reconhecido fica na
+  /// lista como "voltou ao normal", como os outros).
+  void clear(String key) {
+    if (_disposed) return;
+    if (_entries[key]?.phase.active == true && _normalize(key)) _changed();
+  }
+
   // ── Vigiar ──────────────────────────────────────────────────────────────────
 
   /// Projeto mudou: refaz a lista de variáveis vigiadas e tira da lista
@@ -302,8 +326,11 @@ class AlarmEngine extends ChangeNotifier {
     final valid = <String>{
       for (final t in project.tags)
         for (final r in t.alarms) _ruleKey(t.id, r.id),
+      // Calculada: a falta de comunicação é a dos equipamentos das entradas.
       for (final t in project.tags)
-        if (t.alarms.isNotEmpty) 'com:${t.deviceId}',
+        if (t.alarms.isNotEmpty)
+          for (final d in t.calc == null ? {t.deviceId} : CalcGraph.devicesOf(project, t)) 'com:$d',
+      ..._external,
     };
     final before = _entries.length;
     _entries.removeWhere((k, _) => !valid.contains(k));
@@ -325,26 +352,30 @@ class AlarmEngine extends ChangeNotifier {
     var changed = false;
 
     // Sem comunicação: os alarmes da variável ficam como estão (não dá para
-    // saber se normalizou) e o equipamento ganha um alarme próprio.
-    final commKey = 'com:${tag.deviceId}';
+    // saber se normalizou) e o equipamento ganha um alarme próprio — numa
+    // calculada, o equipamento da entrada que caiu.
     if (reading.quality == TagQuality.commLost) {
+      final lost = _lostDevice(tag);
+      final commKey = 'com:$lost';
       if (!_entries.containsKey(commKey)) {
-        final device = controller.project.device(tag.deviceId);
+        final device = controller.project.device(lost);
         _activate(AlarmEntry(
           key: commKey,
           priority: AlarmPriority.medium,
           message: 'Sem comunicação com ${device?.name ?? 'o equipamento'}',
           phase: AlarmPhase.activeUnack,
           since: now,
-          deviceId: tag.deviceId,
+          deviceId: lost,
         ));
         changed = true;
       }
       if (changed) _changed();
       return;
     }
-    if (reading.quality == TagQuality.good && _entries[commKey]?.phase.active == true) {
-      changed |= _normalize(commKey);
+    if (reading.quality == TagQuality.good) {
+      for (final d in tag.calc == null ? {tag.deviceId} : CalcGraph.devicesOf(controller.project, tag)) {
+        if (_entries['com:$d']?.phase.active == true) changed |= _normalize('com:$d');
+      }
     }
     if (reading.quality != TagQuality.good) {
       if (changed) _changed();
@@ -379,6 +410,18 @@ class AlarmEngine extends ChangeNotifier {
       }
     }
     if (changed) _changed();
+  }
+
+  /// O equipamento cuja queda derrubou a leitura: o da variável ou, numa
+  /// calculada, o da primeira entrada sem comunicação.
+  String _lostDevice(Tag tag) {
+    if (tag.calc == null) return tag.deviceId;
+    final project = controller.project;
+    for (final id in CalcGraph.expand(project, [tag.id])) {
+      final t = project.tag(id);
+      if (t != null && t.calc == null && runtime.watch(id).value.quality == TagQuality.commLost) return t.deviceId;
+    }
+    return tag.deviceId;
   }
 
   void _activate(AlarmEntry e) {

@@ -148,6 +148,15 @@ class HmiScreen {
   /// de toque de 48 dp mesmo no menor elemento (1×1).
   static const int defaultColumns = 6;
 
+  /// Grade fina: cada célula da normal vira 2×2 (mais variáveis por tela e
+  /// encaixe mais preciso). Ver [withColumns].
+  static const int fineColumns = 12;
+
+  /// Quantas células finas cabem numa normal, por lado (1 ou 2).
+  static int scaleOf(int columns) => columns >= fineColumns ? 2 : 1;
+
+  bool get fine => columns >= fineColumns;
+
   final String id;
   final String name;
   final int columns;
@@ -183,6 +192,27 @@ class HmiScreen {
         elements: elements ?? this.elements,
       );
 
+  /// A mesma tela em outra grade, **sem mover nada na tela**: 6 → 12
+  /// multiplica posição e tamanho por 2. 12 → 6 só se todos forem pares —
+  /// senão devolve nulo (algum elemento ficaria em meia célula).
+  HmiScreen? withColumns(int target) {
+    if (target == columns) return this;
+    if (columns == defaultColumns && target == fineColumns) {
+      return copyWith(columns: target, elements: [
+        for (final e in elements) e.copyWith(x: e.x * 2, y: e.y * 2, w: e.w * 2, h: e.h * 2),
+      ]);
+    }
+    if (columns == fineColumns && target == defaultColumns) {
+      if (elements.any((e) => e.x.isOdd || e.y.isOdd || e.w.isOdd || e.h.isOdd)) return null;
+      return copyWith(columns: target, elements: [
+        for (final e in elements) e.copyWith(x: e.x ~/ 2, y: e.y ~/ 2, w: e.w ~/ 2, h: e.h ~/ 2),
+      ]);
+    }
+    return null;
+  }
+
+  /// Elementos que impedem voltar para a grade normal.
+  int get oddElements => elements.where((e) => e.x.isOdd || e.y.isOdd || e.w.isOdd || e.h.isOdd).length;
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,

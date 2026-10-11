@@ -74,8 +74,7 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
   Future<void> _add(HmiScreen screen) async {
     final type = await PaletteSheet.show(context);
     if (type == null || !mounted) return;
-    final info = ElementCatalog.of(type);
-    final w = info.defaultW.clamp(info.minW, screen.columns), h = info.defaultH;
+    final (w, h) = ElementCatalog.defaultSize(type, screen.columns);
     final (x, y) = _freeSpot(screen, w, h);
     final e = HmiElement(id: newId('e'), type: type, x: x, y: y, w: w, h: h, props: ElementCatalog.defaultProps(type));
     _save(screen.copyWith(elements: [...screen.elements, e]));
@@ -264,6 +263,33 @@ class _ScreenSettingsSheet extends StatelessWidget {
                 if (v.trim().isNotEmpty) c.saveScreen(s.copyWith(name: v.trim()));
               },
             ),
+            const SizedBox(height: 16),
+            // Grade fina: mais variáveis por tela e encaixe mais preciso. A troca
+            // não mexe em nada na tela (ver HmiScreen.withColumns).
+            Text('Grade', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            SegmentedButton<int>(
+              key: const ValueKey('grade-da-tela'),
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: HmiScreen.defaultColumns, label: Text('Normal'), icon: Icon(Icons.grid_view_rounded)),
+                ButtonSegment(value: HmiScreen.fineColumns, label: Text('Fina'), icon: Icon(Icons.apps_rounded)),
+              ],
+              selected: {s.fine ? HmiScreen.fineColumns : HmiScreen.defaultColumns},
+              onSelectionChanged: (sel) {
+                final next = s.withColumns(sel.first);
+                if (next != null) {
+                  c.saveScreen(next);
+                } else {
+                  final n = s.oddElements;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('$n elemento${n == 1 ? '' : 's'} usa${n == 1 ? '' : 'm'} meia célula da grade normal. Ajuste o tamanho ou a posição para voltar.')));
+                }
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(s.fine ? 'Cabe o dobro de elementos em cada direção. Bom para telas com muitas variáveis.' : 'Elementos maiores, fáceis de tocar.',
+                style: TextStyle(color: Ind.textMuted, fontSize: 13)),
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

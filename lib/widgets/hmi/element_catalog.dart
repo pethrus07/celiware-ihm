@@ -126,6 +126,40 @@ class ElementInfo {
 class ElementCatalog {
   ElementCatalog._();
 
+  /// Tamanho inicial em células da grade de [columns] colunas. A ficha está
+  /// em células da grade normal (6); na fina (12) tudo dobra, para o
+  /// elemento nascer com o mesmo tamanho na tela.
+  static (int, int) defaultSize(ElementType type, int columns) {
+    final info = of(type);
+    final k = HmiScreen.scaleOf(columns);
+    final (mw, _) = minSize(type, columns);
+    return ((info.defaultW * k).clamp(mw, columns), info.defaultH * k);
+  }
+
+  /// Posição e tamanho aceitos: dentro da grade, acima do mínimo e sem
+  /// sobrepor outro elemento. O arrasto do editor e os botões de ajuste usam
+  /// a mesma regra.
+  static bool fits(HmiScreen screen, HmiElement c) {
+    if (c.x < 0 || c.y < 0 || c.right > screen.columns) return false;
+    final (minW, minH) = minSize(c.type, screen.columns);
+    if (c.w < minW || c.h < minH) return false;
+    return !screen.elements.any((o) => o.id != c.id && o.overlaps(c));
+  }
+
+  /// Menor tamanho aceito. Na grade fina o mínimo dobra — exceto a altura de
+  /// quem cabe numa linha só (valor, lâmpada, indicador, texto), que pode
+  /// descer a uma célula fina para caber mais variáveis por tela. Quem grava
+  /// (botão, ajuste) nunca desce de 2×2 na fina: ~60 dp, acima dos 48 dp de
+  /// alvo de toque.
+  static (int, int) minSize(ElementType type, int columns) {
+    final info = of(type);
+    final k = HmiScreen.scaleOf(columns);
+    if (k == 1) return (info.minW, info.minH);
+    final oneLine = !info.writes &&
+        (type == ElementType.value || type == ElementType.lamp || type == ElementType.multistate || type == ElementType.label);
+    return (info.minW * k, oneLine ? 1 : info.minH * k);
+  }
+
   static const List<ElementInfo> all = [
     ElementInfo(
       type: ElementType.button,

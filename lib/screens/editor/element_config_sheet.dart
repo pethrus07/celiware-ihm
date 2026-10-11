@@ -306,6 +306,14 @@ class ElementConfigSheet extends StatelessWidget {
         onChanged: (id) => set('goTo', id),
       ));
     }
+
+    // ── Posição e tamanho ── (ajuste fino sem arrastar: na grade fina a célula
+    // tem ~30 dp e o arrasto fica impreciso). Recolhido: quase nunca precisa.
+    final screen = project.screen(screenId);
+    if (screen != null) {
+      w.add(const SizedBox(height: 20));
+      w.add(_GeometryEditor(screen: screen, element: e, onChanged: save));
+    }
     return w;
   }
 
@@ -992,4 +1000,60 @@ class _Hint extends StatelessWidget {
           Expanded(child: Text(text, style: const TextStyle(height: 1.35))),
         ]),
       );
+}
+
+/// Mover e redimensionar com toques (−/+ e setas), sempre dentro da grade e
+/// sem sobrepor outro elemento — a mesma regra do arrasto.
+class _GeometryEditor extends StatelessWidget {
+  const _GeometryEditor({required this.screen, required this.element, required this.onChanged});
+  final HmiScreen screen;
+  final HmiElement element;
+  final void Function(HmiElement) onChanged;
+
+  void _try(HmiElement next) {
+    if (ElementCatalog.fits(screen, next)) onChanged(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final e = element;
+    Widget step(String label, int value, HmiElement Function(int delta) change, String key) => Row(children: [
+          Expanded(child: Text(label, style: TextStyle(color: Ind.textDim))),
+          IconButton.outlined(key: ValueKey('$key-menos'), onPressed: ElementCatalog.fits(screen, change(-1)) ? () => _try(change(-1)) : null, icon: const Icon(Icons.remove_rounded)),
+          SizedBox(width: 44, child: Text('$value', textAlign: TextAlign.center, style: Ind.number(18))),
+          IconButton.outlined(key: ValueKey('$key-mais'), onPressed: ElementCatalog.fits(screen, change(1)) ? () => _try(change(1)) : null, icon: const Icon(Icons.add_rounded)),
+        ]);
+    Widget arrow(IconData icon, int dx, int dy, String key) {
+      final next = e.copyWith(x: e.x + dx, y: e.y + dy);
+      return IconButton.outlined(key: ValueKey(key), onPressed: ElementCatalog.fits(screen, next) ? () => _try(next) : null, icon: Icon(icon));
+    }
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: const ValueKey('posicao-e-tamanho'),
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        title: const Text('Posição e tamanho'),
+        subtitle: Text('${e.w} × ${e.h} células · coluna ${e.x + 1}, linha ${e.y + 1}', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+        children: [
+          step('Largura', e.w, (d) => e.copyWith(w: e.w + d), 'largura'),
+          const SizedBox(height: 8),
+          step('Altura', e.h, (d) => e.copyWith(h: e.h + d), 'altura'),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: Text('Mover', style: TextStyle(color: Ind.textDim))),
+            arrow(Icons.arrow_back_rounded, -1, 0, 'mover-esquerda'),
+            const SizedBox(width: 6),
+            arrow(Icons.arrow_upward_rounded, 0, -1, 'mover-cima'),
+            const SizedBox(width: 6),
+            arrow(Icons.arrow_downward_rounded, 0, 1, 'mover-baixo'),
+            const SizedBox(width: 6),
+            arrow(Icons.arrow_forward_rounded, 1, 0, 'mover-direita'),
+          ]),
+        ],
+      ),
+    );
+  }
 }

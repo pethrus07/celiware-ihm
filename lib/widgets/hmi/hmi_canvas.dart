@@ -94,13 +94,22 @@ class HmiCanvas extends StatelessWidget {
   final EdgeInsets padding;
 
   /// Respiro entre elementos. Com 6 px a tela parecia um bloco só; 12 separa
-  /// cada elemento sem desperdiçar a célula.
+  /// cada elemento sem desperdiçar a célula. Na grade fina a célula é a
+  /// metade, então o respiro acompanha (20% da célula, entre 4 e 12).
   static const double gap = 12;
+  static double gapFor(double cell) => (cell * 0.2).clamp(4.0, gap);
 
-  /// Maior célula aceita (dp). Sem teto, a célula cresce com a largura: no
-  /// celular deitado ou no tablet cabiam só dois elementos gigantes na tela.
-  /// 96 dp dá, num tablet, a mesma tela do celular 1,5× maior e centralizada.
+  /// Maior célula aceita (dp) na grade normal. Sem teto, a célula cresce com a
+  /// largura: no celular deitado ou no tablet cabiam só dois elementos
+  /// gigantes na tela. 96 dp dá, num tablet, a mesma tela do celular 1,5×
+  /// maior e centralizada.
   static const double maxCell = 96;
+
+  /// Na grade fina o teto é a largura (até 1.200 dp): é a grade de quem quer
+  /// muita variável, e no tablet ela usa a tela inteira.
+  static const double maxFineWidth = 1200;
+
+  static double maxCellFor(int columns) => columns >= HmiScreen.fineColumns ? maxFineWidth / columns : maxCell;
 
   @override
   Widget build(BuildContext context) {
@@ -114,8 +123,10 @@ class HmiCanvas extends StatelessWidget {
         // Segundo teto, pela altura: celular deitado tem ~290 dp úteis, e com
         // 96 dp por célula só apareciam duas linhas e meia. Pelo menos ~4,5
         // linhas à vista; tablet e celular em pé nem chegam nesse limite.
-        final byHeight = box.maxHeight.isFinite ? math.max(56.0, box.maxHeight / 4.5) : maxCell;
-        final cell = math.min(math.min(available / screen.columns, maxCell), byHeight);
+        final k = HmiScreen.scaleOf(screen.columns);
+        final byHeight = box.maxHeight.isFinite ? math.max(56.0 / k, box.maxHeight / (4.5 * k)) : maxCellFor(screen.columns);
+        final cell = math.min(math.min(available / screen.columns, maxCellFor(screen.columns)), byHeight);
+        final g = gapFor(cell);
         final width = cell * screen.columns;
         final rows = math.max(screen.rows + (editMode ? 4 : 0), editMode ? 8 : 1);
         final height = rows * cell;
@@ -148,6 +159,7 @@ class HmiCanvas extends StatelessWidget {
                           element: e,
                           screen: screen,
                           cell: cell,
+                          gap: g,
                           selected: e.id == selectedId,
                           onSelect: () => onSelect?.call(e.id),
                           onChanged: onChanged,
@@ -155,10 +167,10 @@ class HmiCanvas extends StatelessWidget {
                         )
                       : Positioned(
                           key: ValueKey('el-${e.id}'),
-                          left: e.x * cell + gap / 2,
-                          top: e.y * cell + gap / 2,
-                          width: e.w * cell - gap,
-                          height: e.h * cell - gap,
+                          left: e.x * cell + g / 2,
+                          top: e.y * cell + g / 2,
+                          width: e.w * cell - g,
+                          height: e.h * cell - g,
                           // Uma camada por elemento: o valor que muda redesenha só
                           // o próprio cartão, não a tela (sombras e bordas saem de cache).
                           child: RepaintBoundary(child: KeyedSubtree(key: keyFor?.call(e), child: _Linked(element: e, onNavigate: onNavigate))),
@@ -210,6 +222,7 @@ class _EditableElement extends StatefulWidget {
     required this.element,
     required this.screen,
     required this.cell,
+    required this.gap,
     required this.selected,
     required this.onSelect,
     required this.onChanged,
@@ -219,6 +232,7 @@ class _EditableElement extends StatefulWidget {
   final HmiElement element;
   final HmiScreen screen;
   final double cell;
+  final double gap;
   final bool selected;
   final VoidCallback onSelect;
   final ValueChanged<HmiElement>? onChanged;
@@ -236,12 +250,7 @@ class _EditableElementState extends State<_EditableElement> {
   HmiElement get e => widget.element;
 
   /// Posição/tamanho aceitos: dentro da grade e sem sobrepor ninguém.
-  bool _fits(HmiElement c) {
-    if (c.x < 0 || c.y < 0 || c.right > widget.screen.columns) return false;
-    final info = ElementCatalog.of(c.type);
-    if (c.w < info.minW || c.h < info.minH) return false;
-    return !widget.screen.elements.any((o) => o.id != c.id && o.overlaps(c));
-  }
+  bool _fits(HmiElement c) => ElementCatalog.fits(widget.screen, c);
 
   void _moveBy(Offset delta) {
     _drag += delta;
@@ -270,7 +279,7 @@ class _EditableElementState extends State<_EditableElement> {
   @override
   Widget build(BuildContext context) {
     final cell = widget.cell;
-    const g = HmiCanvas.gap;
+    final g = widget.gap;
     final sel = widget.selected;
 
     final body = Container(

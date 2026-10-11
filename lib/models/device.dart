@@ -1,6 +1,7 @@
 // Equipamento: onde os dados moram.
 
 import '../core/modbus/modbus_framing.dart';
+import 'mqtt_config.dart';
 
 /// Como o app chega até o equipamento.
 enum DeviceKind {
@@ -11,6 +12,11 @@ enum DeviceKind {
   /// inversor na linha RS-485 do outro lado. O envelope (RTU ou ASCII) fica em
   /// [Device.framing].
   modbusRtuTcp,
+
+  /// Equipamento que publica num broker MQTT da rede local (Mosquitto,
+  /// Node-RED, CLP ou ESP32 com MQTT). Host e porta são os do broker; o resto
+  /// fica em [Device.mqtt].
+  mqtt,
 
   /// Máquina simulada dentro do próprio app — modo demonstração. Tem um
   /// "programa" rodando (ver [DemoProcess]) para os valores se mexerem.
@@ -24,6 +30,8 @@ extension DeviceKindMeta on DeviceKind {
         return 'Equipamento na rede (Modbus TCP)';
       case DeviceKind.modbusRtuTcp:
         return 'Gateway RS-485 (Modbus RTU/ASCII sobre TCP)';
+      case DeviceKind.mqtt:
+        return 'Equipamento num broker MQTT';
       case DeviceKind.demo:
         return 'Máquina de demonstração';
     }
@@ -54,6 +62,7 @@ class Device {
     this.timeoutMs = 1500,
     this.pollMs = 500,
     this.framing = ModbusFraming.rtu,
+    this.mqtt = const MqttBroker(),
   });
 
   final String id;
@@ -77,16 +86,21 @@ class Device {
   /// Envelope das mensagens em [DeviceKind.modbusRtuTcp] (RTU ou ASCII).
   final ModbusFraming framing;
 
+  /// Broker em [DeviceKind.mqtt]: TLS, usuário, keep-alive, testamento.
+  final MqttBroker mqtt;
+
   bool get isDemo => kind == DeviceKind.demo;
 
   /// Fala com o equipamento pela rede (IP e porta), qualquer que seja o
   /// protocolo.
-  bool get isNetwork => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp;
+  bool get isNetwork => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt;
 
   /// Descrição curta para listas: "192.168.0.10:502 · ID 1".
   String get addressLabel => isDemo
       ? 'Simulada neste aparelho'
-      : '$host:$port · ${kind == DeviceKind.modbusRtuTcp ? '${framing.label} · ' : ''}ID $unitId';
+      : kind == DeviceKind.mqtt
+          ? '$host:$port · MQTT${mqtt.tls ? ' · TLS' : ''}'
+          : '$host:$port · ${kind == DeviceKind.modbusRtuTcp ? '${framing.label} · ' : ''}ID $unitId';
 
   Device copyWith({
     String? name,
@@ -97,6 +111,7 @@ class Device {
     int? timeoutMs,
     int? pollMs,
     ModbusFraming? framing,
+    MqttBroker? mqtt,
   }) =>
       Device(
         id: id,
@@ -108,6 +123,7 @@ class Device {
         timeoutMs: timeoutMs ?? this.timeoutMs,
         pollMs: pollMs ?? this.pollMs,
         framing: framing ?? this.framing,
+        mqtt: mqtt ?? this.mqtt,
       );
 
   /// Duas configurações que exigem reabrir a conexão se mudarem.
@@ -117,7 +133,8 @@ class Device {
       port == other.port &&
       unitId == other.unitId &&
       timeoutMs == other.timeoutMs &&
-      framing == other.framing;
+      framing == other.framing &&
+      mqtt == other.mqtt;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -130,6 +147,7 @@ class Device {
         'pollMs': pollMs,
         // Só quando importa: projeto de Modbus TCP fica igual ao de antes.
         if (kind == DeviceKind.modbusRtuTcp) 'framing': framing.name,
+        if (kind == DeviceKind.mqtt) 'mqtt': mqtt.toJson(),
       };
 
   factory Device.fromJson(Map<String, dynamic> j) => Device(
@@ -142,5 +160,6 @@ class Device {
         timeoutMs: (j['timeoutMs'] as int?) ?? 1500,
         pollMs: (j['pollMs'] as int?) ?? 500,
         framing: ModbusFramingMeta.fromName(j['framing'] as String?),
+        mqtt: j['mqtt'] is Map ? MqttBroker.fromJson(Map<String, dynamic>.from(j['mqtt'] as Map)) : const MqttBroker(),
       );
 }

@@ -56,6 +56,7 @@ Script livre (JavaScript) na variável ficou de fora de propósito: a escala lin
 |---|---|
 | Linguagem / framework | Dart 3.13 e Flutter 3.47 (Material 3, tema escuro próprio). |
 | Comunicação industrial | Modbus TCP/IP sobre socket TCP cru, sem biblioteca Modbus externa. |
+| MQTT | Cliente MQTT 3.1.1 do pacote `mqtt_client` (Dart puro, MIT) — seção 4.16. |
 | Persistência | JSON num arquivo na pasta privada do app (`path_provider`). |
 | Arquivos | Exportar/importar projeto e escolher imagem (`file_picker`). |
 | PDF | Página de PDF → imagem, para a imagem por etapa (`printing`, que usa o renderizador do próprio Android). |
@@ -123,11 +124,13 @@ lib/
 │   │   ├── modbus_client_simulated.dart  Transporte para a máquina de demonstração.
 │   │   ├── modbus_memory.dart        Memória Modbus em RAM + lógica de escravo.
 │   │   └── modbus_tcp_server.dart    Escravo TCP em Dart (testes de integração).
+│   ├── mqtt/                         Regras de tópico (curingas) e erro de comunicação MQTT.
 │   ├── theme/app_theme.dart          Tokens de cor, tipografia, tema Material.
 │   └── utils/                        ids, validação de IP, redução de imagem.
 ├── models/
 │   ├── device.dart                   Equipamento.
 │   ├── tag.dart                      Variável (tipo, área, endereço, ordem de bytes).
+│   ├── mqtt_config.dart              Broker do equipamento e tópico da variável (MQTT).
 │   ├── hmi_screen.dart               Tela e elemento posicionado na grade.
 │   └── project.dart                  Projeto inteiro (unidade de arquivo).
 ├── services/
@@ -136,6 +139,8 @@ lib/
 │   │   ├── device_session.dart       Varredura de um equipamento, falhas, reconexão.
 │   │   ├── scan_planner.dart         Agrupa variáveis vizinhas em leituras únicas.
 │   │   ├── tag_codec.dart            Registradores ⇄ valor; formatação pt-BR.
+│   │   ├── mqtt_codec.dart           Mensagem MQTT ⇄ valor (texto, número, JSON com caminho).
+│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver.
 │   │   └── tag_store.dart            Última leitura por variável + histórico curto.
 │   ├── demo/
 │   │   ├── demo_process.dart         "Programa do CLP" da cortadora simulada.
@@ -282,16 +287,40 @@ O "Testar conexão" usa a mesma informação: mostra por onde a conexão sai ("W
 Muito inversor e CLP pequeno só fala Modbus **RTU** pela RS-485. Atrás de um conversor RS-485 → Ethernet que repassa os bytes sem converter, o app fala RTU (ou ASCII) "cru" pelo TCP: equipamento do tipo `modbusRtuTcp`, escolhido em **Na rede → Mais opções → Protocolo**. As funções Modbus são as mesmas (vêm de `ModbusClient`); muda só o envelope (`ModbusFrames`: CRC16 no RTU, LRC no ASCII) e como se acha o fim da resposta — pelo código da função, porque serial não tem cabeçalho de tamanho e o silêncio de 3,5 caracteres da norma não é confiável atrás de USB e de gateways. `ModbusClientSerial` roda sobre um `ByteLink` (TCP hoje; USB-OTG é o próximo), um pedido por vez, com opção de descartar o eco de adaptadores que devolvem o que foi enviado. Resposta de outro escravo é ignorada; CRC/LRC errado vira "resposta inválida".
 
 Testes: `ModbusSerialTcpServer` (escravo RTU/ASCII em Dart, por socket real) e o simulador Python com `--framer rtu|ascii`.
+
+### 4.16. MQTT (broker na rede local)
+
+Equipamento do tipo `mqtt`, escolhido em **Na rede → Mais opções → Protocolo → MQTT**: o IP e a porta passam a ser os do broker (1883; 8883 com TLS) e somem ID do escravo e "ler a cada". Cliente MQTT 3.1.1 do `mqtt_client`, com ID de cliente novo a cada conexão (dois celulares com o mesmo projeto não se derrubam no broker), usuário e senha opcionais, sinal de vida (keep-alive) de 10 s — é ele que percebe o Wi-Fi que caiu sem fechar o socket — e o mesmo vínculo à rede local do Modbus (`LocalNetwork.prepare`, 4.14).
+
+`MqttDriver` é o primeiro driver em modo **assinatura**. A varredura não vai à rede: reconcilia as assinaturas com as variáveis em uso (assina o que falta, tira o que sobrou; duas variáveis no mesmo tópico, uma assinatura), aplica o que já tinha chegado e confere a validade. Cada mensagem vai para o `TagStore` na hora em que chega. O selo mostra só "Online": o tempo de uma varredura que não pergunta nada seria sempre 0 ms.
+
+Na variável, o endereço é o objeto `mqtt` (`MqttAddress`): tópico de estado (aceita `+` e `#`), campo do JSON opcional (`sensores.temp`, `valores[2]`), tópico de comando (vazio = o próprio tópico, se não tiver curinga), QoS 0/1, validade, formato do liga/desliga ao gravar (1/0, true/false, ON/OFF — escolha explícita: supor pela mensagem recebida falharia justo na primeira gravação), comando em JSON (`{"campo": valor}`) e retain do comando, desligado por padrão (comando guardado roda de novo quando o equipamento reconecta). `MqttCodec` traduz mensagem ⇄ valor: número (aceita vírgula), texto, liga/desliga em qualquer convenção ao ler, JSON com caminho, lista JSON para o gráfico de barras, e a escala da variável nos dois sentidos.
+
+| Situação | Na tela |
+|---|---|
+| Broker caiu, ou o sinal de vida ficou sem resposta | `MqttCommError` → sem comunicação com o último valor esmaecido; a sessão reconecta com a espera crescente de sempre e reassina (o retain repõe os valores). |
+| Testamento (LWT) do equipamento no "tópico de aviso de queda" | Todas as variáveis dele sem comunicação ("o equipamento se desconectou do broker") e gravar é recusado. Outra mensagem no tópico = voltou, na hora. |
+| Variável sem mensagem dentro da validade | Só ela sem comunicação ("sem mensagem há mais de 30 s"); o selo continua verde. |
+| Campo do JSON não veio, payload não é número | Erro de configuração daquela variável só. |
+| Gravar | Publica no tópico de comando; com QoS 1 espera o PUBACK. O elemento muda quando o equipamento publica o estado novo. |
+
+"Testar conexão" separa porta sem broker, usuário/senha recusados e falha de TLS, e lembra o tropeço comum do Mosquitto 2, que só aceita conexões do próprio computador até ganhar `listener 1883`. No cadastro de variável, **Ouvir o broker** assina `#` por 10 s e lista tópicos e campos do JSON; tocar preenche tópico, campo, tipo e um nome de partida. O "Lendo agora" mostra a última mensagem do tópico ou, em tom neutro, "esperando mensagem em …" — tópico sem retain só tem valor quando o equipamento publica. Fechar o cadastro solta a conexão aberta só para essa leitura: `DeviceSession.stop` desconecta o driver mesmo com o laço parado (antes a conexão ficava aberta; vale também para o Modbus).
+
+Testes: `test/support/mqtt_test_broker.dart`, broker 3.1.1 mínimo em Dart (CONNECT com senha, SUBSCRIBE com curingas, PUBLISH QoS 0/1, retain, PINGREQ, UNSUBSCRIBE, DISCONNECT e testamento). Fica em `test/` porque nada do app usa broker, e foi escrito sem o código do app: se os dois lados usassem o mesmo casamento de tópico, um erro de curinga passaria nos dois.
+
+Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; TLS só com certificado em que o Android confia (broker com certificado autoassinado não conecta); Sparkplug B e MQTT 5 ficam para a fase 2.
+
 ## 5. Modelo de dados
 
 ### 5.1. Equipamento (`Device`)
 
 | Campo | Significado |
 |---|---|
-| kind | `modbusTcp` (rede) ou `demo` (máquina simulada no aparelho). |
-| host, port, unitId | IP ou nome, porta (502), ID do escravo (1). |
+| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker) ou `demo` (máquina simulada no aparelho). |
+| host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). |
 | timeoutMs | Tempo máximo por resposta (1500 ms). |
 | pollMs | Intervalo entre varreduras (500 ms). |
+| mqtt | Só em equipamento MQTT, e só o que difere do padrão: tls, username, password, keepAliveSec (10), clientId (vazio = automático), statusTopic e offlinePayload do testamento. |
 
 ### 5.2. Variável (`Tag`)
 
@@ -307,6 +336,7 @@ Testes: `ModbusSerialTcpServer` (escravo RTU/ASCII em Dart, por socket real) e o
 | unit, decimals | Apresentação: "°C", 1 casa decimal. |
 | scale, offset | Escala linear: valor = bruto × scale + offset (padrão 1 e 0; só vão para o arquivo quando diferentes). |
 | alarms | Alarmes da variável: lista de {id, kind (above · below · on · off), limit, priority (high · medium · low), message}. Só vai para o arquivo quando há algum; `normalized()` descarta o que não casa com o tipo. |
+| mqtt | Só em variável de equipamento MQTT: topic, jsonPath, commandTopic, qos, retain, validitySec, boolFormat, commandJson. Com ele, area/address voltam ao padrão e ninguém lê. |
 
 `Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura e texto tiram a escrita; escala zero volta a 1).
 
@@ -497,7 +527,7 @@ O protocolo não muda; muda onde cada área começa. Plano: campo `profile` em `
 
 Desde a etapa 4 o motor é dividido em dois. A `DeviceSession` é dona do laço, da espera crescente depois de uma queda e da saúde da conexão — vale para todo protocolo. O que é de protocolo mora num **driver** (`lib/services/runtime/drivers/`), atrás do contrato `DeviceDriver`: `connect`, `scan` (lê as variáveis em uso e publica no `TagStore`), `readOnce`, `write`, `ping` e `tagsChanged`. Falha de comunicação sai como `CommError` (`lib/core/comm/`), que a sessão trata igual para todos: "sem comunicação" com o último valor esmaecido. Falha de uma variável só (endereço inexistente, pedido fora do limite) o driver resolve publicando a qualidade daquela variável.
 
-`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (MQTT, Siemens S7, OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
+`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (Siemens S7, OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.16) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
 
 ### 10.4. Mudar o formato do arquivo
 
@@ -566,6 +596,9 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/core/modbus_serial_test.dart` | CRC16 e LRC com vetores conhecidos, fim de quadro pelo código da função; RTU e ASCII sobre TCP por socket real: leitura e escrita, endereço inexistente, adaptador com eco, CRC corrompido, ID errado = sem resposta, porta fechada = recusou. |
 | `test/runtime/rtu_device_test.dart` | Equipamento atrás de gateway RS-485 pelo caminho de produção (fábrica → driver → sessão): testar, ler na varredura e gravar em RTU e ASCII; envelope no arquivo do projeto. |
 | `test/runtime/device_driver_test.dart` | Contrato do driver com um driver de mentira (não Modbus): a sessão publica, grava e trata queda igual. |
+| `test/core/mqtt_codec_test.dart` | Curingas `+`/`#` e `$SYS`, filtro válido; mensagem → valor (vírgula, escala, liga/desliga em várias convenções, texto, JSON com caminho e posição de lista, campo que não veio); valor → comando (formatos de liga/desliga, escala, passo, JSON com o campo); campos para o "ouvir". |
+| `test/runtime/mqtt_device_test.dart` | Equipamento MQTT pelo caminho de produção contra o broker de teste: testar, ler e gravar; "lendo agora" esperando e soltando o broker ao sair; número, texto, booleano e JSON; retain na hora; comando no tópico certo sem retain; validade vencida; broker que cai e volta; testamento do equipamento; troca de tópico sem reconectar e keep-alive; porta recusada e senha errada; ouvir o broker; variável do protocolo errado; arquivo do projeto ida e volta. |
+| `test/widgets/mqtt_forms_test.dart` | Cadastro com MQTT: protocolo em Mais opções troca porta e campos, TLS e usuário; variável com tópico, campo do JSON e tópico de comando no lugar do endereço Modbus; "Ouvir o broker" contra o broker de teste, tocar preenche tópico, campo, tipo e nome. |
 | `test/runtime/scan_planner_test.dart` | Agrupamento, buracos, limite de 125, áreas separadas, isolamento. |
 | `test/runtime/alarm_logic_test.dart` | Condição com banda morta (acima/abaixo), liga/desliga, valor inválido, mensagem padrão com unidade, alarmes no JSON, descarte de alarme incompatível com o tipo, prioridades. |
 | `test/runtime/hmi_runtime_test.dart` | Inscrição, isolamento do endereço errado, escrita, queda com último valor, soltura insistente do pulso, variável apagada. |

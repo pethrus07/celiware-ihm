@@ -8,6 +8,7 @@
 
 import '../core/modbus/modbus_memory.dart';
 import 'alarm.dart';
+import 'mqtt_config.dart';
 
 /// Formato do dado dentro da memória.
 enum TagDataType {
@@ -154,6 +155,7 @@ class Tag {
     this.offset = 0,
     this.description = '',
     this.alarms = const [],
+    this.mqtt,
   });
 
   final String id;
@@ -200,6 +202,10 @@ class Tag {
   /// projeto e sumir junto quando a variável for apagada.
   final List<AlarmRule> alarms;
 
+  /// Endereço MQTT (tópico, campo do JSON, comando). Só em variável de
+  /// equipamento MQTT; aí área e endereço Modbus ficam no padrão e ninguém lê.
+  final MqttAddress? mqtt;
+
   /// Variável lida de um bit dentro de um registrador.
   bool get isBitOfRegister => dataType == TagDataType.bool && !area.isBit;
 
@@ -224,8 +230,9 @@ class Tag {
 
   static double _pow10(int d) => [1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0][d];
 
-  /// Pode escrever de fato: marcado pelo usuário **e** a área permite.
-  bool get canWrite => writable && area.isWritable;
+  /// Pode escrever de fato: marcado pelo usuário **e** a área permite (no
+  /// MQTT, **e** há tópico onde publicar — curinga não serve).
+  bool get canWrite => writable && (mqtt?.canPublish ?? area.isWritable);
 
   /// Quantas posições da área a variável ocupa (bits ou registradores).
   int get span => area.isBit ? length : dataType.registerCount * length;
@@ -233,8 +240,10 @@ class Tag {
   /// Endereço da última posição ocupada.
   int get lastAddress => address + span - 1;
 
-  /// "HR 100" / "HR 100.3" / "COIL 5" / "HR 10..17".
+  /// "HR 100" / "HR 100.3" / "COIL 5" / "HR 10..17" / "cortadora/estado · temp".
   String get addressLabel {
+    final m = mqtt;
+    if (m != null) return m.label;
     final base = '${area.shortLabel} $address';
     if (isBitOfRegister) return '$base.$bitIndex';
     if (span > 1) return '${area.shortLabel} $address..$lastAddress';
@@ -257,6 +266,7 @@ class Tag {
     double? offset,
     String? description,
     List<AlarmRule>? alarms,
+    MqttAddress? mqtt,
   }) =>
       Tag(
         id: id,
@@ -275,6 +285,7 @@ class Tag {
         offset: offset ?? this.offset,
         description: description ?? this.description,
         alarms: alarms ?? this.alarms,
+        mqtt: mqtt ?? this.mqtt,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -282,6 +293,11 @@ class Tag {
   /// escala zero (que apagaria o valor) volta a 1.
   Tag normalized() {
     var t = this;
+    // MQTT: os campos Modbus voltam ao padrão, para nenhuma regra de área
+    // (bit força liga/desliga, entrada tira a escrita) valer sem querer.
+    if (t.mqtt != null && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
+      t = t.copyWith(area: ModbusArea.holdingRegister, address: 0, bitIndex: 0, byteOrder: ByteOrder.abcd);
+    }
     if (t.area.isBit && t.dataType != TagDataType.bool) {
       t = t.copyWith(dataType: TagDataType.bool);
     }
@@ -318,6 +334,7 @@ class Tag {
         if (offset != 0) 'offset': offset,
         'description': description,
         if (alarms.isNotEmpty) 'alarms': [for (final a in alarms) a.toJson()],
+        if (mqtt != null) 'mqtt': mqtt!.toJson(),
       };
 
   factory Tag.fromJson(Map<String, dynamic> j) => Tag(
@@ -341,5 +358,6 @@ class Tag {
           for (final a in (j['alarms'] as List? ?? const []))
             if (a is Map) AlarmRule.fromJson(Map<String, dynamic>.from(a)),
         ],
+        mqtt: j['mqtt'] is Map ? MqttAddress.fromJson(Map<String, dynamic>.from(j['mqtt'] as Map)) : null,
       ).normalized();
 }

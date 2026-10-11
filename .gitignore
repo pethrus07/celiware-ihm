@@ -67,3 +67,6 @@ tool/node_modules/
 tool/video/.trabalho/
 tool/video/saida/
 sim/.comando
+
+# Cópias de trabalho dos agentes do Claude Code (worktrees) — nunca vão para o git.
+.claude/

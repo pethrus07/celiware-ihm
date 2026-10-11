@@ -1,6 +1,6 @@
 # Simulação — testar sem equipamento
 
-Quatro formas de testar o app sem CLP, da mais simples à mais realista.
+Cinco formas de testar o app sem CLP, da mais simples à mais realista.
 
 | Forma | Serve para | Rede de verdade? |
 |---|---|---|
@@ -8,6 +8,7 @@ Quatro formas de testar o app sem CLP, da mais simples à mais realista.
 | Simulador Python (`sim/simulador.py`) | Testar o caminho real: socket, MBAP, queda de rede, Wi-Fi. | Sim. |
 | Modbus Slave / ModbusTool (programas no PC) | Mexer em valores à mão, imitar um mapa de memória qualquer. | Sim. |
 | Escravo Dart (`ModbusTcpServer`) | Testes automatizados (`flutter test`). | Sim, local. |
+| Arduino falso (`sim/arduino_falso.py`) | Protocolo cru: texto de Arduino/ESP por TCP ou UDP (seção 7). | Sim. |
 
 ## 1. Máquina de demonstração
 
@@ -134,3 +135,24 @@ Armadilhas já resolvidas no script:
 - **Coordenadas de toque** são do Pixel 7 (1080×2400) e medidas nas fotos do ensaio; mudou layout, rode `ensaio` antes.
 - **Teclado numérico** fecha com a tecla voltar (`keyevent 4`), não com ESC.
 - **Capítulos** arredondam antes de dividir (119,6 s virava "01:00").
+
+## 7. Arduino falso (protocolo cru)
+
+`sim/arduino_falso.py` imita um sketch de Arduino/ESP que fala texto, sem norma — o caso do protocolo cru (`docs/REQUISITOS-ETAPA4.md` §8.5). Python puro, não precisa do `.venv`:
+
+```
+python sim/arduino_falso.py                  TCP na porta 5030, T=<temp>;P=<0/1>\n a cada 1 s
+python sim/arduino_falso.py --intervalo 0    só responde a "?" (polling)
+python sim/arduino_falso.py --udp            UDP: responde e transmite para quem falou por último
+python sim/arduino_falso.py --baguncar       TCP: parte mensagens ao meio e manda ruído antes
+```
+
+| Recebe | Responde |
+|---|---|
+| `?\n` | a linha do estado, na hora |
+| `SET P=0\n` / `SET P=1\n` | desliga/liga a bomba e manda a linha nova (confirmação) |
+| `SET T=90\n` | força a temperatura (testar alarme) |
+
+Bomba ligada, a temperatura sobe devagar até ~60 °C; desligada, volta a ~25 °C. Outras opções: `--porta N`, `--intervalo MS`, `--destino IP:PORTA` (UDP: para onde transmitir antes de o app falar).
+
+O perfil que lê isto: fim de linha `\n`, campos chave=valor (`;` e `=`), comando `SET {campo}={valor}\n`. A tela do app para o protocolo cru ainda não existe (RW-3); até lá, confira à mão com um terminal TCP cru (PuTTY em modo *Raw* ou `ncat 127.0.0.1 5030`). Nos testes automatizados o mesmo papel é do `FakeArduinoServer` em Dart (`lib/core/rawlink/`), por TCP e UDP.

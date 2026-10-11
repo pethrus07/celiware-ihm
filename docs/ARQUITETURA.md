@@ -58,6 +58,7 @@ Script livre (JavaScript) na variável ficou de fora de propósito: a escala lin
 | Comunicação industrial | Modbus TCP/IP sobre socket TCP cru, sem biblioteca Modbus externa. |
 | MQTT | Cliente MQTT 3.1.1 do pacote `mqtt_client` (Dart puro, MIT) — seção 4.18. |
 | Siemens S7 | Cliente S7 clássico (ISO-on-TCP, PUT/GET) próprio, em Dart puro — seção 4.16. |
+| Arduino / ESP (cru) | Sockets TCP e UDP do `dart:io` e um interpretador próprio de perfil de mensagem, sem biblioteca — seção 4.17. |
 | Persistência | JSON num arquivo na pasta privada do app (`path_provider`). Histórico dos registros em SQLite (`sqflite`, o do Android — §6.10). |
 | Arquivos | Exportar/importar projeto e escolher imagem (`file_picker`). |
 | PDF | Página de PDF → imagem, para a imagem por etapa (`printing`, que usa o renderizador do próprio Android). |
@@ -134,6 +135,8 @@ lib/
 │   │   ├── s7_client.dart            Cliente ISO-on-TCP (um pedido por vez, PDU, reconexão).
 │   │   └── s7_test_server.dart       CLP S7 em Dart (testes de integração).
 │   ├── mqtt/                         Regras de tópico (curingas) e erro de comunicação MQTT.
+│   ├── link/byte_link.dart           Cano de bytes: TCP e UDP (protocolos sem cabeçalho de tamanho).
+│   ├── rawlink/                      Protocolo cru: perfil, interpretador, cliente, conexão dividida, Arduino falso.
 │   ├── theme/app_theme.dart          Tokens de cor, tipografia, tema Material.
 │   └── utils/                        ids, validação de IP, redução de imagem.
 ├── models/
@@ -142,6 +145,7 @@ lib/
 │   ├── vendor_profiles.dart          Perfis de fabricante: "D200" ⇄ área + endereço Modbus.
 │   ├── mqtt_config.dart              Broker do equipamento e tópico da variável (MQTT).
 │   ├── s7_config.dart                Família do CLP (rack/slot) e endereço S7 da variável.
+│   ├── raw_config.dart               TCP/UDP e perfil do equipamento cru; campo da variável; modelos prontos.
 │   ├── hmi_screen.dart               Tela e elemento posicionado na grade.
 │   └── project.dart                  Projeto inteiro (unidade de arquivo).
 ├── services/
@@ -152,7 +156,9 @@ lib/
 │   │   ├── tag_codec.dart            Registradores ⇄ valor; formatação pt-BR.
 │   │   ├── mqtt_codec.dart           Mensagem MQTT ⇄ valor (texto, número, JSON com caminho).
 │   │   ├── s7_tag_codec.dart         Variável ⇄ S7 (tipo pelo tamanho do endereço) e itens juntados.
-│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver, s7_driver.
+│   │   ├── raw_codec.dart            Campo da mensagem crua ⇄ valor (escala, liga/desliga, texto).
+│   │   ├── raw_preview.dart          Prévia ao vivo do editor de perfil: guarda bytes, reinterpreta a cada mexida.
+│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver, s7_driver, raw_driver.
 │   │   └── tag_store.dart            Última leitura por variável + histórico curto.
 │   ├── logging/                      Registro de dados: motor, banco SQLite, CSV (§6.10).
 │   ├── demo/
@@ -165,7 +171,7 @@ lib/
 │   ├── screens_page.dart             Lista de telas com planta em miniatura.
 │   ├── screen_run_page.dart          Tela em operação.
 │   ├── editor/                       Editor, paleta, configuração de elemento.
-│   ├── devices/                      Lista e cadastro de equipamento (Testar conexão).
+│   ├── devices/                      Lista e cadastro de equipamento (Testar conexão); editor da mensagem crua.
 │   ├── tags/                         Lista e cadastro de variável (Lendo agora).
 │   ├── logs/                         Registros: lista, folha do grupo, histórico.
 │   ├── more_page.dart                Projeto, registros, tutoriais, sobre.
@@ -377,9 +383,38 @@ Arduino, ESP, balança e leitor não seguem norma: cada um manda a sua linha (`T
 | Quem fala primeiro | streaming (o equipamento manda) ou polling (pedido a cada N ms) |
 | Comandos | texto `SET {campo}={valor}\n` (`{valor:2}`, `{cs}`) ou binário `AA {valor:u16} {cs}` |
 
-`MessageParser` só conhece bytes — é o mesmo código no cliente e na futura prévia do editor. Junta mensagem partida, separa as grudadas, descarta lixo antes do início, limita o buffer (mensagem sem fim passa de `maxFrameBytes` e é descartada, inclusive o rabo dela) e, num binário com checksum errado, escorrega byte a byte até voltar a conferir. Mensagens com problema também saem (`FrameProblem`), para a prévia mostrar "checksum errado" em vez de nada. Campo vazio não vira valor; texto só vira número quando o campo inteiro é um número (`25.3C` continua texto — unidade grudada se tira com regex). `RawClient` roda sobre `ByteLink` (`TcpByteLink`, `UdpByteLink`): guarda o valor mais recente de cada chave com o horário, faz o polling sozinho, envia comandos e acusa equipamento mudo pela validade do perfil (`staleAfterMs`). Em UDP o fim do datagrama fecha a mensagem (ESP costuma mandar sem `\n`). Falhas são `RawLinkError`, um `CommError` como os do Modbus.
+`MessageParser` só conhece bytes — é o mesmo código no cliente e na prévia do editor. Junta mensagem partida, separa as grudadas, descarta lixo antes do início, limita o buffer (mensagem sem fim passa de `maxFrameBytes` e é descartada, inclusive o rabo dela) e, num binário com checksum errado, escorrega byte a byte até voltar a conferir. Mensagens com problema também saem (`FrameProblem`), para a prévia mostrar "checksum errado" em vez de nada. Campo vazio não vira valor; texto só vira número quando o campo inteiro é um número (`25.3C` continua texto — unidade grudada se tira com regex). `RawClient` roda sobre `ByteLink` (`TcpByteLink`, `UdpByteLink`): guarda o valor mais recente de cada chave com o horário, faz o polling sozinho, envia comandos e acusa equipamento mudo pela validade do perfil (`staleAfterMs`). Em UDP o fim do datagrama fecha a mensagem (ESP costuma mandar sem `\n`). Falhas são `RawLinkError`, um `CommError` como os do Modbus.
 
-Falta: o driver no motor (`raw_driver`, variável apontando para a chave do campo), a tela do perfil com prévia ao vivo (RW-3) e a serial por USB-OTG. Testes: `FakeArduinoServer` (Dart, TCP e UDP) e `sim/arduino_falso.py` (SIMULACAO §7).
+**No app.** Equipamento do tipo `raw`, escolhido em **Na rede → Mais opções → Protocolo → Arduino / mensagem própria**: TCP ou UDP, IP e porta (5030 de partida — cru não tem porta padrão; o resumo fechado mostra "Arduino · TCP · Porta 5030"). Em UDP, a **porta deste celular**: 0 = qualquer uma, para equipamento que responde a quem perguntou; fixa quando o sketch manda sozinho para o IP e a porta gravados nele. Somem ID do escravo, "ler a cada" e marca e modelo. O perfil vai em `Device.raw` (`RawConfig`: transporte, porta local e o `MessageProfile` inteiro), que só entra no JSON quando o tipo é esse — projeto Modbus fica byte a byte igual. **Mensagem do equipamento** fica à vista, logo abaixo do IP: sem o perfil certo nada funciona.
+
+**Editor do perfil** (`RawProfilePage`, RW-3). A **prévia ao vivo** fica presa no topo: conecta, mostra as últimas mensagens (a mais nova em cima), os campos que o perfil tirou de cada uma — número em pt-BR, texto entre aspas, para ver o que virou número — e os problemas ("checksum errado", "mensagem sem fim descartada", "nenhum campo reconhecido", "mensagem cortada"). `RawPreview` guarda os **bytes** que chegaram (até 4 KB), não as mensagens: cada mexida no perfil reinterpreta tudo na hora, sem esperar o equipamento mandar outra. Perfil que não fecha mostra o motivo no lugar das mensagens; sair assim pergunta (voltar ao anterior ou continuar editando). No polling a prévia manda a pergunta do perfil **em edição**.
+
+| À vista (o caso comum: 2 ou 3 toques) | Em "Mais opções" |
+|---|---|
+| Modelo: **Linha chave=valor** (`T=25.3;P=1`, o padrão, com `SET {campo}={valor}\n`), **Linha com vírgulas** (CSV por posição), **Binário simples** (`AA 55` + dois números de 16 bits na ordem do Arduino) | Onde termina (fim de linha, tamanho fixo, início e fim, tamanho no começo) |
+| Separadores (chave=valor) ou separador e nomes dos campos (vírgulas); no binário, tamanho, cabeçalho e um campo por linha | Checksum (XOR, soma, CRC16; hexadecimal ou cru; separador, bytes ignorados, depois do fim) |
+| Quem fala primeiro: **O equipamento manda sozinho** ou **O app pergunta** (pergunta e intervalo) | Jeito de tirar os campos (inclusive regex), comando para gravar, validade, UTF-8/Latin-1, vírgula decimal, tamanho máximo |
+
+O modelo troca a delimitação, o checksum e os campos; quem fala primeiro, validade e o comando que já existia continuam.
+
+**Variável.** O endereço é `Tag.raw` (`RawAddress`): o **campo** (`T`, a posição `2` num CSV sem nomes, o grupo da regex, o nome do campo binário), uma **validade própria** (0 = só a do equipamento) e um **comando próprio** (vazio = o do perfil para aquele campo, `MessageProfile.commandFor`). Área e endereço Modbus voltam ao padrão e `length` vira 1 — um campo é um valor só. No cadastro (`raw_tag_fields.dart`): **Campo da mensagem** e **Ouvir o equipamento e escolher** (10 s; lista cada campo com o último valor e conta as mensagens que o perfil não entendeu; tocar preenche campo, tipo, casas decimais e um nome de partida); "Pode ser alterada pela tela" mostra o **comando para gravar**, com o do equipamento como dica ("Vazio = SET {campo}={valor}\n") e erro se nenhum dos dois existe; validade do campo e comando em bytes ficam em "Mais opções". O "Lendo agora" mostra o valor, "esperando mensagem do equipamento" em tom neutro, ou "o campo "Z" não veio — chegam T, P".
+
+**Driver.** `RawDriver` é de **assinatura**, como o `MqttDriver`: cada mensagem boa vai para o `TagStore` na hora em que chega (`RawCodec`: escala nos dois sentidos, liga/desliga em número ou palavra, texto); no polling o `RawClient` pergunta sozinho a cada `pollMs` do perfil, e a varredura da sessão (a cada `Device.pollMs`) só aplica o que já chegou às variáveis novas e confere validades. O selo mostra só "Online".
+
+| Situação | Na tela |
+|---|---|
+| Equipamento mudo além da validade do perfil (`staleAfterMs`) | `RawTimeout` → sem comunicação com o último valor esmaecido ("sem mensagem do equipamento"). A próxima mensagem acorda a sessão: volta na hora, sem esperar a espera crescente. |
+| Um campo some e o resto continua chegando (validade na variável) | Só ela sem comunicação ("o campo X não vem há mais de 30 s"); o selo continua verde. |
+| Checksum errado, mensagem sem fim | Descartada pelo interpretador; o valor anterior fica. |
+| Queda (TCP) | Sem comunicação; a sessão reabre com a espera crescente de sempre. Contar a validade da reconexão (e não da última mensagem de antes da queda) evita vencer tudo na hora em que reconecta. |
+| Campo que não é número numa variável de número | Erro de configuração daquela variável só. |
+| Gravar | Comando da variável ou do perfil, com o valor sem a escala (`75,2` com ÷ 10 manda `752`). Valor que não cabe no modelo (`{valor:u8}` com 300) ou sem comando nenhum é recusado sem mandar nada. O elemento muda quando o equipamento manda o estado novo. |
+
+**Uma conexão por equipamento** (`RawLinkPool`). O sketch comum (`WiFiServer` + `while (client.connected())`) atende **um** cliente TCP: uma segunda conexão é aceita pela rede e nunca recebe nada. Varredura, "Testar conexão", prévia do editor e "Ouvir o equipamento" pegam cada um um `ByteLink` que se pendura no mesmo socket daquele endereço (todos recebem tudo, todos podem mandar, fecha com o último). Em UDP vale o mesmo para a porta local.
+
+**Testar conexão** diz se chegou mensagem **e** se o perfil entendeu: "Chegou mensagem e o perfil entendeu", "Conectou, mas nenhuma mensagem chegou em 5 s" (o equipamento só responde a pergunta? UDP mandando para outra porta?) ou "Chegou mensagem, mas o perfil não entendeu: checksum errado" (ajuste a mensagem — a prévia mostra). Espera até a validade do perfil (2 a 10 s) ou três mensagens não entendidas.
+
+Falta: a serial por USB-OTG (e COM no Windows) e o teste com um Arduino de verdade. Testes: `FakeArduinoServer` (Dart, TCP e UDP), `test/runtime/raw_device_test.dart`, `test/widgets/raw_forms_test.dart` e `sim/arduino_falso.py` (SIMULACAO §7).
 ### 4.18. MQTT (broker na rede local)
 
 Equipamento do tipo `mqtt`, escolhido em **Na rede → Mais opções → Protocolo → MQTT**: o IP e a porta passam a ser os do broker (1883; 8883 com TLS) e somem ID do escravo e "ler a cada". Cliente MQTT 3.1.1 do `mqtt_client`, com ID de cliente novo a cada conexão (dois celulares com o mesmo projeto não se derrubam no broker), usuário e senha opcionais, sinal de vida (keep-alive) de 10 s — é ele que percebe o Wi-Fi que caiu sem fechar o socket — e o mesmo vínculo à rede local do Modbus (`LocalNetwork.prepare`, 4.14).
@@ -408,13 +443,14 @@ Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; 
 
 | Campo | Significado |
 |---|---|
-| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker), `demo` (máquina simulada no aparelho) ou `s7` (CLP Siemens). |
-| host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). Em S7, porta 102; o ID não é usado. |
+| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker), `demo` (máquina simulada no aparelho), `s7` (CLP Siemens) ou `raw` (Arduino/ESP com mensagem própria). |
+| host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). Em S7, porta 102; o ID não é usado. No cru, a porta do sketch (5030 de partida). |
 | timeoutMs | Tempo máximo por resposta (1500 ms). |
 | pollMs | Intervalo entre varreduras (500 ms). |
 | profile | Perfil de fabricante (`inovance-h3u`, `invt-ivc1`…); ausente = Modbus genérico. Só vai para o arquivo quando existe (4.6). |
 | mqtt | Só em equipamento MQTT, e só o que difere do padrão: tls, username, password, keepAliveSec (10), clientId (vazio = automático), statusTopic e offlinePayload do testamento. |
 | s7 | Só em equipamento S7, e só o que difere do padrão (1200/1500, rack 0, slot 1): family (`s7300`, `s7400`, `s71200`, `other`) e, em `other`, rack e slot. |
+| raw | Só em equipamento cru: transport (`tcp` · `udp`), localPort (UDP, quando não é 0) e profile — o perfil da mensagem inteiro (framing, checksum, fields, mode, poll, pollMs, staleAfterMs, commands, charset, decimalComma, maxFrameBytes; bytes na notação `\n`, `\xAA`). |
 
 ### 5.2. Variável (`Tag`)
 
@@ -434,6 +470,7 @@ Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; 
 | memory | A memória como no manual ("D200", "X10", "F3-12"), com perfil de fabricante. Só texto para mostrar e recalcular: `area`/`address` continuam a verdade. Só vai para o arquivo quando existe. |
 | mqtt | Só em variável de equipamento MQTT: topic, jsonPath, commandTopic, qos, retain, validitySec, boolFormat, commandJson. Com ele, area/address voltam ao padrão e ninguém lê. |
 | s7 | Só em variável de CLP S7: address, o texto do TIA ("DB1.DBW4", "EW64", "P#DB1.DBX10.0 BYTE 22"). O tipo continua em dataType e precisa caber no tamanho do endereço. Com ele, area/address voltam ao padrão; entrada (I/E) perde a escrita. |
+| raw | Só em variável de equipamento cru: field, validitySec, command (modelo de texto ou binário). Com ele, area/address voltam ao padrão, length = 1 e ninguém lê. |
 
 `Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura e texto tiram a escrita; escala zero volta a 1).
 
@@ -509,7 +546,7 @@ Botão: seis modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira 
 
 ### 6.5. Equipamentos
 
-Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à vista: onde está (rede ou demonstração), nome, IP e **Testar conexão**. Marca e modelo (perfil de fabricante, 4.6), porta, ID, tempo-limite e ritmo ficam em "Mais opções" (o resumo "Porta 502 · ID 1 · Inovance H3U" aparece fechado). O teste responde na hora; quando falha, mostra o que conferir, na ordem em que os problemas costumam acontecer (mesmo Wi-Fi, IP, Modbus ligado no equipamento, porta/ID). Quando o equipamento **recusa** a conexão (o IP respondeu na hora, mas nada escuta na porta — errno 111 no Android, 10061 no Windows), a mensagem vira "o equipamento recusou a conexão nesta porta" e só sobram as duas conferências que fazem sentido: porta e Modbus ligado. "Mais opções" rola a tela sozinho ao abrir, nos dois formulários.
+Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à vista: onde está (rede ou demonstração), nome, IP e **Testar conexão**. Marca e modelo (perfil de fabricante, 4.6), porta, ID, tempo-limite e ritmo ficam em "Mais opções" (o resumo "Porta 502 · ID 1 · Inovance H3U" aparece fechado). O teste responde na hora; quando falha, mostra o que conferir, na ordem em que os problemas costumam acontecer (mesmo Wi-Fi, IP, Modbus ligado no equipamento, porta/ID). Quando o equipamento **recusa** a conexão (o IP respondeu na hora, mas nada escuta na porta — errno 111 no Android, 10061 no Windows), a mensagem vira "o equipamento recusou a conexão nesta porta" e só sobram as duas conferências que fazem sentido: porta e Modbus ligado. "Mais opções" rola a tela sozinho ao abrir, nos dois formulários. No Arduino/ESP (protocolo cru, 4.17) entra uma quinta coisa à vista, **Mensagem do equipamento**, que abre o editor do perfil com a prévia ao vivo; o teste diz se a mensagem chegou e se o perfil a entendeu.
 
 ### 6.6. Variáveis
 
@@ -677,7 +714,7 @@ Corrigir uma tabela não muda sozinho o endereço das variáveis já criadas (el
 
 Desde a etapa 4 o motor é dividido em dois. A `DeviceSession` é dona do laço, da espera crescente depois de uma queda e da saúde da conexão — vale para todo protocolo. O que é de protocolo mora num **driver** (`lib/services/runtime/drivers/`), atrás do contrato `DeviceDriver`: `connect`, `scan` (lê as variáveis em uso e publica no `TagStore`), `readOnce`, `write`, `ping` e `tagsChanged`. Falha de comunicação sai como `CommError` (`lib/core/comm/`), que a sessão trata igual para todos: "sem comunicação" com o último valor esmaecido. Falha de uma variável só (endereço inexistente, pedido fora do limite) o driver resolve publicando a qualidade daquela variável.
 
-`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (OPC UA, cru) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.18) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `S7Driver` (4.16) é o terceiro e o modelo para outro protocolo de varredura: planejador e codec ao lado do driver (`s7_tag_codec.dart`), o endereço da variável num objeto opcional da `Tag` (`Tag.s7`, como `Tag.mqtt`), a configuração num da `Device` (`Device.s7`), e os campos dos cadastros em arquivos próprios (`s7_device_fields.dart`, `s7_tag_fields.dart`) com ganchos pequenos nos formulários (`if (s7) … else if (mqtt) … else`). Variável de um protocolo num equipamento de outro vira erro de configuração dela, nunca uma leitura no lugar errado. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
+`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.18) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `S7Driver` (4.16) é o modelo para outro protocolo de varredura: planejador e codec ao lado do driver (`s7_tag_codec.dart`), o endereço da variável num objeto opcional da `Tag` (`Tag.s7`, como `Tag.mqtt`), a configuração num da `Device` (`Device.s7`), e os campos dos cadastros em arquivos próprios (`s7_device_fields.dart`, `s7_tag_fields.dart`) com ganchos pequenos nos formulários (`if (s7) … else if (mqtt) … else`). `RawDriver` (4.17) também é de assinatura: o `scan` só confere validades, e o socket é dividido pelo `RawLinkPool` com as ferramentas do cadastro. Variável de um protocolo num equipamento de outro (tópico MQTT, endereço S7 ou campo cru num Modbus; endereço Modbus num cru) vira erro de configuração daquela variável — nunca uma leitura do HR 0 no lugar dela. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
 
 ### 10.4. Mudar o formato do arquivo
 
@@ -748,6 +785,8 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/core/rawlink_test.dart` | Protocolo cru: os quatro tipos de delimitação, mensagem partida e grudada, lixo, buffer cheio, ressincronização do binário; checksum com vetores conhecidos (CRC16, NMEA), certo/errado, BCC depois do ETX; campos chave=valor, CSV, regex e binário nas quatro ordens; comandos de texto e binários; JSON do perfil ida e volta; cliente contra o Arduino falso por TCP e UDP (streaming, polling, comando, silêncio, queda, porta fechada). |
 | `test/runtime/s7_device_test.dart` | CLP S7 pelo caminho de produção contra o `S7TestServer`: testar conexão, ler na varredura num pedido só (DB juntado, M, I), gravar bit sem mexer nos vizinhos e palavra, entrada só leitura, faixa na unidade da tela; erro por item isolando só a errada (DB inexistente, fora do DB, acesso negado) e voltando ao corrigir; PUT/GET desligado no teste e na varredura, voltando sozinho; família errada, certa e "Outro"; porta recusada; queda e reconexão; "lendo agora" soltando a conexão; tipo que não cabe e variável de outro protocolo; tipo sugerido, mensagens com o endereço certo, lista, byte e escala, item juntado; arquivo ida e volta e projeto antigo idêntico. |
 | `test/widgets/s7_forms_test.dart` | Cadastro com S7: protocolo em Mais opções troca porta e campos, família do CLP e "Outro" com rack e slot, volta ao Modbus; testar conexão com PUT/GET desligado mostrando o passo a passo do TIA e depois respondendo; variável com o endereço do TIA no lugar do Modbus (sem hexadecimal e ordem de bytes), erro curto, tipo pelo tamanho, entrada só leitura, prova da leitura e "lendo agora" contra o CLP de teste; prova e sugestão de tipo como funções puras. |
+| `test/runtime/raw_device_test.dart` | Equipamento cru pelo caminho de produção contra o Arduino falso: TCP em streaming (testar, ler na hora, gravar pelo comando e a confirmação), polling, escala desfeita e comando próprio da variável, valor que não cabe e falta de comando, checksum errado descartado, teste "não entendeu" × "nada chegou", equipamento mudo e volta na hora, campo que parou de vir, queda e reconexão, UDP em streaming para a porta local e em polling com comando, um socket só para telas + teste + ouvir + prévia, prévia reinterpretando ao mexer no perfil e mandando a pergunta do polling, "Lendo agora" (campo que não veio, nada chegou, soltar ao sair), variável do protocolo errado, arquivo do projeto ida e volta, codec e modelos prontos. |
+| `test/widgets/raw_forms_test.dart` | Cadastro com Arduino: protocolo em Mais opções, TCP/UDP e porta deste celular, mensagem à vista; variável com campo e comando do equipamento como dica; editor do perfil com a prévia ao vivo contra o Arduino falso (problema, trocar o modelo e dar nomes reinterpreta sem mensagem nova, checksum errado), "Testar conexão" falhando e passando; "Ouvir o equipamento" preenche campo, tipo e nome. |
 | `test/runtime/rtu_device_test.dart` | Equipamento atrás de gateway RS-485 pelo caminho de produção (fábrica → driver → sessão): testar, ler na varredura e gravar em RTU e ASCII; envelope no arquivo do projeto. |
 | `test/runtime/device_driver_test.dart` | Contrato do driver com um driver de mentira (não Modbus): a sessão publica, grava e trata queda igual. |
 | `test/core/mqtt_codec_test.dart` | Curingas `+`/`#` e `$SYS`, filtro válido; mensagem → valor (vírgula, escala, liga/desliga em várias convenções, texto, JSON com caminho e posição de lista, campo que não veio); valor → comando (formatos de liga/desliga, escala, passo, JSON com o campo); campos para o "ouvir". |

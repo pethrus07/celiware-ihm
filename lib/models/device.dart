@@ -3,6 +3,7 @@
 import '../core/modbus/modbus_framing.dart';
 import 'mqtt_config.dart';
 import 's7_config.dart';
+import 'raw_config.dart';
 
 /// Como o app chega até o equipamento.
 enum DeviceKind {
@@ -26,6 +27,10 @@ enum DeviceKind {
   /// CLP Siemens S7 (300, 400, 1200, 1500) pela rede, no S7 "clássico"
   /// (PUT/GET, porta 102). Rack e slot ficam em [Device.s7].
   s7,
+  /// Arduino, ESP, balança ou leitor que manda a sua própria mensagem
+  /// (`T=25.3;P=1`) por TCP ou UDP — sem norma. Como ler a mensagem fica no
+  /// perfil, em [Device.raw].
+  raw,
 }
 
 extension DeviceKindMeta on DeviceKind {
@@ -41,6 +46,8 @@ extension DeviceKindMeta on DeviceKind {
         return 'Máquina de demonstração';
       case DeviceKind.s7:
         return 'CLP Siemens S7';
+      case DeviceKind.raw:
+        return 'Arduino, ESP ou balança (mensagem própria)';
     }
   }
 
@@ -72,6 +79,7 @@ class Device {
     this.profile,
     this.mqtt = const MqttBroker(),
     this.s7 = const S7Config(),
+    this.raw = const RawConfig(),
   });
 
   final String id;
@@ -105,6 +113,8 @@ class Device {
 
   /// CLP em [DeviceKind.s7]: família (rack e slot).
   final S7Config s7;
+  /// Em [DeviceKind.raw]: TCP ou UDP e o perfil da mensagem.
+  final RawConfig raw;
 
   bool get isDemo => kind == DeviceKind.demo;
 
@@ -115,7 +125,8 @@ class Device {
 
   /// Fala com o equipamento pela rede (IP e porta), qualquer que seja o
   /// protocolo.
-  bool get isNetwork => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt || kind == DeviceKind.s7;
+  bool get isNetwork =>
+      kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt || kind == DeviceKind.s7 || kind == DeviceKind.raw;
 
   /// Descrição curta para listas: "192.168.0.10:502 · ID 1".
   String get addressLabel => isDemo
@@ -124,6 +135,8 @@ class Device {
           ? '$host:$port · MQTT${mqtt.tls ? ' · TLS' : ''}'
           : kind == DeviceKind.s7
           ? '$host:$port · ${s7.label}'
+          : kind == DeviceKind.raw
+          ? '$host:$port · Arduino · ${raw.transport.label}'
           : '$host:$port · ${kind == DeviceKind.modbusRtuTcp ? '${framing.label} · ' : ''}ID $unitId';
 
   Device copyWith({
@@ -137,6 +150,7 @@ class Device {
     ModbusFraming? framing,
     MqttBroker? mqtt,
     S7Config? s7,
+    RawConfig? raw,
   }) =>
       Device(
         id: id,
@@ -150,6 +164,7 @@ class Device {
         framing: framing ?? this.framing,
         mqtt: mqtt ?? this.mqtt,
         s7: s7 ?? this.s7,
+        raw: raw ?? this.raw,
         profile: profile,
       );
 
@@ -167,6 +182,7 @@ class Device {
         framing: framing,
         mqtt: mqtt,
         s7: s7,
+        raw: raw,
         profile: profile,
       );
 
@@ -179,7 +195,8 @@ class Device {
       timeoutMs == other.timeoutMs &&
       framing == other.framing &&
       mqtt == other.mqtt &&
-      s7 == other.s7;
+      s7 == other.s7 &&
+      raw == other.raw;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -196,6 +213,7 @@ class Device {
         if (kind == DeviceKind.mqtt) 'mqtt': mqtt.toJson(),
         // S7 de fábrica (1200/1500) não grava nada; família diferente, só ela.
         if (kind == DeviceKind.s7 && s7.toJson().isNotEmpty) 's7': s7.toJson(),
+        if (kind == DeviceKind.raw) 'raw': raw.toJson(),
       };
 
   factory Device.fromJson(Map<String, dynamic> j) => Device(
@@ -211,5 +229,6 @@ class Device {
         profile: j['profile'] as String?,
         mqtt: j['mqtt'] is Map ? MqttBroker.fromJson(Map<String, dynamic>.from(j['mqtt'] as Map)) : const MqttBroker(),
         s7: j['s7'] is Map ? S7Config.fromJson(Map<String, dynamic>.from(j['s7'] as Map)) : const S7Config(),
+        raw: j['raw'] is Map ? RawConfig.fromJson(Map<String, dynamic>.from(j['raw'] as Map)) : const RawConfig(),
       );
 }

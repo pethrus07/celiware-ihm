@@ -192,10 +192,13 @@ class RawClient {
 
   /// Sem mensagem com valores há mais que a validade do perfil = sem
   /// comunicação. Conta desde a conexão: equipamento que nunca falou também
-  /// vence.
+  /// vence. Depois de uma reconexão conta da reconexão — a última mensagem de
+  /// antes da queda venceria na hora, antes de o equipamento ter tempo de
+  /// falar.
   bool get isStale {
     final ms = profile.staleAfterMs;
-    final since = _lastDataAt ?? _openedAt;
+    final data = _lastDataAt, opened = _openedAt;
+    final since = data == null || (opened != null && opened.isAfter(data)) ? opened : data;
     if (ms <= 0 || since == null) return false;
     return clock.now().difference(since).inMilliseconds > ms;
   }
@@ -227,6 +230,13 @@ class RawClient {
     final t = profile.commandFor(field);
     if (t == null) throw RawCommandError('o perfil não tem comando para gravar "$field"');
     await send(_parser.buildCommand(t, field: field, value: value));
+  }
+
+  /// Grava [value] no campo [field] com um modelo que não é do perfil (o
+  /// comando próprio de uma variável). O checksum e o conjunto de caracteres
+  /// continuam os do perfil.
+  Future<void> writeWith(CommandTemplate template, String field, Object value) async {
+    await send(_parser.buildCommand(template, field: field, value: value));
   }
 
   /// Manda o comando de nome [name] (botão "Zerar balança").

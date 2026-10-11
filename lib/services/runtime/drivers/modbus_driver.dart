@@ -50,15 +50,17 @@ class ModbusDriver extends DeviceDriver {
   @override
   Future<int> scan(List<Tag> tags, TagStore store, {required bool Function() stillCurrent}) async {
     if (!client.isConnected) await client.connect();
-    // Variável com tópico MQTT ou endereço S7 (o equipamento mudou de
-    // protocolo): não tem endereço Modbus de verdade — ler o HR 0 no lugar
-    // dela mostraria um número qualquer como se fosse o dado.
-    for (final t in tags.where((t) => t.mqtt != null || t.s7 != null)) {
+    // Variável com tópico MQTT, endereço S7 ou campo de mensagem crua (o
+    // equipamento mudou de protocolo): não tem endereço Modbus de verdade —
+    // ler o HR 0 no lugar dela mostraria um número qualquer como se fosse o dado.
+    bool foreign(Tag t) => t.mqtt != null || t.s7 != null || t.raw != null;
+    for (final t in tags.where(foreign)) {
       if (store.read(t.id).quality != TagQuality.configError) {
-        store.publish(t.id, TagReading(quality: TagQuality.configError, message: 'variável de ${t.mqtt != null ? 'MQTT' : 'Siemens S7'} num equipamento Modbus', at: DateTime.now()));
+        final what = t.mqtt != null ? 'MQTT' : (t.s7 != null ? 'Siemens S7' : 'mensagem crua (Arduino)');
+        store.publish(t.id, TagReading(quality: TagQuality.configError, message: 'variável de $what num equipamento Modbus', at: DateTime.now()));
       }
     }
-    final blocks = planner.plan(tags.where((t) => t.mqtt == null && t.s7 == null).toList(), isolated: _isolated);
+    final blocks = planner.plan(tags.where((t) => !foreign(t)).toList(), isolated: _isolated);
     for (final block in blocks) {
       if (!stillCurrent()) break;
       await _readBlock(block, store);

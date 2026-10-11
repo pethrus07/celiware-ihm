@@ -155,4 +155,10 @@ python sim/arduino_falso.py --baguncar       TCP: parte mensagens ao meio e mand
 
 Bomba ligada, a temperatura sobe devagar até ~60 °C; desligada, volta a ~25 °C. Outras opções: `--porta N`, `--intervalo MS`, `--destino IP:PORTA` (UDP: para onde transmitir antes de o app falar).
 
-O perfil que lê isto: fim de linha `\n`, campos chave=valor (`;` e `=`), comando `SET {campo}={valor}\n`. A tela do app para o protocolo cru ainda não existe (RW-3); até lá, confira à mão com um terminal TCP cru (PuTTY em modo *Raw* ou `ncat 127.0.0.1 5030`). Nos testes automatizados o mesmo papel é do `FakeArduinoServer` em Dart (`lib/core/rawlink/`), por TCP e UDP.
+O perfil que lê isto é o padrão do app — **Linha chave=valor** (fim de linha `\n`, pares com `;`, nome e valor com `=`, comando `SET {campo}={valor}\n`):
+
+1. **Equipamentos → +** → Na rede → **Mais opções → Protocolo → Arduino / mensagem própria**; IP do computador, porta 5030 (já vem). **Testar conexão** deve dizer "Chegou mensagem e o perfil entendeu".
+2. **Mensagem do equipamento** abre o editor: a prévia ao vivo mostra `T=25.3;P=1` e, embaixo, `T = 25,3 · P = 1`. Com `--baguncar`, a prévia junta as mensagens partidas e descarta o ruído do começo.
+3. Variáveis: campo `T` (número com vírgula, °C) e campo `P` (liga/desliga, "pode ser alterada pela tela": o botão grava `SET P=0`/`SET P=1` e acende quando o "Arduino" confirma). **Ouvir o equipamento e escolher** lista os dois com o valor.
+
+Variações: `--intervalo 0` pede **O app pergunta** no editor (a pergunta `?\n` já vem); em UDP, escolha **UDP** no cadastro e **O app pergunta** (o sketch responde a quem falou e passa a transmitir para ele) ou rode com `--destino IP_DO_CELULAR:PORTA` e ponha essa porta em **Porta deste celular**. Sem o app, um terminal TCP cru também serve (PuTTY em modo *Raw* ou `ncat 127.0.0.1 5030`). Nos testes automatizados o mesmo papel é do `FakeArduinoServer` em Dart (`lib/core/rawlink/`), por TCP e UDP.

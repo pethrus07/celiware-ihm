@@ -11,10 +11,12 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
 import '../../models/alarm.dart';
+import '../../models/device.dart';
 import '../../models/project.dart';
 import '../../models/narration.dart';
 import '../../models/tag.dart';
 import '../../services/runtime/hmi_runtime.dart';
+import '../../services/runtime/mqtt_codec.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/element_catalog.dart';
@@ -22,6 +24,7 @@ import '../devices/device_form_page.dart';
 import 'address_field.dart';
 import 'alarm_editor.dart';
 import 'device_pick.dart';
+import 'mqtt_tag_fields.dart';
 import 'reading_hints.dart';
 import 'tag_uses.dart';
 import 'narration_editor.dart';
@@ -135,10 +138,16 @@ class _TagFormPageState extends State<TagFormPage> {
   double get _scaleValue => _parseNum(_scale.text) ?? 1;
   double get _offsetValue => _parseNum(_offset.text) ?? 0;
 
+  /// Tópico, campo do JSON e comando — o endereço quando o equipamento é MQTT.
+  late final MqttTagFields _mq = MqttTagFields(widget.tag?.mqtt);
+
   HmiRuntime? _runtime;
   Timer? _liveTimer;
   Object? _liveValue;
   String? _liveError;
+
+  /// "Esperando mensagem…": no MQTT, tópico calado não é erro.
+  String? _liveNote;
   bool _liveBusy = false;
 
   /// Ordens de bytes que já leram lixo neste endereço — a sugestão não manda
@@ -155,6 +164,13 @@ class _TagFormPageState extends State<TagFormPage> {
   AutovalidateMode _autovalidate = AutovalidateMode.disabled;
 
   bool get _editing => widget.tag != null;
+
+  Device? get _device => AppScope.of(context).controller.project.device(_deviceId ?? '');
+  bool get _isMqtt => _device?.kind == DeviceKind.mqtt;
+
+  /// Pode virar "Lê e grava": no MQTT qualquer variável (publica no tópico de
+  /// comando); no Modbus, só onde a área aceita escrita. Texto é só leitura.
+  bool get _canWrite => (_isMqtt || _area.isWritable) && _type != TagDataType.string;
 
   @override
   void initState() {
@@ -207,6 +223,7 @@ class _TagFormPageState extends State<TagFormPage> {
     for (final c in [_name, _address, _bit, _length, _unit, _description, _scale, _offset]) {
       c.dispose();
     }
+    _mq.dispose();
     super.dispose();
   }
 
@@ -228,33 +245,43 @@ class _TagFormPageState extends State<TagFormPage> {
 
   /// Variável como está no formulário, mesmo incompleta (endereço inválido
   /// vira 0) — serve para avisos e prévias.
-  Tag _draft() => Tag(
-        id: _id,
-        name: _name.text.trim().isEmpty ? 'Variável' : _name.text.trim(),
-        deviceId: _deviceId ?? '',
-        area: _area,
-        address: _addressReading.address ?? 0,
-        dataType: _type,
-        byteOrder: _order,
-        bitIndex: (int.tryParse(_bit.text) ?? 0).clamp(0, 15),
-        length: _type == TagDataType.bool ? 1 : (int.tryParse(_length.text) ?? 1).clamp(1, 120),
-        writable: _writable,
-        unit: _unit.text.trim(),
-        decimals: _decimals,
-        scale: _scaleValue,
-        offset: _offsetValue,
-        description: _description.text.trim(),
-        alarms: _alarms,
-        narrations: _narrations,
-      ).normalized();
+  Tag _draft() {
+    // MQTT: o endereço é o tópico; área e endereço Modbus ficam no padrão.
+    final mqtt = _isMqtt ? _mq.build() : null;
+    return Tag(
+      id: _id,
+      name: _name.text.trim().isEmpty ? 'Variável' : _name.text.trim(),
+      deviceId: _deviceId ?? '',
+      mqtt: mqtt,
+      area: mqtt != null ? ModbusArea.holdingRegister : _area,
+      address: mqtt != null ? 0 : _addressReading.address ?? 0,
+      dataType: _type,
+      byteOrder: mqtt != null ? ByteOrder.abcd : _order,
+      bitIndex: mqtt != null ? 0 : (int.tryParse(_bit.text) ?? 0).clamp(0, 15),
+      length: _type == TagDataType.bool ? 1 : (int.tryParse(_length.text) ?? 1).clamp(1, 120),
+      writable: _writable,
+      unit: _unit.text.trim(),
+      decimals: _decimals,
+      scale: _scaleValue,
+      offset: _offsetValue,
+      description: _description.text.trim(),
+      alarms: _alarms,
+      narrations: _narrations,
+    ).normalized();
+  }
 
-  /// Variável como está no formulário agora (nula se faltar o essencial).
-  Tag? _current() => _deviceId == null || _addressReading.address == null ? null : _draft();
+  /// Variável como está no formulário agora (nula se faltar o essencial:
+  /// equipamento e endereço — ou tópico, no MQTT).
+  Tag? _current() {
+    if (_deviceId == null) return null;
+    if (_isMqtt) return _mq.build() == null ? null : _draft();
+    return _addressReading.address == null ? null : _draft();
+  }
 
   /// O que a leitura depende: mudou durante a ida ao equipamento, o valor
   /// que voltou é de outra configuração e não vale.
   static String _readKey(Tag t) =>
-      '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.byteOrder.name}|${t.bitIndex}|${t.length}|${t.scale}|${t.offset}';
+      '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.byteOrder.name}|${t.bitIndex}|${t.length}|${t.scale}|${t.offset}|${t.mqtt == null ? '' : jsonEncode(t.mqtt!.toJson())}';
 
   /// O mesmo, sem a ordem dos bytes: as ordens que falharam valem para ele.
   static String _decodeKey(Tag t) => '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.length}';
@@ -278,7 +305,16 @@ class _TagFormPageState extends State<TagFormPage> {
       setState(() {
         _liveValue = v;
         _liveError = null;
+        _liveNote = null;
       });
+    } on MqttNoMessageYet catch (e) {
+      if (mounted) {
+        setState(() {
+          _liveValue = null;
+          _liveError = null;
+          _liveNote = e.message;
+        });
+      }
     } on CommError catch (e) {
       if (mounted) setState(() => _liveError = e.userMessage);
     } on TagValueError catch (e) {
@@ -311,6 +347,7 @@ class _TagFormPageState extends State<TagFormPage> {
         _order.name,
         _writable,
         _alarmsJson(),
+        _mq.build()?.toJson() ?? _mq.topic.text.trim(),
       ]);
 
   bool get _dirty => (_initialDeviceId != null && _deviceId != _initialDeviceId) || _snapshot() != _initialSnapshot;
@@ -416,12 +453,20 @@ class _TagFormPageState extends State<TagFormPage> {
   /// Resumo do que está em "Mais opções", para ninguém precisar abrir só
   /// para conferir.
   String _moreSummary() {
-    final hex = _hex ? 'endereço em hex' : null;
-    if (_type == TagDataType.bool) return hex != null ? 'Endereço em hex' : 'Observação, endereço em hex';
+    final mqtt = _isMqtt;
+    final mq = mqtt ? _mq.summary(writable: _writable, isBool: _type == TagDataType.bool) : const <String>[];
+    // Endereço em hexadecimal só existe no Modbus.
+    final hex = _hex && !mqtt ? 'endereço em hex' : null;
+    if (_type == TagDataType.bool) {
+      if (mqtt) return mq.isEmpty ? 'Observação' : mq.join(' · ');
+      return hex != null ? 'Endereço em hex' : 'Observação, endereço em hex';
+    }
     if (_type == TagDataType.string) {
+      if (mqtt) return ['Texto', ...mq].join(' · ');
       return [_order == ByteOrder.abcd ? 'Texto · STRING' : 'Texto · bytes trocados', ?hex].join(' · ');
     }
     final parts = <String>[
+      ...mq,
       if (_scaleLabel() != null) _scaleLabel()!,
       if (_unit.text.trim().isNotEmpty) _unit.text.trim(),
       if (_decimals > 0) _decimals == 1 ? '1 casa decimal' : '$_decimals casas decimais',
@@ -430,7 +475,8 @@ class _TagFormPageState extends State<TagFormPage> {
       if ((int.tryParse(_length.text) ?? 1) > 1) 'lista de ${_length.text}',
       ?hex,
     ];
-    return parts.isEmpty ? 'Escala, unidade, decimais, formato, hex' : parts.join(' · ');
+    if (parts.isNotEmpty) return parts.join(' · ');
+    return mqtt ? 'Escala, unidade, decimais, validade' : 'Escala, unidade, decimais, formato, hex';
   }
 
   /// "÷ 10", "× 0,5 + 3"... ou nulo sem escala.
@@ -455,7 +501,27 @@ class _TagFormPageState extends State<TagFormPage> {
   void _onFieldChanged() => setState(() {
         _liveValue = null;
         _liveError = null;
+        _liveNote = null;
       });
+
+  /// Escolheu um tópico (e campo) ouvido no broker: preenche o endereço, o
+  /// tipo que combina com o valor e, sem nome ainda, um nome de partida.
+  void _onMqttPick(MqttPick p) {
+    _mq.topic.text = p.topic;
+    _mq.jsonPath.text = p.jsonPath;
+    if (_name.text.trim().isEmpty) _name.text = p.suggestedName;
+    final fits = switch (widget.fit) {
+      TagFit.boolean => p.type == TagDataType.bool,
+      TagFit.number || TagFit.numberList => p.type.isNumeric,
+      TagFit.scalar => p.type != TagDataType.string,
+      _ => true,
+    };
+    if (fits) {
+      _setType(p.type);
+    } else {
+      _onFieldChanged();
+    }
+  }
 
   // ── Salvar e erros ────────────────────────────────────────────────────────
 
@@ -475,8 +541,12 @@ class _TagFormPageState extends State<TagFormPage> {
   /// 1 em silêncio).
   (GlobalKey, bool)? _firstProblem() {
     if (Validators.name(_name.text) != null) return (_nameAnchor, false);
-    if (_addressReading.error != null) return (_addressAnchor, false);
-    if (_isBitOfWord && _rangeError(_bit.text, 0, 15) != null) return (_bitAnchor, false);
+    if (_isMqtt) {
+      if (_mq.build() == null) return (_addressAnchor, false);
+    } else {
+      if (_addressReading.error != null) return (_addressAnchor, false);
+      if (_isBitOfWord && _rangeError(_bit.text, 0, 15) != null) return (_bitAnchor, false);
+    }
     if ((_lengthInMain || _lengthInMore) && _rangeError(_length.text, 1, 120) != null) return (_lengthAnchor, _lengthInMore);
     if (_type.isNumeric && _customScale && (_scaleError(_scale.text) != null || _offsetError(_offset.text) != null)) {
       return (_scaleAnchor, true);
@@ -586,6 +656,8 @@ class _TagFormPageState extends State<TagFormPage> {
       return true;
     }).toList();
     final isText = _type == TagDataType.string;
+    final mqtt = _isMqtt;
+    final canWrite = _canWrite;
     final draft = _draft();
     final live = _current();
     final dormantAlarms = _alarms.where((a) => !draft.acceptsAlarm(a)).toList();
@@ -652,9 +724,12 @@ class _TagFormPageState extends State<TagFormPage> {
                         value: _liveValue,
                         error: _liveError,
                         tag: live,
+                        note: _liveNote,
                         idle: _deviceId == null
                             ? 'Escolha o equipamento'
-                            : _addressReading.overMax
+                            : mqtt
+                                ? 'Complete o tópico'
+                                : _addressReading.overMax
                                 ? 'Endereço acima de 65535'
                                 : _addressReading.error ?? 'Complete equipamento e endereço',
                       ),
@@ -727,11 +802,18 @@ class _TagFormPageState extends State<TagFormPage> {
                           'Onde fica',
                           padding: const EdgeInsets.fromLTRB(0, 28, 0, 12),
                           trailing: AnimatedOpacity(
-                            opacity: _whereChanged ? 1 : 0,
+                            opacity: _whereChanged && !mqtt ? 1 : 0,
                             duration: const Duration(milliseconds: 250),
                             child: Text('mudou com o tipo', style: TextStyle(color: Ind.accent, fontSize: 12.5, fontWeight: FontWeight.w600)),
                           ),
                         ),
+                        // MQTT: o endereço é o tópico (e o campo do JSON).
+                        if (mqtt)
+                          KeyedSubtree(
+                            key: _addressAnchor,
+                            child: MqttAddressBlock(fields: _mq, device: _device, onChanged: _onFieldChanged, onPick: _onMqttPick),
+                          )
+                        else ...[
                         _whereBlock(),
                         const SizedBox(height: Ind.spaceLarge),
                         // Bloco do endereço: é aqui que a "Memória do CLP"
@@ -755,6 +837,7 @@ class _TagFormPageState extends State<TagFormPage> {
                             ),
                           ),
                         ],
+                        ], // fim do endereço Modbus
                         // Lista é obrigatória para o gráfico de barras: aí fica à vista.
                         if (_lengthInMain && !isText) ...[
                           const SizedBox(height: Ind.space),
@@ -764,7 +847,8 @@ class _TagFormPageState extends State<TagFormPage> {
                           ),
                         ],
                         // Texto: o tamanho é o essencial (quantos registradores ler).
-                        if (isText) ...[
+                        // No MQTT o texto vem inteiro na mensagem.
+                        if (isText && !mqtt) ...[
                           const SizedBox(height: Ind.space),
                           KeyedSubtree(
                             key: _lengthAnchor,
@@ -783,15 +867,19 @@ class _TagFormPageState extends State<TagFormPage> {
                         SwitchListTile(
                           key: const ValueKey('pode-gravar'),
                           contentPadding: EdgeInsets.zero,
-                          value: _writable && _area.isWritable && !isText,
-                          onChanged: _area.isWritable && !isText ? (v) => setState(() => _writable = v) : null,
+                          value: _writable && canWrite,
+                          onChanged: canWrite ? (v) => setState(() => _writable = v) : null,
                           title: const Text('Pode ser alterada pela tela'),
                           subtitle: isText
                               ? const Text('Texto é só leitura nesta versão.')
-                              : _area.isWritable
+                              : canWrite
                                   ? null
                                   : const Text('Esta memória é só de leitura.'),
                         ),
+                        if (mqtt && _writable && canWrite) ...[
+                          const SizedBox(height: Ind.spaceSmall),
+                          MqttCommandField(fields: _mq, onChanged: _onFieldChanged),
+                        ],
                         // Alarme: uma linha só, à vista (é segurança, não detalhe); o
                         // editor abre numa folha. Texto e lista não alarmam.
                         if (!draft.isText && !draft.isArray) ...[
@@ -905,6 +993,7 @@ class _TagFormPageState extends State<TagFormPage> {
         subtitle: Text(_moreSummary(), style: TextStyle(color: Ind.textMuted, fontSize: 13)),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_isMqtt) MqttMoreOptions(fields: _mq, writable: _writable && _canWrite, isBool: _type == TagDataType.bool, onChanged: _onFieldChanged),
           if (_type.isNumeric) ...[
             // Escala primeiro: é o que mais se usa aqui ("o
             // manual diz para dividir por 10").
@@ -992,14 +1081,19 @@ class _TagFormPageState extends State<TagFormPage> {
                 child: StepperField(label: 'Quantos valores seguidos', controller: _length, min: 1, max: 120, helper: 'Mais que 1 forma uma lista (gráfico de barras).', onChanged: _onFieldChanged),
               ),
             ],
-            const SectionHeader('Outros formatos', padding: EdgeInsets.fromLTRB(0, 24, 0, 10)),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final t in typeOptions.where((t) => !_isMainType(t)))
-                ChoiceChip(key: ValueKey('formato-${t.name}'), label: Text('${t.label} · ${t.technical}'), selected: _type == t, onSelected: (_) => _setType(t)),
-            ]),
+            // MQTT não tem registrador: 16/32 bits e ordem de bytes não
+            // existem lá; dos formatos raros só sobra texto.
+            if (typeOptions.any((t) => !_isMainType(t) && (!_isMqtt || t == TagDataType.string))) ...[
+              const SectionHeader('Outros formatos', padding: EdgeInsets.fromLTRB(0, 24, 0, 10)),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final t in typeOptions.where((t) => !_isMainType(t) && (!_isMqtt || t == TagDataType.string)))
+                  ChoiceChip(key: ValueKey('formato-${t.name}'), label: Text(_isMqtt ? t.label : '${t.label} · ${t.technical}'), selected: _type == t, onSelected: (_) => _setType(t)),
+              ]),
+            ],
             // Formato raro escolhido aqui: o aviso da troca aparece aqui também,
             // onde a pessoa está olhando.
             if (typeWarning != null && !_isMainType(_type)) ...[const SizedBox(height: 12), typeWarning],
+            if (!_isMqtt) ...[
             const SectionHeader('Ordem dos bytes', padding: EdgeInsets.fromLTRB(0, 24, 0, 10)),
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final o in ByteOrder.values)
@@ -1014,11 +1108,12 @@ class _TagFormPageState extends State<TagFormPage> {
                     },
                   ),
             ]),
+            ],
             const SizedBox(height: Ind.space),
           ],
           // Endereço como o manual escreve. A "Memória do CLP" (perfis de
           // fabricante) é a outra opção de endereço que mora aqui.
-          SwitchListTile(
+          if (!_isMqtt) SwitchListTile(
             key: const ValueKey('endereco-hex'),
             contentPadding: EdgeInsets.zero,
             value: _hex,
@@ -1098,7 +1193,7 @@ class _Warning extends StatelessWidget {
 
 /// Painel "Lendo agora do equipamento".
 class _LivePanel extends StatelessWidget {
-  const _LivePanel({required this.value, required this.error, required this.tag, required this.idle});
+  const _LivePanel({required this.value, required this.error, required this.tag, required this.idle, this.note});
   final Object? value;
   final String? error;
   final Tag? tag;
@@ -1106,12 +1201,16 @@ class _LivePanel extends StatelessWidget {
   /// O que falta para começar a ler ("Endereço acima de 65535").
   final String idle;
 
+  /// Aviso neutro no lugar do valor ("esperando mensagem em …").
+  final String? note;
+
   @override
   Widget build(BuildContext context) {
     final err = error;
     final color = err != null ? Ind.alarm : (value != null ? Ind.ok : Ind.textMuted);
     final t = tag;
-    final text = err != null ? capitalized(err) : (t == null ? idle : value == null ? 'Lendo…' : _fmt(t, value));
+    final waiting = note != null ? capitalized(note!) : 'Lendo…';
+    final text = err != null ? capitalized(err) : (t == null ? idle : value == null ? waiting : _fmt(t, value));
     // Com escala, mostrar o número cru ao lado é a prova de que a conta está
     // certa: "vem 752 do equipamento" → "75,2 °C" na tela.
     final v = value;
@@ -1141,7 +1240,12 @@ class _LivePanel extends StatelessWidget {
             ],
           ]),
         ),
-        if (t != null) Text(t.addressLabel, style: Ind.number(12, color: Ind.textMuted)),
+        // Tópico MQTT pode ser comprido: o valor lido é que não pode sumir.
+        if (t != null)
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 130),
+            child: Text(t.addressLabel, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right, style: Ind.number(12, color: Ind.textMuted)),
+          ),
       ]),
     );
   }

@@ -5,6 +5,7 @@ import '../../../models/device.dart';
 import '../../../models/tag.dart';
 import '../tag_store.dart';
 import 'modbus_driver.dart';
+import 'mqtt_driver.dart';
 
 /// O que muda de um protocolo para outro, atrás de um contrato só.
 ///
@@ -22,6 +23,10 @@ abstract class DeviceDriver {
   ValueListenable<ModbusLinkState> get state;
 
   bool get isConnected => state.value == ModbusLinkState.connected;
+
+  /// O tempo de uma varredura mede a rede (vai para o selo: "Online · 42 ms").
+  /// Driver de assinatura não pergunta nada na varredura — o número seria 0.
+  bool get reportsScanTime => true;
 
   /// O driver pede uma varredura já (ex.: separou um bloco para achar o
   /// endereço errado). A sessão liga isto ao próprio "acordar".
@@ -57,6 +62,8 @@ abstract class DeviceDriver {
       case DeviceKind.modbusRtuTcp:
       case DeviceKind.demo:
         return ModbusDriver(clientFactory(device));
+      case DeviceKind.mqtt:
+        return MqttDriver(device);
     }
   }
 }

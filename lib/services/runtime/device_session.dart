@@ -154,7 +154,13 @@ class DeviceSession {
   }
 
   Future<void> stop() async {
-    if (!_running) return;
+    if (!_running) {
+      // Leitura avulsa ("lendo agora") conecta sem ligar o laço; sem isto a
+      // conexão ficava aberta depois de fechar o cadastro (no MQTT, pingando
+      // o broker até o app ir para segundo plano).
+      await _driver.disconnect();
+      return;
+    }
     _running = false;
     _generation++;
     wake();
@@ -200,7 +206,7 @@ class DeviceSession {
     try {
       final reads = await driver.scan(tags, store, stillCurrent: () => current() && identical(driver, _driver));
       _failures = 0;
-      _setHealth(link: driver.state.value, lastScanMs: sw.elapsedMilliseconds, blocks: reads);
+      _setHealth(link: driver.state.value, lastScanMs: driver.reportsScanTime ? sw.elapsedMilliseconds : null, blocks: reads);
       return Duration(milliseconds: _device.pollMs);
     } on CommError catch (e) {
       _failures++;

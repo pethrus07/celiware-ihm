@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/modbus/modbus_framing.dart';
+import '../../core/mqtt/mqtt_error.dart';
+import '../../core/mqtt/mqtt_topic.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
 import '../../models/device.dart';
 import '../../models/vendor_profiles.dart';
+import '../../models/mqtt_config.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/common.dart';
 import 'vendor_profile_sheet.dart';
@@ -30,16 +33,29 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   late final String _id = widget.device?.id ?? newId('d');
   late bool _demo = widget.device?.isDemo ?? false;
 
-  /// Protocolo de rede: Modbus TCP, ou RTU/ASCII "cru" por um gateway serial.
+  /// Protocolo de rede: Modbus TCP, RTU/ASCII "cru" por um gateway serial,
+  /// ou MQTT (o IP passa a ser o do broker).
   late _Protocol _protocol = switch (widget.device) {
     Device(kind: DeviceKind.modbusRtuTcp, framing: ModbusFraming.ascii) => _Protocol.ascii,
     Device(kind: DeviceKind.modbusRtuTcp) => _Protocol.rtu,
+    Device(kind: DeviceKind.mqtt) => _Protocol.mqtt,
     _ => _Protocol.tcp,
   };
 
   /// Marca e modelo (perfil de fabricante); nulo = Modbus genérico.
   late String? _profile = widget.device?.profile;
   String? get _profileName => VendorProfiles.byId(_profile)?.name;
+  late final MqttBroker _broker = widget.device?.mqtt ?? const MqttBroker();
+  late bool _tls = _broker.tls;
+  late final _user = TextEditingController(text: _broker.username);
+  late final _pass = TextEditingController(text: _broker.password);
+  late final _clientId = TextEditingController(text: _broker.clientId);
+  late final _keepAlive = TextEditingController(text: '${_broker.keepAliveSec}');
+  late final _statusTopic = TextEditingController(text: _broker.statusTopic);
+  late final _offline = TextEditingController(text: _broker.offlinePayload);
+  bool _showPass = false;
+
+  bool get _mqtt => !_demo && _protocol == _Protocol.mqtt;
   late final _name = TextEditingController(text: widget.device?.name ?? '');
   late final _host = TextEditingController(text: widget.device?.host ?? '');
   late final _port = TextEditingController(text: '${widget.device?.port ?? 502}');
@@ -54,7 +70,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 
   @override
   void dispose() {
-    for (final c in [_name, _host, _port, _unit, _timeout, _poll]) {
+    for (final c in [_name, _host, _port, _unit, _timeout, _poll, _user, _pass, _clientId, _keepAlive, _statusTopic, _offline]) {
       c.dispose();
     }
     super.dispose();
@@ -63,15 +79,66 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   Device _build() => Device(
         id: _id,
         name: _name.text.trim().isEmpty ? 'Equipamento' : _name.text.trim(),
-        kind: _demo ? DeviceKind.demo : (_protocol == _Protocol.tcp ? DeviceKind.modbusTcp : DeviceKind.modbusRtuTcp),
+        kind: _demo
+            ? DeviceKind.demo
+            : switch (_protocol) {
+                _Protocol.tcp => DeviceKind.modbusTcp,
+                _Protocol.mqtt => DeviceKind.mqtt,
+                _ => DeviceKind.modbusRtuTcp,
+              },
         framing: _protocol == _Protocol.ascii ? ModbusFraming.ascii : ModbusFraming.rtu,
         host: _host.text.trim(),
         port: int.tryParse(_port.text) ?? 502,
         unitId: int.tryParse(_unit.text) ?? 1,
         timeoutMs: (int.tryParse(_timeout.text) ?? 1500).clamp(200, 10000),
         pollMs: (int.tryParse(_poll.text) ?? 500).clamp(100, 60000),
-        profile: _demo ? null : _profile,
+        // Perfil de fabricante é mapa de memória Modbus: no MQTT não existe.
+        profile: _demo || _mqtt ? null : _profile,
+        // Só MQTT guarda broker; nos outros fica o padrão (e o arquivo, igual).
+        mqtt: _mqtt
+            ? MqttBroker(
+                tls: _tls,
+                username: _user.text.trim(),
+                password: _pass.text,
+                keepAliveSec: (int.tryParse(_keepAlive.text) ?? 30).clamp(0, 65535),
+                clientId: _clientId.text.trim(),
+                statusTopic: _statusTopic.text.trim(),
+                offlinePayload: _offline.text.trim().isEmpty ? 'offline' : _offline.text.trim(),
+              )
+            : const MqttBroker(),
       );
+
+  /// Trocar de protocolo leva junto a porta padrão — quem escolhe MQTT quase
+  /// nunca quer a 502 que já estava no campo.
+  void _setProtocol(_Protocol p) {
+    final port = int.tryParse(_port.text);
+    if (p == _Protocol.mqtt && (port == 502 || port == null)) {
+      _port.text = '${_tls ? MqttBroker.tlsPort : MqttBroker.defaultPort}';
+    } else if (p != _Protocol.mqtt && (port == MqttBroker.defaultPort || port == MqttBroker.tlsPort)) {
+      _port.text = '502';
+    }
+    _protocol = p;
+    _probe = null;
+  }
+
+  void _setTls(bool on) {
+    final port = int.tryParse(_port.text);
+    if (on && port == MqttBroker.defaultPort) _port.text = '${MqttBroker.tlsPort}';
+    if (!on && port == MqttBroker.tlsPort) _port.text = '${MqttBroker.defaultPort}';
+    _tls = on;
+    _probe = null;
+  }
+
+  /// Resumo de "Mais opções" fechado.
+  String _moreSummary() {
+    if (!_mqtt) return '${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}${_profileName == null ? '' : ' · $_profileName'}';
+    return [
+      'MQTT · Porta ${_port.text}',
+      if (_tls) 'TLS',
+      if (_user.text.trim().isNotEmpty) _user.text.trim(),
+      if (_statusTopic.text.trim().isNotEmpty) 'aviso de queda',
+    ].join(' · ');
+  }
 
   Future<void> _test() async {
     // Testar só exige o IP — validar o formulário inteiro marcava erro no
@@ -195,7 +262,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 validator: (v) => tcp ? Validators.host(v) : null,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: Ind.number(20),
-                decoration: const InputDecoration(labelText: 'IP do equipamento', hintText: '192.168.0.10'),
+                decoration: InputDecoration(labelText: _mqtt ? 'IP do broker' : 'IP do equipamento', hintText: '192.168.0.10'),
                 onChanged: (_) => setState(() => _probe = null),
               ),
             ],
@@ -208,7 +275,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   : const Icon(Icons.network_check_rounded),
               label: Text(_probing ? 'Testando…' : 'Testar conexão'),
             ),
-            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp))],
+            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt))],
             if (tcp) ...[
               const SizedBox(height: Ind.spaceLarge),
               Theme(
@@ -220,22 +287,25 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   childrenPadding: const EdgeInsets.only(bottom: 8),
                   expandedCrossAxisAlignment: CrossAxisAlignment.start,
                   title: const Text('Mais opções'),
-                  subtitle: Text('${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}${_profileName == null ? '' : ' · $_profileName'}',
-                      style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+                  subtitle: Text(_moreSummary(), style: TextStyle(color: Ind.textMuted, fontSize: 13)),
                   children: [
                     // Marca e modelo: com ela, as variáveis aceitam a memória
                     // como no manual ("D200"). Genérico = endereço Modbus direto.
-                    ListTile(
-                      key: const ValueKey('marca-modelo'),
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Marca e modelo'),
-                      subtitle: Text(_profileName ?? 'Genérico', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: _pickProfile,
-                    ),
-                    const SizedBox(height: Ind.spaceSmall),
+                    // No MQTT não há mapa de memória.
+                    if (!_mqtt) ...[
+                      ListTile(
+                        key: const ValueKey('marca-modelo'),
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Marca e modelo'),
+                        subtitle: Text(_profileName ?? 'Genérico', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: _pickProfile,
+                      ),
+                      const SizedBox(height: Ind.spaceSmall),
+                    ],
                     // Gateway serial→Ethernet (RS-485 do outro lado) que repassa
-                    // RTU/ASCII cru: escolha rara, por isso fica aqui.
+                    // RTU/ASCII cru, ou um broker MQTT: escolhas raras, por isso
+                    // ficam aqui.
                     Text('Protocolo', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, runSpacing: 8, children: [
@@ -244,25 +314,24 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                           key: ValueKey('protocolo-${p.name}'),
                           label: Text(p.chip),
                           selected: _protocol == p,
-                          onSelected: (_) => setState(() {
-                            _protocol = p;
-                            _probe = null;
-                          }),
+                          onSelected: (_) => setState(() => _setProtocol(p)),
                         ),
                     ]),
-                    if (_protocol != _Protocol.tcp) ...[
+                    if (_protocol == _Protocol.rtu || _protocol == _Protocol.ascii) ...[
                       const SizedBox(height: 6),
                       Text('Para conversor RS-485 → Ethernet que repassa os bytes sem converter. Se o conversor faz a conversão para Modbus TCP, use Modbus TCP.',
                           style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
                     ],
-                    const SizedBox(height: Ind.space),
-                    StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
-                    const SizedBox(height: Ind.space),
-                    StepperField(label: 'ID do escravo', controller: _unit, min: 0, max: 255, helper: 'Quase sempre 1.', onChanged: () => setState(() {})),
-                    const SizedBox(height: Ind.space),
-                    StepperField(label: 'Tempo de resposta (ms)', controller: _timeout, min: 200, max: 10000),
-                    const SizedBox(height: Ind.space),
-                    StepperField(label: 'Ler a cada (ms)', controller: _poll, min: 100, max: 60000),
+                    if (_mqtt) ..._mqttOptions() else ...[
+                      const SizedBox(height: Ind.space),
+                      StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
+                      const SizedBox(height: Ind.space),
+                      StepperField(label: 'ID do escravo', controller: _unit, min: 0, max: 255, helper: 'Quase sempre 1.', onChanged: () => setState(() {})),
+                      const SizedBox(height: Ind.space),
+                      StepperField(label: 'Tempo de resposta (ms)', controller: _timeout, min: 200, max: 10000),
+                      const SizedBox(height: Ind.space),
+                      StepperField(label: 'Ler a cada (ms)', controller: _poll, min: 100, max: 60000),
+                    ],
                   ],
                 ),
               ),
@@ -272,12 +341,87 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
       ),
     );
   }
+
+  void _refresh([VoidCallback? change]) => setState(change ?? () {});
+
+  /// "Mais opções" do MQTT, na ordem em que costumam ser mexidas: porta,
+  /// usuário e senha, TLS. Aviso de queda, sinal de vida, ID e tempo são raros.
+  List<Widget> _mqttOptions() => [
+        const SizedBox(height: 6),
+        Text('O app assina os tópicos num broker da rede (Mosquitto, Node-RED, CLP ou ESP32 com MQTT). O IP acima é o do broker.',
+            style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
+        const SizedBox(height: Ind.space),
+        StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: 'MQTT usa 1883; com TLS, 8883.', onChanged: () => _refresh()),
+        const SizedBox(height: Ind.space),
+        TextFormField(
+          key: const ValueKey('campo-usuario-mqtt'),
+          controller: _user,
+          autocorrect: false,
+          decoration: const InputDecoration(labelText: 'Usuário', hintText: 'Vazio = broker sem senha'),
+          onChanged: (_) => _refresh(),
+        ),
+        const SizedBox(height: Ind.space),
+        TextFormField(
+          key: const ValueKey('campo-senha-mqtt'),
+          controller: _pass,
+          obscureText: !_showPass,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+            labelText: 'Senha',
+            suffixIcon: IconButton(
+              tooltip: _showPass ? 'Esconder' : 'Mostrar',
+              icon: Icon(_showPass ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+              onPressed: () => _refresh(() => _showPass = !_showPass),
+            ),
+          ),
+        ),
+        SwitchListTile(
+          key: const ValueKey('mqtt-tls'),
+          contentPadding: EdgeInsets.zero,
+          value: _tls,
+          onChanged: (v) => _refresh(() => _setTls(v)),
+          title: const Text('Conexão segura (TLS)'),
+          subtitle: const Text('O certificado do broker precisa ser confiável para o celular.'),
+        ),
+        const SizedBox(height: Ind.spaceSmall),
+        TextFormField(
+          controller: _statusTopic,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            labelText: 'Tópico de aviso de queda (LWT)',
+            hintText: 'Ex.: cortadora/status',
+            helperText: 'Se o equipamento deixa testamento no broker, as variáveis dele ficam "sem comunicação" quando ele cai.',
+            helperMaxLines: 3,
+          ),
+          validator: (v) => v == null || v.trim().isEmpty || MqttTopic.isValidFilter(v.trim()) ? null : 'Tópico inválido',
+          onChanged: (_) => _refresh(),
+        ),
+        if (_statusTopic.text.trim().isNotEmpty) ...[
+          const SizedBox(height: Ind.space),
+          TextFormField(
+            controller: _offline,
+            decoration: const InputDecoration(labelText: 'Mensagem de queda', helperText: 'O que o testamento publica. Qualquer outra mensagem ali = voltou.', helperMaxLines: 2),
+          ),
+        ],
+        const SizedBox(height: Ind.space),
+        StepperField(label: 'Sinal de vida a cada (s)', controller: _keepAlive, min: 0, max: 65535, helper: 'Keep-alive: avisa o broker que o app está vivo e percebe Wi-Fi que caiu. 0 desliga.'),
+        const SizedBox(height: Ind.space),
+        TextFormField(
+          controller: _clientId,
+          autocorrect: false,
+          decoration: const InputDecoration(labelText: 'ID do cliente', hintText: 'Automático', helperText: 'Vazio: um ID novo a cada conexão. Fixo só se o broker exigir.', helperMaxLines: 2),
+        ),
+        const SizedBox(height: Ind.space),
+        StepperField(label: 'Tempo de resposta (ms)', controller: _timeout, min: 200, max: 10000),
+      ];
 }
 
 class _ProbeCard extends StatelessWidget {
-  const _ProbeCard({required this.result, required this.tcp});
+  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false});
   final ProbeResult result;
   final bool tcp;
+  final bool mqtt;
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +443,7 @@ class _ProbeCard extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                ok ? 'Equipamento respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}' : 'Não conectou: ${result.message}',
+                ok ? '${mqtt ? 'Broker' : 'Equipamento'} respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}' : 'Não conectou: ${result.message}',
                 style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 15),
               ),
             ),
@@ -319,12 +463,12 @@ class _ProbeCard extends StatelessWidget {
               Text(result.hint!, key: const ValueKey('teste-dica'), style: const TextStyle(fontWeight: FontWeight.w600, height: 1.35)),
               const SizedBox(height: 10),
             ],
-            Text(result.refused ? 'O equipamento está na rede, mas não aceitou nesta porta:' : 'Confira, nesta ordem:',
+            Text(result.refused ? '${mqtt ? 'O broker' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             // Recusou = achou o aparelho; o problema é porta ou Modbus
             // desligado. Nem vale mandar conferir Wi-Fi e IP.
-            for (final t in result.refused
+            for (final t in mqtt ? _mqttChecks() : result.refused
                 ? const [
                     'A porta está certa? Modbus TCP usa 502 — confira em "Mais opções".',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
@@ -347,13 +491,35 @@ class _ProbeCard extends StatelessWidget {
       ),
     );
   }
+
+  /// O que conferir quando o broker não conecta. Senha recusada tem uma
+  /// conferência só; porta recusada aponta o tropeço mais comum: o Mosquitto 2
+  /// vem aceitando só conexões do próprio computador.
+  List<String> _mqttChecks() {
+    if (result.message == MqttCommError.badCredentials) {
+      return const ['Usuário e senha estão iguais aos do broker? Maiúsculas contam — confira em "Mais opções".'];
+    }
+    if (result.refused) {
+      return const [
+        'A porta está certa? MQTT usa 1883; com TLS, 8883.',
+        'O broker aceita conexões da rede? O Mosquitto 2 só aceita do próprio computador até ganhar "listener 1883" e "allow_anonymous true" (ou usuário e senha) no mosquitto.conf.',
+      ];
+    }
+    return [
+      if (result.hint == null) 'O celular está no mesmo Wi-Fi do broker?',
+      'O IP é o do broker (o computador, CLP ou ESP32 que roda o MQTT)?',
+      'O broker está rodando? (ex.: serviço Mosquitto)',
+      'A porta é 1883 (8883 com TLS)?',
+    ];
+  }
 }
 
 /// Protocolo de um equipamento na rede.
 enum _Protocol {
   tcp('Modbus TCP', 'Modbus TCP', 'Modbus TCP'),
   rtu('RTU (gateway)', 'Modbus RTU · gateway', 'RTU'),
-  ascii('ASCII (gateway)', 'Modbus ASCII · gateway', 'ASCII');
+  ascii('ASCII (gateway)', 'Modbus ASCII · gateway', 'ASCII'),
+  mqtt('MQTT', 'MQTT · broker', 'MQTT');
 
   const _Protocol(this.chip, this.subtitle, this.short);
   final String chip;

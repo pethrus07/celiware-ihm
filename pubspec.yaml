@@ -26,6 +26,8 @@ dependencies:
   clock: ^1.1.3
   # Avisos de alarme por voz no fone (fila própria em Dart: VoiceAnnouncer).
   flutter_tts: ^4.2.5
+  # Cliente MQTT 3.1.1 (Dart puro, MIT) para equipamento que publica num broker.
+  mqtt_client: ^10.12.0
 
 dev_dependencies:
   flutter_test:

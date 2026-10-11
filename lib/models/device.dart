@@ -1,9 +1,16 @@
 // Equipamento: onde os dados moram.
 
+import '../core/modbus/modbus_framing.dart';
+
 /// Como o app chega até o equipamento.
 enum DeviceKind {
   /// Modbus TCP/IP pela rede (Wi-Fi da fábrica, cabo, conversor serial→TCP).
   modbusTcp,
+
+  /// Modbus RTU/ASCII "cru" pelo TCP: gateway serial→Ethernet com o CLP ou o
+  /// inversor na linha RS-485 do outro lado. O envelope (RTU ou ASCII) fica em
+  /// [Device.framing].
+  modbusRtuTcp,
 
   /// Máquina simulada dentro do próprio app — modo demonstração. Tem um
   /// "programa" rodando (ver [DemoProcess]) para os valores se mexerem.
@@ -15,6 +22,8 @@ extension DeviceKindMeta on DeviceKind {
     switch (this) {
       case DeviceKind.modbusTcp:
         return 'Equipamento na rede (Modbus TCP)';
+      case DeviceKind.modbusRtuTcp:
+        return 'Gateway RS-485 (Modbus RTU/ASCII sobre TCP)';
       case DeviceKind.demo:
         return 'Máquina de demonstração';
     }
@@ -44,6 +53,7 @@ class Device {
     this.unitId = 1,
     this.timeoutMs = 1500,
     this.pollMs = 500,
+    this.framing = ModbusFraming.rtu,
   });
 
   final String id;
@@ -64,11 +74,19 @@ class Device {
   /// Intervalo entre varreduras completas das variáveis em uso.
   final int pollMs;
 
+  /// Envelope das mensagens em [DeviceKind.modbusRtuTcp] (RTU ou ASCII).
+  final ModbusFraming framing;
+
   bool get isDemo => kind == DeviceKind.demo;
 
+  /// Fala com o equipamento pela rede (IP e porta), qualquer que seja o
+  /// protocolo.
+  bool get isNetwork => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp;
+
   /// Descrição curta para listas: "192.168.0.10:502 · ID 1".
-  String get addressLabel =>
-      isDemo ? 'Simulada neste aparelho' : '$host:$port · ID $unitId';
+  String get addressLabel => isDemo
+      ? 'Simulada neste aparelho'
+      : '$host:$port · ${kind == DeviceKind.modbusRtuTcp ? '${framing.label} · ' : ''}ID $unitId';
 
   Device copyWith({
     String? name,
@@ -78,6 +96,7 @@ class Device {
     int? unitId,
     int? timeoutMs,
     int? pollMs,
+    ModbusFraming? framing,
   }) =>
       Device(
         id: id,
@@ -88,6 +107,7 @@ class Device {
         unitId: unitId ?? this.unitId,
         timeoutMs: timeoutMs ?? this.timeoutMs,
         pollMs: pollMs ?? this.pollMs,
+        framing: framing ?? this.framing,
       );
 
   /// Duas configurações que exigem reabrir a conexão se mudarem.
@@ -96,7 +116,8 @@ class Device {
       host == other.host &&
       port == other.port &&
       unitId == other.unitId &&
-      timeoutMs == other.timeoutMs;
+      timeoutMs == other.timeoutMs &&
+      framing == other.framing;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -107,6 +128,8 @@ class Device {
         'unitId': unitId,
         'timeoutMs': timeoutMs,
         'pollMs': pollMs,
+        // Só quando importa: projeto de Modbus TCP fica igual ao de antes.
+        if (kind == DeviceKind.modbusRtuTcp) 'framing': framing.name,
       };
 
   factory Device.fromJson(Map<String, dynamic> j) => Device(
@@ -118,5 +141,6 @@ class Device {
         unitId: (j['unitId'] as int?) ?? 1,
         timeoutMs: (j['timeoutMs'] as int?) ?? 1500,
         pollMs: (j['pollMs'] as int?) ?? 500,
+        framing: ModbusFramingMeta.fromName(j['framing'] as String?),
       );
 }

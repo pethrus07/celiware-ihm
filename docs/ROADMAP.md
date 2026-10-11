@@ -59,7 +59,7 @@ upgrade de R$ [valor].
 | 6 | Tela de tablet | reunião | item 3 de "Próximo" |
 | 7 | Importar memórias por faixa (M0–M1000, D0–D3000, X, Y) | reunião | importa o projeto inteiro |
 | 8 | Mapas de memória prontos das marcas parceiras (Inovance, INVT…) | reunião | perfil Inovance planejado (ARQUITETURA §10.2) |
-| 9 | Protocolos: Siemens S7, OPC UA, MQTT, Modbus RTU/ASCII (serial e USB-OTG), TCP/UDP/serial com interpretador de mensagens (Arduino) | 15, 16, 60, 64 · reunião | só Modbus TCP |
+| 9 | Protocolos: Siemens S7, OPC UA, MQTT, Modbus RTU/ASCII (serial e USB-OTG), TCP/UDP/serial com interpretador de mensagens (Arduino) | 15, 16, 60, 64 · reunião | **11/10: base de drivers feita; Modbus RTU/ASCII sobre TCP (gateway) feito.** Falta: USB-OTG, MQTT, S7, cru, OPC UA |
 | 10 | Avisos por voz no fone e narração de eventos | 10, 12 · reunião | o alarme só vibra |
 | 11 | Lógica entre máquinas (intertravamento) e cálculos | 13, 14 · reunião | sem motor de lógica; script na escrita recusado na 1.1 — a lógica **nunca** é função de segurança da máquina |
 | 12 | Câmeras IP (RTSP) vinculadas à máquina, abertas por botão | 70, 71 | não existe |

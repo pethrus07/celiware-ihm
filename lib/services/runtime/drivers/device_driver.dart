@@ -54,6 +54,7 @@ abstract class DeviceDriver {
   static DeviceDriver forDevice(Device device, {required ModbusClient Function(Device) clientFactory}) {
     switch (device.kind) {
       case DeviceKind.modbusTcp:
+      case DeviceKind.modbusRtuTcp:
       case DeviceKind.demo:
         return ModbusDriver(clientFactory(device));
     }

@@ -42,6 +42,7 @@ O `requirements.txt` trava o pymodbus em 3.8.6: da 3.9 em diante a API de memór
 | `--porta N` | Porta TCP (padrão 5020; a 502 exige administrador no Windows). |
 | `--id N` | Unit ID do escravo (padrão 1). |
 | `--cair-a-cada N` | Derruba o servidor a cada N segundos por 5 s — o app deve esmaecer os valores e reconectar sozinho. |
+| `--framer rtu` / `--framer ascii` | Fala Modbus RTU/ASCII "cru" no socket, como um gateway RS-485 → Ethernet. No app: **Na rede → Mais opções → Protocolo: RTU (gateway)**. |
 | `--painel` | Abre a janela do simulador (abaixo) em vez de rodar só no terminal. |
 
 ### 2.2.1. Painel visual (`--painel`)

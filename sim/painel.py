@@ -48,8 +48,9 @@ NOMES_FC = {1: "lê coils", 2: "lê entradas", 3: "lê registradores", 4: "lê i
 class Servidor:
     """Servidor Modbus num laço asyncio próprio, numa thread — o Tk manda na principal."""
 
-    def __init__(self, ctx, host: str, port: int, proc=None):
+    def __init__(self, ctx, host: str, port: int, proc=None, framer: str = "tcp"):
         self.ctx, self.host, self.port, self.proc = ctx, host, port, proc
+        self.framer = framer
         self.loop = asyncio.new_event_loop()
         self.clientes = 0
         self.no_ar = False
@@ -101,8 +102,10 @@ class Servidor:
 
     async def _servir(self) -> None:
         self.no_ar = True
+        from simulador import framer_kwargs
         await StartAsyncTcpServer(context=self.ctx, address=(self.host, self.port),
-                                  trace_pdu=self._trace_pdu, trace_connect=self._trace_connect)
+                                  trace_pdu=self._trace_pdu, trace_connect=self._trace_connect,
+                                  **framer_kwargs(self.framer))
 
     def derrubar(self, segundos: float = 6) -> None:
         """Simula queda de rede: tira o servidor do ar e volta depois."""

@@ -41,6 +41,7 @@ from pymodbus.datastore import (
     ModbusServerContext,
     ModbusSlaveContext,
 )
+from pymodbus import FramerType
 from pymodbus.server import ServerAsyncStop, StartAsyncTcpServer
 
 log = logging.getLogger("simulador")
@@ -172,11 +173,11 @@ async def run_process(proc: Cortadora, tick: float = 0.2) -> None:
         await asyncio.sleep(tick)
 
 
-async def serve_with_drops(ctx: ModbusServerContext, host: str, port: int, every: int) -> None:
+async def serve_with_drops(ctx: ModbusServerContext, host: str, port: int, every: int, framer: str = "tcp") -> None:
     """Servidor que cai a cada [every] s por 5 s (0 = nunca cai)."""
     while True:
-        server = asyncio.create_task(StartAsyncTcpServer(context=ctx, address=(host, port)))
-        log.info("Escutando em %s:%s", host, port)
+        server = asyncio.create_task(StartAsyncTcpServer(context=ctx, address=(host, port), **framer_kwargs(framer)))
+        log.info("Escutando em %s:%s (%s)", host, port, framer.upper())
         if every <= 0:
             await server
             return
@@ -187,6 +188,11 @@ async def serve_with_drops(ctx: ModbusServerContext, host: str, port: int, every
 
 
 
+def framer_kwargs(framer: str) -> dict:
+    """Argumento do pymodbus para RTU/ASCII crus no TCP (gateway serial→Ethernet)."""
+    return {} if framer == "tcp" else {"framer": FramerType.RTU if framer == "rtu" else FramerType.ASCII}
+
+
 async def servir_terminal(args, ctx) -> None:
     """Modo terminal: servidor + programa da cortadora no mesmo laço asyncio."""
     tasks = []
@@ -195,7 +201,7 @@ async def servir_terminal(args, ctx) -> None:
         log.info("Cenário CORTADORA: coil 0 = liga · HR 1 = velocidade desejada · HR 2 = velocidade")
     else:
         log.info("Cenário VAZIO: 10.000 posições zeradas por área")
-    await serve_with_drops(ctx, args.host, args.porta, args.cair_a_cada)
+    await serve_with_drops(ctx, args.host, args.porta, args.cair_a_cada, args.framer)
     for t in tasks:
         t.cancel()
 
@@ -207,6 +213,8 @@ def main() -> None:
     ap.add_argument("--porta", type=int, default=5020)
     ap.add_argument("--id", type=int, default=1, help="Unit ID do escravo")
     ap.add_argument("--cair-a-cada", type=int, default=0, metavar="N", help="derruba o servidor a cada N s")
+    ap.add_argument("--framer", choices=["tcp", "rtu", "ascii"], default="tcp",
+                    help="tcp = Modbus TCP; rtu/ascii = bytes seriais crus no socket, como um gateway RS-485")
     ap.add_argument("--painel", action="store_true", help="abre o painel gráfico (valores ao vivo, pedidos, botões de falha)")
     args = ap.parse_args()
 
@@ -219,7 +227,7 @@ def main() -> None:
         # asyncio próprio, noutra thread (ver painel.Servidor).
         from painel import Painel, Servidor
         proc = Cortadora(ctx[args.id]) if args.cenario == "cortadora" else None
-        Painel(Servidor(ctx, args.host, args.porta, proc), args.id, args.cenario).rodar()
+        Painel(Servidor(ctx, args.host, args.porta, proc, framer=args.framer), args.id, args.cenario).rodar()
     else:
         asyncio.run(servir_terminal(args, ctx))
 

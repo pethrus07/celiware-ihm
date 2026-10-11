@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/modbus/modbus_client.dart';
-import '../../../core/modbus/modbus_client_tcp.dart';
+import '../../../core/modbus/modbus_client_simulated.dart';
 import '../../../core/modbus/modbus_exception.dart';
 import '../../../core/modbus/modbus_memory.dart';
 import '../../../models/tag.dart';
@@ -143,7 +143,7 @@ class ModbusDriver extends DeviceDriver {
     // Rede de verdade: uma leitura mínima confirma que há Modbus do outro lado
     // (e não só uma porta aberta). Exceção de endereço também prova que o
     // equipamento respondeu. O simulado está sempre vivo.
-    if (client is! ModbusClientTcp) return;
+    if (client is SimulatedModbusClient) return;
     try {
       await client.fn03ReadHoldingRegisters(startAddress: 0, quantity: 1);
     } on ModbusExceptionResponse {/* respondeu: está vivo */}

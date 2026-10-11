@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
+import '../../core/modbus/modbus_framing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
@@ -25,7 +26,14 @@ class DeviceFormPage extends StatefulWidget {
 class _DeviceFormPageState extends State<DeviceFormPage> {
   final _form = GlobalKey<FormState>();
   late final String _id = widget.device?.id ?? newId('d');
-  late DeviceKind _kind = widget.device?.kind ?? DeviceKind.modbusTcp;
+  late bool _demo = widget.device?.isDemo ?? false;
+
+  /// Protocolo de rede: Modbus TCP, ou RTU/ASCII "cru" por um gateway serial.
+  late _Protocol _protocol = switch (widget.device) {
+    Device(kind: DeviceKind.modbusRtuTcp, framing: ModbusFraming.ascii) => _Protocol.ascii,
+    Device(kind: DeviceKind.modbusRtuTcp) => _Protocol.rtu,
+    _ => _Protocol.tcp,
+  };
   late final _name = TextEditingController(text: widget.device?.name ?? '');
   late final _host = TextEditingController(text: widget.device?.host ?? '');
   late final _port = TextEditingController(text: '${widget.device?.port ?? 502}');
@@ -49,7 +57,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   Device _build() => Device(
         id: _id,
         name: _name.text.trim().isEmpty ? 'Equipamento' : _name.text.trim(),
-        kind: _kind,
+        kind: _demo ? DeviceKind.demo : (_protocol == _Protocol.tcp ? DeviceKind.modbusTcp : DeviceKind.modbusRtuTcp),
+        framing: _protocol == _Protocol.ascii ? ModbusFraming.ascii : ModbusFraming.rtu,
         host: _host.text.trim(),
         port: int.tryParse(_port.text) ?? 502,
         unitId: int.tryParse(_unit.text) ?? 1,
@@ -60,7 +69,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   Future<void> _test() async {
     // Testar só exige o IP — validar o formulário inteiro marcava erro no
     // nome, que não tem nada a ver com o teste.
-    if (_kind == DeviceKind.modbusTcp && !(_ipField.currentState?.validate() ?? false)) return;
+    if (!_demo && !(_ipField.currentState?.validate() ?? false)) return;
     setState(() {
       _probing = true;
       _probe = null;
@@ -105,7 +114,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final tcp = _kind == DeviceKind.modbusTcp;
+    final tcp = !_demo;
     return Scaffold(
       appBar: AppBar(
         title: Text(_editing ? 'Equipamento' : 'Novo equipamento'),
@@ -126,14 +135,14 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 32),
           children: [
-            ChoiceCards<DeviceKind>(
-              options: const [
-                ChoiceOption(value: DeviceKind.modbusTcp, title: 'Na rede', subtitle: 'Modbus TCP', icon: Icons.router_outlined),
-                ChoiceOption(value: DeviceKind.demo, title: 'Demonstração', subtitle: 'Simulada', icon: Icons.smart_toy_outlined),
+            ChoiceCards<bool>(
+              options: [
+                ChoiceOption(value: false, title: 'Na rede', subtitle: _protocol.subtitle, icon: Icons.router_outlined),
+                const ChoiceOption(value: true, title: 'Demonstração', subtitle: 'Simulada', icon: Icons.smart_toy_outlined),
               ],
-              selected: _kind,
+              selected: _demo,
               onChanged: (k) => setState(() {
-                _kind = k;
+                _demo = k;
                 _probe = null;
               }),
             ),
@@ -176,10 +185,33 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   onExpansionChanged: (open) => revealAfterExpand(_moreKey, open),
                   tilePadding: EdgeInsets.zero,
                   childrenPadding: const EdgeInsets.only(bottom: 8),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
                   title: const Text('Mais opções'),
-                  subtitle: Text('Porta ${_port.text} · ID ${_unit.text}', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+                  subtitle: Text('${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
                   children: [
-                    StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: 'Modbus TCP usa 502.', onChanged: () => setState(() {})),
+                    // Gateway serial→Ethernet (RS-485 do outro lado) que repassa
+                    // RTU/ASCII cru: escolha rara, por isso fica aqui.
+                    Text('Protocolo', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final p in _Protocol.values)
+                        ChoiceChip(
+                          key: ValueKey('protocolo-${p.name}'),
+                          label: Text(p.chip),
+                          selected: _protocol == p,
+                          onSelected: (_) => setState(() {
+                            _protocol = p;
+                            _probe = null;
+                          }),
+                        ),
+                    ]),
+                    if (_protocol != _Protocol.tcp) ...[
+                      const SizedBox(height: 6),
+                      Text('Para conversor RS-485 → Ethernet que repassa os bytes sem converter. Se o conversor faz a conversão para Modbus TCP, use Modbus TCP.',
+                          style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
+                    ],
+                    const SizedBox(height: Ind.space),
+                    StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
                     const SizedBox(height: Ind.space),
                     StepperField(label: 'ID do escravo', controller: _unit, min: 0, max: 255, helper: 'Quase sempre 1.', onChanged: () => setState(() {})),
                     const SizedBox(height: Ind.space),
@@ -270,4 +302,16 @@ class _ProbeCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Protocolo de um equipamento na rede.
+enum _Protocol {
+  tcp('Modbus TCP', 'Modbus TCP', 'Modbus TCP'),
+  rtu('RTU (gateway)', 'Modbus RTU · gateway', 'RTU'),
+  ascii('ASCII (gateway)', 'Modbus ASCII · gateway', 'ASCII');
+
+  const _Protocol(this.chip, this.subtitle, this.short);
+  final String chip;
+  final String subtitle;
+  final String short;
 }

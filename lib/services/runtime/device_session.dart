@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
 import '../../core/comm/comm_error.dart';
+import '../../core/link/byte_link.dart';
 import '../../core/modbus/modbus_client.dart';
+import '../../core/modbus/modbus_client_serial.dart';
 import '../../core/modbus/modbus_client_simulated.dart';
 import '../../core/modbus/modbus_client_tcp.dart';
 import '../../models/device.dart';
@@ -87,6 +89,16 @@ class DeviceSession {
 
   /// Cliente Modbus real ou simulado conforme o tipo de equipamento.
   static ModbusClient defaultClientFactory(Device d) {
+    if (d.kind == DeviceKind.modbusRtuTcp) {
+      // Gateway serial→Ethernet: os bytes RTU/ASCII vão crus pelo socket.
+      return ModbusClientSerial(
+        link: TcpByteLink(host: d.host, port: d.port, beforeConnect: LocalNetwork.prepare),
+        framing: d.framing,
+        unitId: d.unitId,
+        responseTimeout: Duration(milliseconds: d.timeoutMs),
+        label: '${d.host}:${d.port}',
+      );
+    }
     if (d.isDemo) {
       return SimulatedModbusClient(memory: DemoRegistry.forDevice(d.id).memory, unitId: d.unitId);
     }

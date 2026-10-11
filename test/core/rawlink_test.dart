@@ -563,6 +563,10 @@ void main() {
       await until(() => server.received.where((l) => l == '?').length >= 3);
       expect(c.valueOf('T')!.value, 25.3);
       server.values['P'] = 0;
+      // Sem número de pedido no protocolo, uma resposta automática já a caminho
+      // (com o valor antigo) pode chegar antes da do poll(); espera o valor novo
+      // entrar e só então confere que o poll() devolve o atual.
+      await until(() => c.valueOf('P')?.value == 0);
       expect((await c.poll()).fields['P'], 0);
     });
 

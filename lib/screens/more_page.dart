@@ -22,6 +22,7 @@ import 'screens_page.dart';
 import 'shell.dart';
 import 'tags/tags_page.dart';
 import 'tours.dart';
+import 'voice_sheet.dart';
 
 /// Aba "Mais": projeto (exportar/importar), tutoriais e sobre.
 class MorePage extends StatelessWidget {
@@ -103,6 +104,9 @@ class MorePage extends StatelessWidget {
               ]),
             ),
           ),
+          // Voz é do aparelho, como a aparência: vem logo depois dela.
+          const SectionHeader('Alarmes'),
+          const VoiceSettingsTile(),
           const SectionHeader('Tutoriais'),
           for (final (id, title, _) in Tours.catalog)
             ListTile(

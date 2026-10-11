@@ -49,6 +49,7 @@ class AlarmEntry {
     this.deviceId,
     this.rule,
     this.valueText = '',
+    this.silenced = false,
   });
 
   /// `regra:<tagId>:<ruleId>` ou `com:<deviceId>` (falta de comunicação).
@@ -64,9 +65,14 @@ class AlarmEntry {
   /// Valor quando ativou ("88,2 °C").
   final String valueText;
 
+  /// Voz silenciada (VZ-3): o fone para de falar este alarme, mas ele
+  /// continua não reconhecido — piscando, na faixa e na lista. Silenciar não
+  /// é reconhecer (OPC UA Part 9 §5.8.7). Vale só para esta ativação.
+  final bool silenced;
+
   bool get isComm => key.startsWith('com:');
 
-  AlarmEntry copyWith({AlarmPhase? phase, DateTime? since, String? valueText}) => AlarmEntry(
+  AlarmEntry copyWith({AlarmPhase? phase, DateTime? since, String? valueText, bool? silenced}) => AlarmEntry(
         key: key,
         priority: priority,
         message: message,
@@ -76,16 +82,21 @@ class AlarmEntry {
         deviceId: deviceId,
         rule: rule,
         valueText: valueText ?? this.valueText,
+        silenced: silenced ?? this.silenced,
       );
 }
 
-enum AlarmEventType { activated, acknowledged, returned }
+// O arquivo grava o NOME do tipo. Versão antiga (até a 1.3.2) que não conhece
+// "silenced" lê o histórico sem quebrar: o fromJson dela cai no padrão e
+// mostra a linha como "Ativou" (teste em voice_announcer_test).
+enum AlarmEventType { activated, acknowledged, returned, silenced }
 
 extension AlarmEventTypeMeta on AlarmEventType {
   String get label => switch (this) {
         AlarmEventType.activated => 'Ativou',
         AlarmEventType.acknowledged => 'Reconhecido',
         AlarmEventType.returned => 'Normalizou',
+        AlarmEventType.silenced => 'Silenciado',
       };
 }
 
@@ -109,10 +120,13 @@ class AlarmEvent {
 
   static AlarmEvent? fromJson(Map<String, dynamic> j) {
     final at = DateTime.tryParse(j['at'] as String? ?? '');
-    if (at == null) return null;
+    // Tipo que esta versão não conhece (arquivo de uma versão mais nova): a
+    // linha é pulada — virar "Ativou" inventaria um alarme que não houve.
+    final type = AlarmEventType.values.where((t) => t.name == j['type']).firstOrNull;
+    if (at == null || type == null) return null;
     return AlarmEvent(
       at: at,
-      type: AlarmEventType.values.firstWhere((t) => t.name == j['type'], orElse: () => AlarmEventType.activated),
+      type: type,
       priority: AlarmPriorityMeta.fromName(j['priority'] as String?),
       message: j['message'] as String? ?? '',
       valueText: j['value'] as String? ?? '',
@@ -244,6 +258,20 @@ class AlarmEngine extends ChangeNotifier {
     for (final k in [..._entries.keys]) {
       acknowledge(k);
     }
+  }
+
+  // ── Silenciar ───────────────────────────────────────────────────────────────
+
+  /// Cala a voz deste alarme **sem** reconhecê-lo (VZ-3): quem está com as
+  /// mãos ocupadas para o fone de repetir, mas o alarme continua pedindo
+  /// reconhecimento. Fica no histórico, como pede a OPC UA Part 9 (auditoria).
+  void silence(String key) {
+    final e = _entries[key];
+    if (e == null || e.silenced || !e.phase.unacked) return;
+    _log.info('Silenciado: ${e.message}');
+    _addEvent(AlarmEvent(at: clock.now(), type: AlarmEventType.silenced, priority: e.priority, message: e.message));
+    _entries[key] = e.copyWith(silenced: true);
+    _changed();
   }
 
   // ── Vigiar ──────────────────────────────────────────────────────────────────

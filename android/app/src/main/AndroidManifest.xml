@@ -53,5 +53,11 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Avisos por voz (flutter_tts): no Android 11+ o app só enxerga o
+             motor de conversão de texto em voz se declarar que procura por ele.
+             Sem isto, TextToSpeech não acha motor nenhum e o fone fica mudo. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
+        </intent>
     </queries>
 </manifest>

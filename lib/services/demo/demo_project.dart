@@ -2,6 +2,7 @@ import '../../core/modbus/modbus_memory.dart';
 import '../../models/alarm.dart';
 import '../../models/device.dart';
 import '../../models/hmi_screen.dart';
+import '../../models/narration.dart';
 import '../../models/project.dart';
 import '../../models/tag.dart';
 import 'demo_process.dart';
@@ -70,7 +71,12 @@ class DemoProject {
         AlarmRule(id: 'al_porta', kind: AlarmKind.off, priority: AlarmPriority.high, message: 'Porta aberta'),
       ]),
       t('demo_papel', 'Papel presente', di, DemoMap.diPaperPresent),
-      t('demo_status', 'Status da máquina', hr, DemoMap.hrStatus, description: '0 parada · 1 em ciclo · 2 alarme'),
+      // Narração por voz (item 12 da lista do cliente): cada estado fala um
+      // texto no fone. O 2 (alarme) não narra — já sobe como alarme.
+      t('demo_status', 'Status da máquina', hr, DemoMap.hrStatus, description: '0 parada · 1 em ciclo · 2 alarme').copyWith(narrations: const [
+        EventNarration(id: 'nr_parada', value: 0, text: 'A cortadora parou'),
+        EventNarration(id: 'nr_ciclo', value: 1, text: 'A cortadora está em ciclo'),
+      ]),
       t('demo_sp', 'Velocidade desejada', hr, DemoMap.hrSpeedSetpoint, writable: true, unit: 'm/min'),
       t('demo_vel', 'Velocidade', hr, DemoMap.hrSpeed, unit: 'm/min'),
       t('demo_prod', 'Rótulos cortados', hr, DemoMap.hrProduction, type: TagDataType.uint32, unit: 'un'),

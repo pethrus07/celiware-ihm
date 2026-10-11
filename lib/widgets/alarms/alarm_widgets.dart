@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/alarm.dart';
 import '../../screens/alarms_page.dart';
 import '../../services/alarms/alarm_engine.dart';
+import 'silence_button.dart';
 
 /// Cor reservada de cada prioridade (ISA-18.2 §11.4.3): vermelho, laranja,
 /// amarelo — em ordem de urgência, e só alarme usa laranja.
@@ -270,6 +271,7 @@ class _Banner extends StatelessWidget {
                           Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textDim, fontSize: 12.5)),
                         ]),
                 ),
+                SilenceButton(entry: top, compact: true),
                 if (count > 1)
                   Container(
                     margin: const EdgeInsets.only(left: 8),

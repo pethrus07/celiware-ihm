@@ -12,6 +12,7 @@ import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
 import '../../models/alarm.dart';
 import '../../models/project.dart';
+import '../../models/narration.dart';
 import '../../models/tag.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../services/runtime/tag_codec.dart';
@@ -23,6 +24,7 @@ import 'alarm_editor.dart';
 import 'device_pick.dart';
 import 'reading_hints.dart';
 import 'tag_uses.dart';
+import 'narration_editor.dart';
 
 /// Onde o dado mora, em palavras de quem opera — cada opção vira uma
 /// combinação área Modbus + tipo.
@@ -100,6 +102,7 @@ class _TagFormPageState extends State<TagFormPage> {
   /// casam com o tipo escolhido agora ficam guardados aqui (voltando ao tipo,
   /// voltam) e saem no Salvar.
   late List<AlarmRule> _alarms = widget.tag?.alarms ?? const [];
+  late List<EventNarration> _narrations = widget.tag?.narrations ?? const [];
 
   late final _name = TextEditingController(text: widget.tag?.name ?? '');
   late final _address = TextEditingController(text: '${widget.tag?.address ?? 0}');
@@ -242,6 +245,7 @@ class _TagFormPageState extends State<TagFormPage> {
         offset: _offsetValue,
         description: _description.text.trim(),
         alarms: _alarms,
+        narrations: _narrations,
       ).normalized();
 
   /// Variável como está no formulário agora (nula se faltar o essencial).
@@ -798,6 +802,9 @@ class _TagFormPageState extends State<TagFormPage> {
                             // Os que não valem com este tipo continuam guardados.
                             onChanged: (a) => setState(() => _alarms = [...a, ...dormantAlarms]),
                           ),
+                          // Narração: o operador ouve no fone o passo da máquina.
+                          const SizedBox(height: Ind.spaceSmall),
+                          NarrationsRow(tag: draft, narrations: _narrations, onChanged: (n) => setState(() => _narrations = n)),
                         ],
                         const SizedBox(height: Ind.spaceSmall),
                         _moreOptions(typeOptions, typeWarning),

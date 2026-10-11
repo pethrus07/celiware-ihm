@@ -59,7 +59,8 @@ Script livre (JavaScript) na variável ficou de fora de propósito: a escala lin
 | Persistência | JSON num arquivo na pasta privada do app (`path_provider`). |
 | Arquivos | Exportar/importar projeto e escolher imagem (`file_picker`). |
 | PDF | Página de PDF → imagem, para a imagem por etapa (`printing`, que usa o renderizador do próprio Android). |
-| Marcas por aparelho | "Tutorial já visto" (`shared_preferences`). |
+| Marcas por aparelho | "Tutorial já visto", aparência, preferências de voz (`shared_preferences`). |
+| Voz | Avisos de alarme e narração de eventos no fone (`flutter_tts`), com fila própria em Dart (§6.9). |
 | Logs | `logging`. |
 | Estado | `ValueNotifier` / `ChangeNotifier` / `InheritedNotifier` — sem biblioteca de estado. |
 | Simulação | Simulador interno em Dart + simulador externo em Python (pymodbus 3.8.6). |
@@ -103,7 +104,7 @@ toque no elemento ──> WriteActions (só leitura? confirmação?) ──> Hmi
 
 ### 2.4. Ciclo de vida
 
-Quando o app vai para segundo plano, `main.dart` solta todos os botões de pulso, para a varredura (rede e bateria) e grava o que estiver pendente. Ao voltar, a varredura religa com as mesmas inscrições.
+Quando o app vai para segundo plano, `main.dart` solta todos os botões de pulso, para a varredura (rede e bateria), cala a voz (§6.9) e grava o que estiver pendente. Ao voltar, a varredura religa com as mesmas inscrições.
 
 ## 3. Estrutura de pastas
 
@@ -351,6 +352,7 @@ Falta: o driver no motor (`raw_driver`, variável apontando para a chave do camp
 | unit, decimals | Apresentação: "°C", 1 casa decimal. |
 | scale, offset | Escala linear: valor = bruto × scale + offset (padrão 1 e 0; só vão para o arquivo quando diferentes). |
 | alarms | Alarmes da variável: lista de {id, kind (above · below · on · off), limit, priority (high · medium · low), message}. Só vai para o arquivo quando há algum; `normalized()` descarta o que não casa com o tipo. |
+| narrations | Narrações por voz (§6.9): lista de {id, kind (equals · above · below), value, text}. Só vai para o arquivo quando há alguma; `normalized()` descarta as sem texto e as que não casam com o tipo (liga/desliga só "valer 1/0"; texto e lista não falam). |
 
 `Tag.normalized()` corrige combinações impossíveis vindas de edição ou de arquivo antigo (área de bit força liga/desliga; área só-leitura e texto tiram a escrita; escala zero volta a 1).
 
@@ -462,13 +464,35 @@ Seguem a ANSI/ISA-18.2 (resumo em `docs/PESQUISA-UI-UX.md` §1.2). O alarme **mo
 
 **Contra alarme tagarela** (EEMUA 191): a condição precisa durar **1 s** para disparar, e a volta tem **banda morta de 1% do limite** (acima de 85 só normaliza abaixo de 84,15).
 
-**Onde aparece.** (1) **Faixa fixa no topo do app**, acima de todas as telas, com o alarme que pede ação (o não reconhecido mais grave), o estado e a hora — sem o valor do disparo, que congelado desmentia o elemento da tela; celular deitado, a faixa cabe numa linha; o número "+2" de outros; toque abre a lista; o celular vibra quando um novo entra (som não funciona no chão de fábrica — ISA-18.2 §11.3.4). Tudo reconhecido, a faixa fica discreta, mas à vista enquanto a condição existir. (2) **No próprio elemento** da tela: borda na cor e a forma no canto — o alarme aparece onde o valor está. (3) Na **lista de variáveis**: sino (tem alarme) ou a forma (em alarme agora). (4) **Página Alarmes** (faixa ou sino da lista de telas): aba *Ativos* — o mais grave em cima; cada cartão com mensagem, valor de **agora** e limite, prioridade/estado, "desde 19:21 · há 3 min" e o botão **Reconhecer** (um a um; "Reconhecer todos" com confirmação quando há mais de um); aba *Histórico* — por dia, hora com segundos, Ativou / Reconhecido / Normalizou.
+**Onde aparece.** (1) **Faixa fixa no topo do app**, acima de todas as telas, com o alarme que pede ação (o não reconhecido mais grave), o estado e a hora — sem o valor do disparo, que congelado desmentia o elemento da tela; celular deitado, a faixa cabe numa linha; o número "+2" de outros; toque abre a lista; o celular vibra quando um novo entra (som não funciona no chão de fábrica — ISA-18.2 §11.3.4); com fone, a voz fala (§6.9). Tudo reconhecido, a faixa fica discreta, mas à vista enquanto a condição existir. (2) **No próprio elemento** da tela: borda na cor e a forma no canto — o alarme aparece onde o valor está. (3) Na **lista de variáveis**: sino (tem alarme) ou a forma (em alarme agora). (4) **Página Alarmes** (faixa ou sino da lista de telas): aba *Ativos* — o mais grave em cima; cada cartão com mensagem, valor de **agora** e limite, prioridade/estado, "desde 19:21 · há 3 min" e o botão **Reconhecer** (um a um; "Reconhecer todos" com confirmação quando há mais de um); aba *Histórico* — por dia, hora com segundos, Ativou / Reconhecido / Normalizou.
 
 **Demonstração.** A cortadora já vem com as três prioridades: motor acima de 75 °C (baixa) e de 85 °C (alta), porta aberta (alta), pouca tensão no papel (baixa) e **máquina parada por alarme** (média — é consequência; a causa sobe como alta). A 150 m/min o motor passa de 85 °C em ~40 s, a máquina desarma e o RESET (segurar) rearma. que tem alarmes vira alarme próprio (média): sem leitura, os outros alarmes não merecem confiança. Os alarmes da variável ficam como estão até a leitura voltar.
 
 **Vigiado em qualquer tela.** O `AlarmEngine` (`lib/services/alarms/`) mantém inscritas no runtime as variáveis com alarme enquanto o app está aberto — o equipamento continua sendo lido mesmo sem tela aberta. O histórico (últimos 300 eventos) fica em `historico-alarmes.json`, ao lado do projeto; é do aparelho, não vai na exportação. O piscar usa um timer de 500 ms que só corre com alarme não reconhecido (2 quadros/s, nunca animação contínua).
 
 **Limite desta versão:** com o app em segundo plano a leitura para (bateria), então **não há alarme com o app fechado** nem notificação do Android. Resolver isso pede um serviço em primeiro plano (notificação fixa "vigiando a cortadora") — fica como próximo passo, a decidir.
+
+### 6.9. Voz e narração
+
+Avisos por voz no fone (`docs/REQUISITOS-ETAPA4.md` §9.1, VZ-1 a VZ-6), em `lib/services/voice/`. A voz **nunca é a única indicação**: faixa e vibração continuam iguais, com ou sem voz, com ou sem fone.
+
+**Fila por prioridade.** O `VoiceAnnouncer` escuta o `AlarmEngine` e tem fila própria em Dart — o `flutter_tts` só fala e para (no Windows nem tem fila). Alarme novo entra pela prioridade; mesma prioridade, ordem de chegada; **alta interrompe** média, baixa e narração, e a fala cortada volta para a frente da sua prioridade. A urgência vai na frente: "Alarme urgente: Porta aberta", "Alarme: …", "Atenção: …". O motor fica atrás da interface `SpeechEngine` — os testes usam um falso.
+
+**Quanto fala.** Padrão: alta repete a cada 30 s enquanto ativa e não reconhecida; média fala uma vez; baixa não fala. Cada prioridade e o intervalo são configuráveis. A repetição conta do fim da fala; voltou ao normal sem reconhecimento, não repete mais.
+
+**Silenciar ≠ Reconhecer** (OPC UA Part 9 §5.8.7). `AlarmEngine.silence` marca o alarme (`AlarmEntry.silenced`) e grava **Silenciado** no histórico; ele continua piscando, na faixa e pedindo reconhecimento. O botão só aparece onde a voz insiste (prioridade em "Repete"): discreto ao lado de Reconhecer no cartão, só o ícone na faixa. Reconhecer ou silenciar cala na hora, mesmo no meio da frase. O histórico grava o tipo pelo nome: a 1.3.2 lê "silenced" como "Ativou" sem quebrar; daqui em diante, tipo desconhecido (versão mais nova) é pulado em vez de virar "Ativou".
+
+**Só com fone** (ligado por padrão). Antes de cada fala, o canal `celiware/voz` (`SaidaDeAudio.kt`) consulta `AudioManager.getDevices(GET_DEVICES_OUTPUTS)`: fone com fio, Bluetooth A2DP/SCO/LE, USB, aparelho auditivo. Sem fone a fala é pulada, mas a repetição segue — fala quando o fone voltar. Onde a plataforma não informa, a opção nem aparece e a voz não é calada por palpite. A2DP inclui caixa de som e rádio de carro: o Android não distingue.
+
+**Android.** A fala usa o atributo de navegação (como o GPS: abaixa a música e sai no fone), pede foco de áudio transitório "abaixando os outros" e tem 300 ms de silêncio antes (o Bluetooth come a primeira sílaba). Tempo-limite folgado em cada fala: se o motor der erro no meio, a fila segue. Android 11+: `<queries>` com `android.intent.action.TTS_SERVICE` no manifesto, senão o app não enxerga o motor de voz.
+
+**Voz pt-BR (VZ-6).** Com a voz ligada, ao abrir o app, ao abrir a folha e ao voltar para o app, `FlutterTtsEngine.check` confere: sem motor, sem português do Brasil, ou voz não baixada para uso offline. O problema aparece com nome — "Falta a voz em português (Brasil) em 'Serviços de fala do Google'" — na linha Mais → Voz e avisos e na folha, com **Abrir ajustes de voz** (`com.android.settings.TTS_SETTINGS`; se o fabricante esconder, instalar dados de voz; por fim, ajustes gerais).
+
+**Narração de eventos (VZ-5).** No cadastro de variável, a linha recolhida **Narração por voz** (como a de Alarmes) abre o editor: *Valer X*, *Passar de X* ou *Ficar abaixo de X* → *Falar "texto"* (até 80 letras); liga/desliga: *Ao ligar* / *Ao desligar*. É o item 12 do cliente: variável de estado com um texto por valor ("1 → A máquina está iniciando", "2 → Montagem"); se um indicador de estado já mostra a variável, o editor oferece "Usar os textos do indicador". Fala só na **passagem** — nem na primeira leitura, nem na volta da comunicação (não dá para saber quando mudou) —, depois de todo alarme e no máximo uma vez por evento a cada N s (10 s). O `EventNarrator` mantém essas variáveis inscritas no runtime enquanto a narração está ligada, como o `AlarmEngine`. A demonstração narra "A cortadora parou" e "A cortadora está em ciclo".
+
+**Preferências do aparelho** (`shared_preferences`, chave `voz`; não vão no projeto), em **Mais → Voz e avisos**: ligar, só com fone, volume, velocidade (devagar · normal · rápida) e **Falar um exemplo** (fala mesmo sem fone — é a pessoa pedindo). Em Mais opções: quanto fala cada prioridade, o intervalo da repetição, a narração e o limite por evento.
+
+**Segundo plano: sem voz.** A varredura para (§2.4), então não há alarme novo nem o que falar. `main.dart` chama `VoiceAnnouncer.pause` (para a fala, descarta narração da fila, guarda o alarme) e `resume` (alarme que ainda pede reconhecimento fala ao voltar). Voz com o app fechado pede o serviço em primeiro plano (REQUISITOS-ETAPA4 §9.6) — fora desta entrega.
 
 ## 7. Tutoriais dentro do app
 
@@ -615,6 +639,8 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/runtime/rtu_device_test.dart` | Equipamento atrás de gateway RS-485 pelo caminho de produção (fábrica → driver → sessão): testar, ler na varredura e gravar em RTU e ASCII; envelope no arquivo do projeto. |
 | `test/runtime/device_driver_test.dart` | Contrato do driver com um driver de mentira (não Modbus): a sessão publica, grava e trata queda igual. |
 | `test/runtime/scan_planner_test.dart` | Agrupamento, buracos, limite de 125, áreas separadas, isolamento. |
+| `test/runtime/voice_announcer_test.dart` | Fila de voz com motor falso e relógio controlado (`fake_async` + `clock`): prioridade, ordem de chegada, alta interrompendo no meio da frase, repetição a cada 30 s, reconhecer/silenciar calando, só com fone, narração com limite por evento, segundo plano, voz pt-BR ausente com nome; `AlarmEngine.silence`; narração na Tag (JSON ida e volta, arquivo antigo, descarte); histórico com "Silenciado" lido pela 1.3.2. |
+| `test/widgets/voice_test.dart` | No app: alarme alto fala e repete; Silenciar (faixa e cartão) cala sem reconhecer e entra no histórico; folha Voz e avisos (exemplo, desligar, velocidade, quem repete, gravado no aparelho); falta de voz pt-BR com o nome do motor; linha de narração no cadastro de variável. |
 | `test/runtime/alarm_logic_test.dart` | Condição com banda morta (acima/abaixo), liga/desliga, valor inválido, mensagem padrão com unidade, alarmes no JSON, descarte de alarme incompatível com o tipo, prioridades. |
 | `test/runtime/hmi_runtime_test.dart` | Inscrição, isolamento do endereço errado, escrita, queda com último valor, soltura insistente do pulso, variável apagada, bit de registrador de entrada (FC04, só leitura). |
 | `test/widgets/tag_form_test.dart` | Cadastro de variável, EM-1 a EM-12: descartar alterações, aviso de alarmes e de elementos ao trocar o tipo, realce de "Onde fica", volta de Texto, sugestões de sinal e de CDAB no "Lendo agora", endereço acima de 65535, hexadecimal, bit de registrador de entrada, rolar até o erro, decimais e unidade, escolha entre muitos equipamentos; leitura de endereço, sugestões e usos da variável como funções puras. |
@@ -631,5 +657,5 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
 - **Ideias registradas:** variável calculada/script (só se aparecer caso que a escala linear não cobre), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.
-- **Alarme com o app fechado:** serviço em primeiro plano + notificação do Android (hoje os alarmes só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.
+- **Alarme com o app fechado:** serviço em primeiro plano + notificação do Android (hoje os alarmes e a voz só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.
 - **Próximas fases do visual:** faixa de status no topo da operação, miniatura real das telas, tablet com barra lateral, comando em 3 fases visíveis.

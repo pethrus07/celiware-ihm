@@ -46,6 +46,9 @@ class FakeArduinoServer {
 
   int get port => udp ? _udp!.port : _tcp!.port;
 
+  /// Conexões TCP abertas agora — o sketch comum atende uma só.
+  int get connections => _clients.length;
+
   /// `T=25.3;P=1\n`.
   static List<int> keyValueLine(Map<String, Object> v) =>
       utf8.encode('${v.entries.map((e) => '${e.key}=${e.value}').join(';')}\n');

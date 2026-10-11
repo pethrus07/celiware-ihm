@@ -10,8 +10,10 @@ import '../../core/utils/validators.dart';
 import '../../models/device.dart';
 import '../../models/vendor_profiles.dart';
 import '../../models/mqtt_config.dart';
+import '../../models/raw_config.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/common.dart';
+import 'raw_device_fields.dart';
 import 'vendor_profile_sheet.dart';
 
 /// Cadastro/edição de equipamento.
@@ -39,6 +41,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     Device(kind: DeviceKind.modbusRtuTcp, framing: ModbusFraming.ascii) => _Protocol.ascii,
     Device(kind: DeviceKind.modbusRtuTcp) => _Protocol.rtu,
     Device(kind: DeviceKind.mqtt) => _Protocol.mqtt,
+    Device(kind: DeviceKind.raw) => _Protocol.raw,
     _ => _Protocol.tcp,
   };
 
@@ -56,6 +59,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   bool _showPass = false;
 
   bool get _mqtt => !_demo && _protocol == _Protocol.mqtt;
+
+  /// Arduino/ESP com mensagem própria: TCP ou UDP e o perfil da mensagem.
+  late final RawDeviceFields _rw = RawDeviceFields(widget.device?.raw ?? const RawConfig());
+  bool get _raw => !_demo && _protocol == _Protocol.raw;
   late final _name = TextEditingController(text: widget.device?.name ?? '');
   late final _host = TextEditingController(text: widget.device?.host ?? '');
   late final _port = TextEditingController(text: '${widget.device?.port ?? 502}');
@@ -73,6 +80,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     for (final c in [_name, _host, _port, _unit, _timeout, _poll, _user, _pass, _clientId, _keepAlive, _statusTopic, _offline]) {
       c.dispose();
     }
+    _rw.dispose();
     super.dispose();
   }
 
@@ -84,6 +92,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
             : switch (_protocol) {
                 _Protocol.tcp => DeviceKind.modbusTcp,
                 _Protocol.mqtt => DeviceKind.mqtt,
+                _Protocol.raw => DeviceKind.raw,
                 _ => DeviceKind.modbusRtuTcp,
               },
         framing: _protocol == _Protocol.ascii ? ModbusFraming.ascii : ModbusFraming.rtu,
@@ -92,8 +101,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         unitId: int.tryParse(_unit.text) ?? 1,
         timeoutMs: (int.tryParse(_timeout.text) ?? 1500).clamp(200, 10000),
         pollMs: (int.tryParse(_poll.text) ?? 500).clamp(100, 60000),
-        // Perfil de fabricante é mapa de memória Modbus: no MQTT não existe.
-        profile: _demo || _mqtt ? null : _profile,
+        // Perfil de fabricante é mapa de memória Modbus: no MQTT e no cru não existe.
+        profile: _demo || _mqtt || _raw ? null : _profile,
         // Só MQTT guarda broker; nos outros fica o padrão (e o arquivo, igual).
         mqtt: _mqtt
             ? MqttBroker(
@@ -106,15 +115,20 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 offlinePayload: _offline.text.trim().isEmpty ? 'offline' : _offline.text.trim(),
               )
             : const MqttBroker(),
+        // Só o cru guarda o perfil da mensagem.
+        raw: _raw ? _rw.build() : const RawConfig(),
       );
 
   /// Trocar de protocolo leva junto a porta padrão — quem escolhe MQTT quase
   /// nunca quer a 502 que já estava no campo.
   void _setProtocol(_Protocol p) {
     final port = int.tryParse(_port.text);
-    if (p == _Protocol.mqtt && (port == 502 || port == null)) {
+    final standard = port == null || port == 502 || port == MqttBroker.defaultPort || port == MqttBroker.tlsPort || port == RawConfig.defaultPort;
+    if (p == _Protocol.mqtt && (port == 502 || port == null || port == RawConfig.defaultPort)) {
       _port.text = '${_tls ? MqttBroker.tlsPort : MqttBroker.defaultPort}';
-    } else if (p != _Protocol.mqtt && (port == MqttBroker.defaultPort || port == MqttBroker.tlsPort)) {
+    } else if (p == _Protocol.raw && standard) {
+      _port.text = '${RawConfig.defaultPort}';
+    } else if (p != _Protocol.mqtt && p != _Protocol.raw && standard) {
       _port.text = '502';
     }
     _protocol = p;
@@ -131,6 +145,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 
   /// Resumo de "Mais opções" fechado.
   String _moreSummary() {
+    if (_raw) return _rw.summary(_port.text);
     if (!_mqtt) return '${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}${_profileName == null ? '' : ' · $_profileName'}';
     return [
       'MQTT · Porta ${_port.text}',
@@ -266,6 +281,12 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 onChanged: (_) => setState(() => _probe = null),
               ),
             ],
+            // Cru: sem o perfil certo nada funciona — fica à vista, antes do
+            // teste (que confere se o perfil entende a mensagem).
+            if (_raw) ...[
+              const SizedBox(height: Ind.space),
+              RawProfileRow(fields: _rw, device: _build, onChanged: () => setState(() => _probe = null)),
+            ],
             const SizedBox(height: Ind.space),
             OutlinedButton.icon(
               key: const ValueKey('testar-conexao'),
@@ -275,7 +296,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   : const Icon(Icons.network_check_rounded),
               label: Text(_probing ? 'Testando…' : 'Testar conexão'),
             ),
-            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt))],
+            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, raw: _raw ? _rw : null))],
             if (tcp) ...[
               const SizedBox(height: Ind.spaceLarge),
               Theme(
@@ -291,8 +312,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   children: [
                     // Marca e modelo: com ela, as variáveis aceitam a memória
                     // como no manual ("D200"). Genérico = endereço Modbus direto.
-                    // No MQTT não há mapa de memória.
-                    if (!_mqtt) ...[
+                    // No MQTT e no cru não há mapa de memória.
+                    if (!_mqtt && !_raw) ...[
                       ListTile(
                         key: const ValueKey('marca-modelo'),
                         contentPadding: EdgeInsets.zero,
@@ -322,7 +343,9 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                       Text('Para conversor RS-485 → Ethernet que repassa os bytes sem converter. Se o conversor faz a conversão para Modbus TCP, use Modbus TCP.',
                           style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
                     ],
-                    if (_mqtt) ..._mqttOptions() else ...[
+                    if (_raw)
+                      RawDeviceMoreOptions(fields: _rw, port: _port, timeout: _timeout, onChanged: () => setState(() => _probe = null))
+                    else if (_mqtt) ..._mqttOptions() else ...[
                       const SizedBox(height: Ind.space),
                       StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
                       const SizedBox(height: Ind.space),
@@ -418,10 +441,13 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 }
 
 class _ProbeCard extends StatelessWidget {
-  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false});
+  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false, this.raw});
   final ProbeResult result;
   final bool tcp;
   final bool mqtt;
+
+  /// Equipamento cru: o teste fala de mensagem e de perfil.
+  final RawDeviceFields? raw;
 
   @override
   Widget build(BuildContext context) {
@@ -443,7 +469,11 @@ class _ProbeCard extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                ok ? '${mqtt ? 'Broker' : 'Equipamento'} respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}' : 'Não conectou: ${result.message}',
+                raw != null
+                    ? rawProbeTitle(result)
+                    : ok
+                        ? '${mqtt ? 'Broker' : 'Equipamento'} respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}'
+                        : 'Não conectou: ${result.message}',
                 style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 15),
               ),
             ),
@@ -463,12 +493,12 @@ class _ProbeCard extends StatelessWidget {
               Text(result.hint!, key: const ValueKey('teste-dica'), style: const TextStyle(fontWeight: FontWeight.w600, height: 1.35)),
               const SizedBox(height: 10),
             ],
-            Text(result.refused ? '${mqtt ? 'O broker' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
+            Text(raw != null ? rawProbeHeader(result) : result.refused ? '${mqtt ? 'O broker' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             // Recusou = achou o aparelho; o problema é porta ou Modbus
             // desligado. Nem vale mandar conferir Wi-Fi e IP.
-            for (final t in mqtt ? _mqttChecks() : result.refused
+            for (final t in mqtt ? _mqttChecks() : raw != null ? rawProbeChecks(result, udp: raw!.isUdp) : result.refused
                 ? const [
                     'A porta está certa? Modbus TCP usa 502 — confira em "Mais opções".',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
@@ -519,7 +549,8 @@ enum _Protocol {
   tcp('Modbus TCP', 'Modbus TCP', 'Modbus TCP'),
   rtu('RTU (gateway)', 'Modbus RTU · gateway', 'RTU'),
   ascii('ASCII (gateway)', 'Modbus ASCII · gateway', 'ASCII'),
-  mqtt('MQTT', 'MQTT · broker', 'MQTT');
+  mqtt('MQTT', 'MQTT · broker', 'MQTT'),
+  raw('Arduino / mensagem própria', 'Arduino · mensagem própria', 'Arduino');
 
   const _Protocol(this.chip, this.subtitle, this.short);
   final String chip;

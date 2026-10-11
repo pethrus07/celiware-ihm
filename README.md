@@ -54,6 +54,7 @@ tool/             Gerador de ícone, da documentação em Word e do vídeo de ap
 | `docs/SIMULACAO.md` | Como testar sem equipamento: demonstração, simulador Python, Modbus Slave, celular por Wi-Fi. |
 | `docs/PUBLICACAO.md` | Roteiro da Play Store (conta, chave, pacote, ficha). |
 | `docs/ROADMAP.md` | Versões entregues e tudo o que ainda falta fazer. |
+| `docs/REQUISITOS-ETAPA4.md` | Requisitos numerados da etapa 4, com horas e fontes (pesquisas completas em `docs/pesquisa-etapa4/`). |
 | `docs/PESQUISA-UI-UX.md` | Pesquisa que embasou o visual (ISA-101, ISA-18.2, mercado). |
 
 Cada arquivo de código abre com um comentário explicando o que a classe faz e por quê.

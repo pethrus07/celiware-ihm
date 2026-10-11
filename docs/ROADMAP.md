@@ -45,6 +45,8 @@ upgrade de R$ [valor].
 
 ### Entra
 
+**Requisitos detalhados, horas e fontes:** `docs/REQUISITOS-ETAPA4.md` (levantamento de 11/10/2026: [estimativa interna] no total, mais da metade em protocolos).
+
 | # | Item | Da lista dele / da reunião | Hoje (código em 11/10) |
 |---|---|---|---|
 | 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | o app não amarra a conexão ao Wi-Fi |

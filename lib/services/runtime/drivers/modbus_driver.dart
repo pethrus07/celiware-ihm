@@ -50,15 +50,15 @@ class ModbusDriver extends DeviceDriver {
   @override
   Future<int> scan(List<Tag> tags, TagStore store, {required bool Function() stillCurrent}) async {
     if (!client.isConnected) await client.connect();
-    // Variável com tópico MQTT (o equipamento deixou de ser MQTT): não tem
-    // endereço Modbus de verdade — ler o HR 0 no lugar dela mostraria um
-    // número qualquer como se fosse o dado.
-    for (final t in tags.where((t) => t.mqtt != null)) {
+    // Variável com tópico MQTT ou endereço S7 (o equipamento mudou de
+    // protocolo): não tem endereço Modbus de verdade — ler o HR 0 no lugar
+    // dela mostraria um número qualquer como se fosse o dado.
+    for (final t in tags.where((t) => t.mqtt != null || t.s7 != null)) {
       if (store.read(t.id).quality != TagQuality.configError) {
-        store.publish(t.id, TagReading(quality: TagQuality.configError, message: 'variável de MQTT num equipamento Modbus', at: DateTime.now()));
+        store.publish(t.id, TagReading(quality: TagQuality.configError, message: 'variável de ${t.mqtt != null ? 'MQTT' : 'Siemens S7'} num equipamento Modbus', at: DateTime.now()));
       }
     }
-    final blocks = planner.plan(tags.where((t) => t.mqtt == null).toList(), isolated: _isolated);
+    final blocks = planner.plan(tags.where((t) => t.mqtt == null && t.s7 == null).toList(), isolated: _isolated);
     for (final block in blocks) {
       if (!stillCurrent()) break;
       await _readBlock(block, store);

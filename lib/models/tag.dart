@@ -10,6 +10,7 @@ import '../core/modbus/modbus_memory.dart';
 import 'alarm.dart';
 import 'narration.dart';
 import 'mqtt_config.dart';
+import 's7_config.dart';
 
 /// Formato do dado dentro da memória.
 enum TagDataType {
@@ -159,6 +160,7 @@ class Tag {
     this.narrations = const [],
     this.memory,
     this.mqtt,
+    this.s7,
   });
 
   final String id;
@@ -221,6 +223,10 @@ class Tag {
   /// equipamento MQTT; aí área e endereço Modbus ficam no padrão e ninguém lê.
   final MqttAddress? mqtt;
 
+  /// Endereço Siemens S7 como no TIA ("DB1.DBW4", "M10.3"). Só em variável
+  /// de CLP S7; aí, como no MQTT, área e endereço Modbus ficam no padrão.
+  final S7TagAddress? s7;
+
   /// Variável lida de um bit dentro de um registrador.
   bool get isBitOfRegister => dataType == TagDataType.bool && !area.isBit;
 
@@ -247,7 +253,7 @@ class Tag {
 
   /// Pode escrever de fato: marcado pelo usuário **e** a área permite (no
   /// MQTT, **e** há tópico onde publicar — curinga não serve).
-  bool get canWrite => writable && (mqtt?.canPublish ?? area.isWritable);
+  bool get canWrite => writable && (mqtt?.canPublish ?? s7?.canWrite ?? area.isWritable);
 
   /// Quantas posições da área a variável ocupa (bits ou registradores).
   int get span => area.isBit ? length : dataType.registerCount * length;
@@ -255,10 +261,13 @@ class Tag {
   /// Endereço da última posição ocupada.
   int get lastAddress => address + span - 1;
 
-  /// "HR 100" / "HR 100.3" / "COIL 5" / "HR 10..17" / "cortadora/estado · temp".
+  /// "HR 100" / "HR 100.3" / "COIL 5" / "HR 10..17" / "cortadora/estado · temp"
+  /// / "DB1.DBW4".
   String get addressLabel {
     final m = mqtt;
     if (m != null) return m.label;
+    final s = s7;
+    if (s != null) return isArray ? '${s.address} · $length valores' : s.address;
     final base = '${area.shortLabel} $address';
     if (isBitOfRegister) return '$base.$bitIndex';
     if (span > 1) return '${area.shortLabel} $address..$lastAddress';
@@ -283,6 +292,7 @@ class Tag {
     List<AlarmRule>? alarms,
     List<EventNarration>? narrations,
     MqttAddress? mqtt,
+    S7TagAddress? s7,
   }) =>
       Tag(
         id: id,
@@ -302,6 +312,7 @@ class Tag {
         description: description ?? this.description,
         alarms: alarms ?? this.alarms,
         mqtt: mqtt ?? this.mqtt,
+        s7: s7 ?? this.s7,
         narrations: narrations ?? this.narrations,
         memory: memory,
       );
@@ -328,6 +339,7 @@ class Tag {
         narrations: narrations,
         memory: memory,
         mqtt: mqtt,
+        s7: s7,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -335,15 +347,16 @@ class Tag {
   /// escala zero (que apagaria o valor) volta a 1.
   Tag normalized() {
     var t = this;
-    // MQTT: os campos Modbus voltam ao padrão, para nenhuma regra de área
-    // (bit força liga/desliga, entrada tira a escrita) valer sem querer.
-    if (t.mqtt != null && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
+    // MQTT e S7: os campos Modbus voltam ao padrão, para nenhuma regra de
+    // área (bit força liga/desliga, entrada tira a escrita) valer sem querer.
+    if ((t.mqtt != null || t.s7 != null) && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
       t = t.copyWith(area: ModbusArea.holdingRegister, address: 0, bitIndex: 0, byteOrder: ByteOrder.abcd);
     }
     if (t.area.isBit && t.dataType != TagDataType.bool) {
       t = t.copyWith(dataType: TagDataType.bool);
     }
     if (!t.area.isWritable && t.writable) t = t.copyWith(writable: false);
+    if (t.writable && t.s7 != null && !t.s7!.canWrite) t = t.copyWith(writable: false);
     // Texto é só leitura nesta versão (nenhum elemento digita texto).
     if (t.isText && t.writable) t = t.copyWith(writable: false);
     if (t.length < 1) t = t.copyWith(length: 1);
@@ -393,6 +406,7 @@ class Tag {
         // Só com perfil de fabricante: projeto genérico fica igual ao de antes.
         if (memory != null) 'memory': memory,
         if (mqtt != null) 'mqtt': mqtt!.toJson(),
+        if (s7 != null) 's7': s7!.toJson(),
       };
 
   factory Tag.fromJson(Map<String, dynamic> j) => Tag(
@@ -422,5 +436,6 @@ class Tag {
         ],
         memory: j['memory'] as String?,
         mqtt: j['mqtt'] is Map ? MqttAddress.fromJson(Map<String, dynamic>.from(j['mqtt'] as Map)) : null,
+        s7: j['s7'] is Map ? S7TagAddress.fromJson(Map<String, dynamic>.from(j['s7'] as Map)) : null,
       ).normalized();
 }

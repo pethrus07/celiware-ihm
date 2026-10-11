@@ -10,8 +10,10 @@ import '../../core/utils/validators.dart';
 import '../../models/device.dart';
 import '../../models/vendor_profiles.dart';
 import '../../models/mqtt_config.dart';
+import '../../models/s7_config.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/common.dart';
+import 's7_device_fields.dart';
 import 'vendor_profile_sheet.dart';
 
 /// Cadastro/edição de equipamento.
@@ -39,6 +41,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     Device(kind: DeviceKind.modbusRtuTcp, framing: ModbusFraming.ascii) => _Protocol.ascii,
     Device(kind: DeviceKind.modbusRtuTcp) => _Protocol.rtu,
     Device(kind: DeviceKind.mqtt) => _Protocol.mqtt,
+    Device(kind: DeviceKind.s7) => _Protocol.s7,
     _ => _Protocol.tcp,
   };
 
@@ -56,6 +59,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   bool _showPass = false;
 
   bool get _mqtt => !_demo && _protocol == _Protocol.mqtt;
+
+  /// Siemens S7: família do CLP (rack e slot) no lugar do ID do escravo.
+  late final S7DeviceFields _s7 = S7DeviceFields(widget.device?.s7);
+  bool get _isS7 => !_demo && _protocol == _Protocol.s7;
   late final _name = TextEditingController(text: widget.device?.name ?? '');
   late final _host = TextEditingController(text: widget.device?.host ?? '');
   late final _port = TextEditingController(text: '${widget.device?.port ?? 502}');
@@ -73,6 +80,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     for (final c in [_name, _host, _port, _unit, _timeout, _poll, _user, _pass, _clientId, _keepAlive, _statusTopic, _offline]) {
       c.dispose();
     }
+    _s7.dispose();
     super.dispose();
   }
 
@@ -84,6 +92,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
             : switch (_protocol) {
                 _Protocol.tcp => DeviceKind.modbusTcp,
                 _Protocol.mqtt => DeviceKind.mqtt,
+                _Protocol.s7 => DeviceKind.s7,
                 _ => DeviceKind.modbusRtuTcp,
               },
         framing: _protocol == _Protocol.ascii ? ModbusFraming.ascii : ModbusFraming.rtu,
@@ -92,8 +101,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         unitId: int.tryParse(_unit.text) ?? 1,
         timeoutMs: (int.tryParse(_timeout.text) ?? 1500).clamp(200, 10000),
         pollMs: (int.tryParse(_poll.text) ?? 500).clamp(100, 60000),
-        // Perfil de fabricante é mapa de memória Modbus: no MQTT não existe.
-        profile: _demo || _mqtt ? null : _profile,
+        // Perfil de fabricante é mapa de memória Modbus: no MQTT e no S7 não existe.
+        profile: _demo || _mqtt || _isS7 ? null : _profile,
         // Só MQTT guarda broker; nos outros fica o padrão (e o arquivo, igual).
         mqtt: _mqtt
             ? MqttBroker(
@@ -106,16 +115,19 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 offlinePayload: _offline.text.trim().isEmpty ? 'offline' : _offline.text.trim(),
               )
             : const MqttBroker(),
+        s7: _isS7 ? _s7.build() : const S7Config(),
       );
 
   /// Trocar de protocolo leva junto a porta padrão — quem escolhe MQTT quase
-  /// nunca quer a 502 que já estava no campo.
+  /// nunca quer a 502 que já estava no campo. Porta mexida à mão fica.
   void _setProtocol(_Protocol p) {
     final port = int.tryParse(_port.text);
-    if (p == _Protocol.mqtt && (port == 502 || port == null)) {
-      _port.text = '${_tls ? MqttBroker.tlsPort : MqttBroker.defaultPort}';
-    } else if (p != _Protocol.mqtt && (port == MqttBroker.defaultPort || port == MqttBroker.tlsPort)) {
-      _port.text = '502';
+    if (port == null || const {502, MqttBroker.defaultPort, MqttBroker.tlsPort, S7Config.defaultPort}.contains(port)) {
+      _port.text = switch (p) {
+        _Protocol.mqtt => '${_tls ? MqttBroker.tlsPort : MqttBroker.defaultPort}',
+        _Protocol.s7 => '${S7Config.defaultPort}',
+        _ => '502',
+      };
     }
     _protocol = p;
     _probe = null;
@@ -131,6 +143,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 
   /// Resumo de "Mais opções" fechado.
   String _moreSummary() {
+    if (_isS7) return '${_s7.build().label} · Porta ${_port.text}';
     if (!_mqtt) return '${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}${_profileName == null ? '' : ' · $_profileName'}';
     return [
       'MQTT · Porta ${_port.text}',
@@ -262,7 +275,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 validator: (v) => tcp ? Validators.host(v) : null,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: Ind.number(20),
-                decoration: InputDecoration(labelText: _mqtt ? 'IP do broker' : 'IP do equipamento', hintText: '192.168.0.10'),
+                decoration: InputDecoration(labelText: _mqtt ? 'IP do broker' : _isS7 ? 'IP do CLP' : 'IP do equipamento', hintText: '192.168.0.10'),
                 onChanged: (_) => setState(() => _probe = null),
               ),
             ],
@@ -275,7 +288,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   : const Icon(Icons.network_check_rounded),
               label: Text(_probing ? 'Testando…' : 'Testar conexão'),
             ),
-            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt))],
+            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7))],
             if (tcp) ...[
               const SizedBox(height: Ind.spaceLarge),
               Theme(
@@ -291,8 +304,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   children: [
                     // Marca e modelo: com ela, as variáveis aceitam a memória
                     // como no manual ("D200"). Genérico = endereço Modbus direto.
-                    // No MQTT não há mapa de memória.
-                    if (!_mqtt) ...[
+                    // No MQTT e no S7 não há mapa de memória Modbus.
+                    if (!_mqtt && !_isS7) ...[
                       ListTile(
                         key: const ValueKey('marca-modelo'),
                         contentPadding: EdgeInsets.zero,
@@ -322,7 +335,11 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                       Text('Para conversor RS-485 → Ethernet que repassa os bytes sem converter. Se o conversor faz a conversão para Modbus TCP, use Modbus TCP.',
                           style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
                     ],
-                    if (_mqtt) ..._mqttOptions() else ...[
+                    if (_mqtt)
+                      ..._mqttOptions()
+                    else if (_isS7)
+                      S7DeviceOptions(fields: _s7, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
+                    else ...[
                       const SizedBox(height: Ind.space),
                       StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
                       const SizedBox(height: Ind.space),
@@ -418,10 +435,11 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 }
 
 class _ProbeCard extends StatelessWidget {
-  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false});
+  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false, this.s7 = false});
   final ProbeResult result;
   final bool tcp;
   final bool mqtt;
+  final bool s7;
 
   @override
   Widget build(BuildContext context) {
@@ -443,7 +461,7 @@ class _ProbeCard extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                ok ? '${mqtt ? 'Broker' : 'Equipamento'} respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}' : 'Não conectou: ${result.message}',
+                ok ? '${mqtt ? 'Broker' : s7 ? 'CLP' : 'Equipamento'} respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}' : 'Não conectou: ${result.message}',
                 style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 15),
               ),
             ),
@@ -463,12 +481,12 @@ class _ProbeCard extends StatelessWidget {
               Text(result.hint!, key: const ValueKey('teste-dica'), style: const TextStyle(fontWeight: FontWeight.w600, height: 1.35)),
               const SizedBox(height: 10),
             ],
-            Text(result.refused ? '${mqtt ? 'O broker' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
+            Text(result.refused ? '${mqtt ? 'O broker' : s7 ? 'O CLP' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             // Recusou = achou o aparelho; o problema é porta ou Modbus
             // desligado. Nem vale mandar conferir Wi-Fi e IP.
-            for (final t in mqtt ? _mqttChecks() : result.refused
+            for (final t in mqtt ? _mqttChecks() : s7 ? S7DeviceFields.checks(result) : result.refused
                 ? const [
                     'A porta está certa? Modbus TCP usa 502 — confira em "Mais opções".',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
@@ -519,7 +537,8 @@ enum _Protocol {
   tcp('Modbus TCP', 'Modbus TCP', 'Modbus TCP'),
   rtu('RTU (gateway)', 'Modbus RTU · gateway', 'RTU'),
   ascii('ASCII (gateway)', 'Modbus ASCII · gateway', 'ASCII'),
-  mqtt('MQTT', 'MQTT · broker', 'MQTT');
+  mqtt('MQTT', 'MQTT · broker', 'MQTT'),
+  s7('Siemens S7', 'Siemens S7', 'S7');
 
   const _Protocol(this.chip, this.subtitle, this.short);
   final String chip;

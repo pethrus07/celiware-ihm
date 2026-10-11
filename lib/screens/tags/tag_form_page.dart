@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
-import '../../core/modbus/modbus_exception.dart';
+import '../../core/comm/comm_error.dart';
 import '../../core/modbus/modbus_memory.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
@@ -186,7 +186,7 @@ class _TagFormPageState extends State<TagFormPage> {
           _liveError = null;
         });
       }
-    } on ModbusError catch (e) {
+    } on CommError catch (e) {
       if (mounted) setState(() => _liveError = e.userMessage);
     } on TagValueError catch (e) {
       if (mounted) setState(() => _liveError = e.message);

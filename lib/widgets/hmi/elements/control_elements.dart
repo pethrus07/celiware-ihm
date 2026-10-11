@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/app_scope.dart';
-import '../../../core/modbus/modbus_exception.dart';
+import '../../../core/comm/comm_error.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/hmi_screen.dart';
 import '../../../models/tag.dart';
@@ -190,7 +190,7 @@ class _ButtonElementState extends State<ButtonElement> {
     HapticFeedback.mediumImpact();
     try {
       await AppScope.of(context).runtime.press(tag.id);
-    } on ModbusError catch (err) {
+    } on CommError catch (err) {
       if (mounted) WriteActions.toast(context, 'Não gravou: ${err.userMessage}.', error: true);
     }
   }

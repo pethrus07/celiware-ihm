@@ -3,17 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
+import '../../core/comm/comm_error.dart';
 import '../../core/modbus/modbus_client.dart';
-import '../../core/modbus/modbus_client_simulated.dart';
-import '../../core/modbus/modbus_client_tcp.dart';
 import '../../core/modbus/modbus_exception.dart';
-import '../../core/modbus/modbus_memory.dart';
 import '../../models/device.dart';
 import '../../models/project.dart';
 import '../../models/tag.dart';
 import '../demo/demo_process.dart';
 import '../net/local_network.dart';
 import 'device_session.dart';
+import 'drivers/device_driver.dart';
 import 'tag_codec.dart';
 import 'tag_store.dart';
 
@@ -279,32 +278,25 @@ class HmiRuntime {
   // ── Teste de conexão ─────────────────────────────────────────────────────────
 
   /// Conecta num equipamento (ainda não salvo, inclusive) e opcionalmente lê
-  /// uma variável — é o "Testar" das telas de cadastro. Usa um cliente
+  /// uma variável — é o "Testar" das telas de cadastro. Usa um driver
   /// próprio, sem mexer nas sessões em andamento.
   Future<ProbeResult> probe(Device device, {Tag? tag}) async {
-    final client = _clientFactory(device);
+    if (device.isDemo) DemoRegistry.forDevice(device.id);
+    final driver = DeviceDriver.forDevice(device, clientFactory: _clientFactory);
     final sw = Stopwatch()..start();
     try {
-      if (device.isDemo && client is SimulatedModbusClient) {
-        DemoRegistry.forDevice(device.id);
-      }
-      await client.connect();
+      await driver.connect();
       Object? value;
       if (tag != null) {
-        value = await _readOnce(client, tag);
-      } else if (client is ModbusClientTcp) {
-        // Sem variável: uma leitura mínima confirma que há Modbus do outro
-        // lado (e não só uma porta aberta). Exceção de endereço também prova
-        // que o equipamento respondeu.
-        try {
-          await client.fn03ReadHoldingRegisters(startAddress: 0, quantity: 1);
-        } on ModbusExceptionResponse {/* respondeu: está vivo */}
+        value = await driver.readOnce(tag);
+      } else {
+        await driver.ping();
       }
       final nets = device.isDemo ? null : await LocalNetwork.list();
       return ProbeResult(ok: true, message: 'Conectado', elapsedMs: sw.elapsedMilliseconds, value: value,
           network: LocalNetwork.routeTo(device.host, nets)?.label);
-    } on ModbusError catch (e) {
-      final refused = e is ModbusConnectionError && e.refused;
+    } on CommError catch (e) {
+      final refused = e.refused;
       final nets = device.isDemo ? null : await LocalNetwork.list();
       return ProbeResult(ok: false, message: e.userMessage, elapsedMs: sw.elapsedMilliseconds, refused: refused,
           // Recusou = achou o aparelho; a rede está certa, não vale diagnosticar.
@@ -313,20 +305,7 @@ class HmiRuntime {
     } on TagValueError catch (e) {
       return ProbeResult(ok: false, message: e.message);
     } finally {
-      await client.dispose();
-    }
-  }
-
-  static Future<Object> _readOnce(ModbusClient c, Tag t) async {
-    switch (t.area) {
-      case ModbusArea.coil:
-        return TagCodec.decodeBits(t, await c.fn01ReadCoils(startAddress: t.address, count: t.span));
-      case ModbusArea.discreteInput:
-        return TagCodec.decodeBits(t, await c.fn02ReadDiscreteInputs(startAddress: t.address, count: t.span));
-      case ModbusArea.holdingRegister:
-        return TagCodec.decodeRegisters(t, await c.fn03ReadHoldingRegisters(startAddress: t.address, quantity: t.span));
-      case ModbusArea.inputRegister:
-        return TagCodec.decodeRegisters(t, await c.fn04ReadInputRegisters(startAddress: t.address, quantity: t.span));
+      await driver.dispose();
     }
   }
 

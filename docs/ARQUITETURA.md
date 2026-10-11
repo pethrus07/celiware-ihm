@@ -490,7 +490,9 @@ O protocolo não muda; muda onde cada área começa. Plano: campo `profile` em `
 
 ### 10.3. Acrescentar outro protocolo
 
-Implementar um transporte com a mesma interface de `ModbusClient` só serve para Modbus sobre outro meio (ex.: RTU por gateway). Protocolo diferente (OPC-UA, S7) pede uma sessão própria no nível da `DeviceSession`, com o mesmo contrato: publicar `TagReading` no `TagStore` e aceitar `write`.
+Desde a etapa 4 o motor é dividido em dois. A `DeviceSession` é dona do laço, da espera crescente depois de uma queda e da saúde da conexão — vale para todo protocolo. O que é de protocolo mora num **driver** (`lib/services/runtime/drivers/`), atrás do contrato `DeviceDriver`: `connect`, `scan` (lê as variáveis em uso e publica no `TagStore`), `readOnce`, `write`, `ping` e `tagsChanged`. Falha de comunicação sai como `CommError` (`lib/core/comm/`), que a sessão trata igual para todos: "sem comunicação" com o último valor esmaecido. Falha de uma variável só (endereço inexistente, pedido fora do limite) o driver resolve publicando a qualidade daquela variável.
+
+`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (MQTT, Siemens S7, OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
 
 ### 10.4. Mudar o formato do arquivo
 

@@ -8,17 +8,11 @@
 /// exceção tipada, e cada tipo vira uma mensagem diferente na interface.
 library;
 
-/// Base de todas as falhas Modbus.
-sealed class ModbusError implements Exception {
-  const ModbusError(this.message);
+import '../comm/comm_error.dart';
 
-  final String message;
-
-  /// Texto curto para mostrar ao operador (pt-BR, sem jargão de socket).
-  String get userMessage;
-
-  @override
-  String toString() => '$runtimeType: $message';
+/// Base de todas as falhas Modbus — um [CommError], como as dos outros protocolos.
+sealed class ModbusError extends CommError {
+  const ModbusError(super.message);
 }
 
 /// O equipamento respondeu, mas recusou o pedido (resposta com bit 0x80).
@@ -89,6 +83,7 @@ class ModbusConnectionError extends ModbusError {
   /// mas nada escuta naquela porta — porta errada ou Modbus TCP desligado.
   /// Diferente de IP errado/rede fora, que só estoura o tempo. Separar os dois
   /// casos poupa o técnico de conferir Wi-Fi e IP à toa.
+  @override
   final bool refused;
 
   @override

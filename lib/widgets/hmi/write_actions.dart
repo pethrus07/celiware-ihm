@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/app_scope.dart';
-import '../../core/modbus/modbus_exception.dart';
+import '../../core/comm/comm_error.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/tag.dart';
 import '../../services/runtime/tag_codec.dart';
@@ -48,7 +48,7 @@ class WriteActions {
       return true;
     } on TagValueError catch (e) {
       _toast(messenger, e.message, error: true);
-    } on ModbusError catch (e) {
+    } on CommError catch (e) {
       _toast(messenger, 'Não gravou: ${e.userMessage}.', error: true);
     }
     return false;

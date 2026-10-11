@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -113,9 +114,49 @@ void main() {
     });
   });
 
+  test('desconectar com o pedido ainda saindo: o erro vai para quem pediu, nunca "não tratado"', () async {
+    // O envio fica preso até o teste soltar; desconectar nesse meio falha o
+    // pedido antes de alguém esperar a resposta (a corrida que derrubava o
+    // teste do RTU sob carga, ao cancelar a inscrição no meio da varredura).
+    final link = _SlowLink();
+    final c = ModbusClientSerial(link: link, responseTimeout: const Duration(seconds: 2));
+    await c.connect();
+    final read = c.fn03ReadHoldingRegisters(startAddress: 0, quantity: 1);
+    await link.writing.future;
+    await c.disconnect();
+    link.release.complete();
+    await expectLater(read, throwsA(isA<ModbusConnectionError>()));
+  });
+
   test('porta fechada num gateway = recusou', () async {
     final c = ModbusClientSerial(link: TcpByteLink(host: '127.0.0.1', port: 1), responseTimeout: const Duration(milliseconds: 300));
     await expectLater(c.connect(), throwsA(isA<ModbusConnectionError>().having((e) => e.refused, 'refused', isTrue)));
     await c.dispose();
   }, timeout: const Timeout(Duration(seconds: 10)));
+}
+
+/// Link cujo envio só termina quando o teste solta ([release]).
+class _SlowLink extends ByteLink {
+  final writing = Completer<void>();
+  final release = Completer<void>();
+  final _input = StreamController<Uint8List>.broadcast();
+  bool _open = false;
+
+  @override
+  bool get isOpen => _open;
+
+  @override
+  Stream<Uint8List> get input => _input.stream;
+
+  @override
+  Future<void> open() async => _open = true;
+
+  @override
+  Future<void> write(Uint8List bytes) async {
+    if (!writing.isCompleted) writing.complete();
+    await release.future;
+  }
+
+  @override
+  Future<void> close() async => _open = false;
 }

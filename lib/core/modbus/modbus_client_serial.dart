@@ -108,6 +108,11 @@ class ModbusClientSerial extends ModbusClient {
       _rx.clear(); // sobra de resposta atrasada não pode casar com este pedido
       _echoLeft = discardEcho ? frame.length : 0;
       final completer = Completer<Uint8List>();
+      // Ouvinte desde já: se a conexão cair (ou o app desconectar) enquanto o
+      // pedido ainda está saindo, o erro chega antes de alguém esperar a
+      // resposta — sem ouvinte, vira "erro não tratado" na zona. Quem chamou
+      // recebe o erro do mesmo jeito.
+      unawaited(completer.future.then<void>((_) {}, onError: (Object _) {}));
       _pending = completer;
       _timer = Timer(responseTimeout, () {
         if (identical(_pending, completer)) _pending = null;

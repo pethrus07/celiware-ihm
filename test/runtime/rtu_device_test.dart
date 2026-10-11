@@ -45,7 +45,11 @@ void main() {
 
       await rt.apply(Project(devices: [device], tags: const [freq]));
       final sub = rt.subscribe(const ['f']);
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      // Espera a primeira varredura chegar (300 ms fixos às vezes não
+      // bastavam com a máquina ocupada).
+      for (var i = 0; i < 60 && rt.watch('f').value.quality != TagQuality.good; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
       expect(rt.watch('f').value.value, 4500);
       expect(rt.watch('f').value.quality, TagQuality.good);
 

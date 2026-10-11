@@ -165,6 +165,11 @@ class ModbusClientTcp extends ModbusClient {
         ..setRange(7, 7 + requestPdu.length, requestPdu);
 
       final completer = Completer<Uint8List>();
+      // Ouvinte desde já: se a conexão cair (ou o app desconectar) enquanto o
+      // pedido ainda está saindo, o erro chega antes de alguém esperar a
+      // resposta — sem ouvinte, vira "erro não tratado" na zona. Quem chamou
+      // recebe o erro do mesmo jeito.
+      unawaited(completer.future.then<void>((_) {}, onError: (Object _) {}));
       final timer = Timer(responseTimeout, () {
         if (_pending?.tid == tid) _pending = null;
         if (!completer.isCompleted) {

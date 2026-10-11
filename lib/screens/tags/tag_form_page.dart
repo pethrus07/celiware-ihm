@@ -15,6 +15,7 @@ import '../../models/device.dart';
 import '../../models/project.dart';
 import '../../models/narration.dart';
 import '../../models/tag.dart';
+import '../../models/vendor_profiles.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../services/runtime/mqtt_codec.dart';
 import '../../services/runtime/tag_codec.dart';
@@ -83,6 +84,7 @@ class _TagFormPageState extends State<TagFormPage> {
   // Âncoras para levar a pessoa até o primeiro campo com erro.
   final _nameAnchor = GlobalKey();
   final _addressAnchor = GlobalKey();
+  final _memoryAnchor = GlobalKey();
   final _bitAnchor = GlobalKey();
   final _lengthAnchor = GlobalKey();
   final _scaleAnchor = GlobalKey();
@@ -100,6 +102,18 @@ class _TagFormPageState extends State<TagFormPage> {
 
   /// Endereço digitado em hexadecimal ("2000" = 8192). Só do formulário.
   bool _hex = false;
+
+  /// Perfil de fabricante do equipamento escolhido (nulo = Modbus genérico).
+  /// Com ele, a memória entra como no manual do CLP ("D200") e a sugestão de
+  /// notação de manual (40001…) sai — lá esses números são endereços (MP-4).
+  VendorProfile? _profile;
+
+  /// A memória como no manual ("D200"), quando há perfil (MP-3).
+  late final _memory = TextEditingController(text: widget.tag?.memory ?? '');
+
+  /// A mudança veio do próprio campo da memória: não reescrever o campo.
+  bool _fromMemory = false;
+  bool _memoryStarted = false;
 
   /// Alarmes da variável — gravados junto com ela em Salvar. Os que não
   /// casam com o tipo escolhido agora ficam guardados aqui (voltando ao tipo,
@@ -170,7 +184,7 @@ class _TagFormPageState extends State<TagFormPage> {
 
   /// Pode virar "Lê e grava": no MQTT qualquer variável (publica no tópico de
   /// comando); no Modbus, só onde a área aceita escrita. Texto é só leitura.
-  bool get _canWrite => (_isMqtt || _area.isWritable) && _type != TagDataType.string;
+  bool get _canWrite => (_isMqtt || _area.isWritable) && _type != TagDataType.string && !_memoryReadOnly;
 
   @override
   void initState() {
@@ -210,6 +224,12 @@ class _TagFormPageState extends State<TagFormPage> {
     _deviceId ??= widget.tag?.deviceId ??
         (preferred != null && project.device(preferred) != null ? preferred : project.devices.lastOrNull?.id);
     _initialDeviceId ??= _deviceId;
+    _profile = VendorProfiles.of(project.device(_deviceId ?? ''));
+    // Variável de antes do perfil: o campo já abre com o nome do endereço dela.
+    if (!_memoryStarted) {
+      _memoryStarted = true;
+      if (widget.tag != null && widget.tag!.memory == null) _syncMemory();
+    }
   }
 
   @override
@@ -220,7 +240,7 @@ class _TagFormPageState extends State<TagFormPage> {
     _runtime?.releaseIdle();
     _more.dispose();
     _scroll.dispose();
-    for (final c in [_name, _address, _bit, _length, _unit, _description, _scale, _offset]) {
+    for (final c in [_name, _address, _bit, _length, _unit, _description, _scale, _offset, _memory]) {
       c.dispose();
     }
     _mq.dispose();
@@ -236,7 +256,137 @@ class _TagFormPageState extends State<TagFormPage> {
 
   bool get _isBitOfWord => _where == _Where.bitInRegister || _where == _Where.bitInInput;
 
-  AddressReading get _addressReading => AddressInput.read(_address.text, area: _area, hex: _hex);
+  AddressReading get _addressReading => AddressInput.read(_address.text, area: _area, hex: _hex, manual: _profile == null);
+
+  // ── Memória do CLP (perfil de fabricante) ─────────────────────────────────
+
+  /// A memória digitada, lida no perfil (nula sem perfil, vazia ou inválida).
+  MemoryRef? get _memoryRef {
+    final p = _profile;
+    final text = _memory.text.trim();
+    if (p == null || text.isEmpty) return null;
+    try {
+      return VendorProfiles.parseMemory(text, profile: p, bit: _type == TagDataType.bool);
+    } on MemoryError {
+      return null;
+    }
+  }
+
+  /// Bit dentro do registrador, quando a variável é um.
+  int? get _wordBit => _isBitOfWord ? (int.tryParse(_bit.text) ?? 0).clamp(0, 15) : null;
+
+  /// A memória digitada aponta para o endereço que está no formulário.
+  bool _memoryMatches(MemoryRef ref) => ref.area == _area && ref.address == _addressReading.address && ref.bit == _wordBit;
+
+  /// O que vai em [Tag.memory]: o texto digitado, se ainda aponta para o
+  /// endereço do formulário; senão, o nome que o perfil dá a esse endereço.
+  /// Quem mexeu no endereço Modbus à mão não fica com um "D200" falso — e
+  /// editar outro campo de uma variável feita em Criar várias não apaga o dela.
+  String? _memoryForDraft() {
+    final p = _profile;
+    final address = _addressReading.address;
+    if (p == null || address == null) return null;
+    final ref = _memoryRef;
+    if (ref != null && !ref.raw && _memoryMatches(ref)) return ref.text;
+    return p.format(_area, address, bit: _wordBit);
+  }
+
+  /// Entrada física exposta como coil (o X da Inovance e do WEG): o perfil
+  /// diz que é só leitura, mesmo a área aceitando escrita.
+  bool get _memoryReadOnly {
+    final ref = _memoryRef;
+    return ref != null && _memoryMatches(ref) && ref.readOnly;
+  }
+
+  /// Mexeram no endereço Modbus, em "Onde fica", no bit ou no equipamento: o
+  /// campo da memória passa a mostrar o nome que o perfil dá ao endereço — ou
+  /// fica vazio, se o perfil não tem nome para ele.
+  void _syncMemory() {
+    final p = _profile;
+    final address = _addressReading.address;
+    if (p == null || address == null) return;
+    final ref = _memoryRef;
+    if (ref != null && _memoryMatches(ref)) return;
+    _memory.text = p.format(_area, address, bit: _wordBit) ?? '';
+  }
+
+  /// A pessoa digitou a memória como no manual ("D200", "X10", "D100.3"):
+  /// onde fica, endereço, bit e tipo seguem. Enquanto o texto não é memória
+  /// válida, o resto fica como estava.
+  void _onMemoryChanged(String _) {
+    final ref = _memoryRef;
+    _fromMemory = true;
+    try {
+      if (ref != null) {
+        // Bit (M, X, "D100.3") é liga/desliga; contador de 32 bits é INT32;
+        // registrador sem bit deixa de ser liga/desliga.
+        final type = ref.forcedType ?? (_type == TagDataType.bool ? TagDataType.uint16 : _type);
+        if (type != _type) _setType(type);
+        _where = switch (ref.area) {
+          ModbusArea.coil => _Where.coil,
+          ModbusArea.discreteInput => _Where.discrete,
+          ModbusArea.holdingRegister => ref.bit != null ? _Where.bitInRegister : _Where.holding,
+          ModbusArea.inputRegister => ref.bit != null ? _Where.bitInInput : _Where.input,
+        };
+        if (ref.bit != null) _bit.text = '${ref.bit}';
+        _hex = false;
+        _address.text = '${ref.address}';
+        if (ref.readOnly) _writable = false;
+      }
+      _onFieldChanged();
+    } finally {
+      _fromMemory = false;
+    }
+  }
+
+  /// O que está errado na memória, nas palavras do manual ("X8 não existe —
+  /// X conta em octal"). Confere também o valor de 32 bits num registrador de
+  /// 16, que ocupa a memória seguinte.
+  String? _memoryError() {
+    final p = _profile;
+    final text = _memory.text.trim();
+    if (p == null || text.isEmpty) return null;
+    final MemoryRef ref;
+    try {
+      ref = VendorProfiles.parseMemory(text, profile: p, bit: _type == TagDataType.bool);
+    } on MemoryError catch (e) {
+      return e.message;
+    }
+    final rule = ref.rule, n = ref.number;
+    if (_type.is32Bit && rule != null && n != null && rule.wordsPerItem == 1) {
+      final next = rule.addressOf(n + 1);
+      if (next != ref.address + 1) {
+        return '${ref.text} com 32 bits ocuparia ${rule.text(n + 1)}, que ${next == null ? 'não existe neste CLP' : 'não fica logo depois no Modbus'}.';
+      }
+    }
+    return null;
+  }
+
+  /// "Memória do CLP" (ou "Parâmetro do inversor"): o texto do manual e,
+  /// embaixo, a prova da tradução ("D200 → Holding 200") ou o que está errado.
+  Widget _memoryField() {
+    final p = _profile!;
+    final error = _memoryError();
+    return TextFormField(
+      key: const ValueKey('campo-memoria'),
+      controller: _memory,
+      autocorrect: false,
+      enableSuggestions: false,
+      // Letras e números à vista, sem corretor.
+      keyboardType: TextInputType.visiblePassword,
+      textCapitalization: TextCapitalization.characters,
+      style: Ind.number(20),
+      decoration: InputDecoration(
+        labelText: p.kind == ProfileKind.drive ? 'Parâmetro do inversor' : 'Memória do CLP',
+        hintText: 'Ex.: ${p.example}',
+        helperText: error == null ? _memoryRef?.proof : null,
+        errorText: error,
+        errorMaxLines: 3,
+      ),
+      onChanged: _onMemoryChanged,
+      validator: (_) => _memoryError(),
+    );
+  }
 
   /// Onde o campo "quantos valores" aparece: à vista (Texto, ou lista pedida
   /// pelo gráfico de barras) ou em "Mais opções" (lista opcional).
@@ -259,7 +409,7 @@ class _TagFormPageState extends State<TagFormPage> {
       byteOrder: mqtt != null ? ByteOrder.abcd : _order,
       bitIndex: mqtt != null ? 0 : (int.tryParse(_bit.text) ?? 0).clamp(0, 15),
       length: _type == TagDataType.bool ? 1 : (int.tryParse(_length.text) ?? 1).clamp(1, 120),
-      writable: _writable,
+      writable: _writable && !_memoryReadOnly,
       unit: _unit.text.trim(),
       decimals: _decimals,
       scale: _scaleValue,
@@ -267,6 +417,7 @@ class _TagFormPageState extends State<TagFormPage> {
       description: _description.text.trim(),
       alarms: _alarms,
       narrations: _narrations,
+      memory: mqtt != null ? null : _memoryForDraft(),
     ).normalized();
   }
 
@@ -457,15 +608,19 @@ class _TagFormPageState extends State<TagFormPage> {
     final mq = mqtt ? _mq.summary(writable: _writable, isBool: _type == TagDataType.bool) : const <String>[];
     // Endereço em hexadecimal só existe no Modbus.
     final hex = _hex && !mqtt ? 'endereço em hex' : null;
+    // Com perfil, o endereço Modbus mora aqui: o resumo mostra qual é.
+    final where = _addressInMore && _addressReading.address != null ? _draft().addressLabel : null;
     if (_type == TagDataType.bool) {
       if (mqtt) return mq.isEmpty ? 'Observação' : mq.join(' · ');
+      if (where != null) return [where, ?hex].join(' · ');
       return hex != null ? 'Endereço em hex' : 'Observação, endereço em hex';
     }
     if (_type == TagDataType.string) {
       if (mqtt) return ['Texto', ...mq].join(' · ');
-      return [_order == ByteOrder.abcd ? 'Texto · STRING' : 'Texto · bytes trocados', ?hex].join(' · ');
+      return [?where, _order == ByteOrder.abcd ? 'Texto · STRING' : 'Texto · bytes trocados', ?hex].join(' · ');
     }
     final parts = <String>[
+      ?where,
       ...mq,
       if (_scaleLabel() != null) _scaleLabel()!,
       if (_unit.text.trim().isNotEmpty) _unit.text.trim(),
@@ -499,6 +654,7 @@ class _TagFormPageState extends State<TagFormPage> {
   }
 
   void _onFieldChanged() => setState(() {
+        if (!_fromMemory) _syncMemory();
         _liveValue = null;
         _liveError = null;
         _liveNote = null;
@@ -544,8 +700,9 @@ class _TagFormPageState extends State<TagFormPage> {
     if (_isMqtt) {
       if (_mq.build() == null) return (_addressAnchor, false);
     } else {
-      if (_addressReading.error != null) return (_addressAnchor, false);
-      if (_isBitOfWord && _rangeError(_bit.text, 0, 15) != null) return (_bitAnchor, false);
+      if (_memoryError() != null) return (_memoryAnchor, false);
+      if (_addressReading.error != null) return (_addressAnchor, _addressInMore);
+      if (_isBitOfWord && _rangeError(_bit.text, 0, 15) != null) return (_bitAnchor, _addressInMore);
     }
     if ((_lengthInMain || _lengthInMore) && _rangeError(_length.text, 1, 120) != null) return (_lengthAnchor, _lengthInMore);
     if (_type.isNumeric && _customScale && (_scaleError(_scale.text) != null || _offsetError(_offset.text) != null)) {
@@ -770,6 +927,7 @@ class _TagFormPageState extends State<TagFormPage> {
                             selectedId: _deviceId,
                             onChanged: (id) {
                               _deviceId = id;
+                              _profile = VendorProfiles.of(project.device(id));
                               _onFieldChanged();
                             },
                           ),
@@ -785,6 +943,12 @@ class _TagFormPageState extends State<TagFormPage> {
                             decoration: const InputDecoration(labelText: 'Nome', hintText: 'Ex.: Velocidade da faca'),
                           ),
                         ),
+                        // Com marca e modelo no equipamento: a memória como no
+                        // manual, e o resto do formulário segue (MP-3).
+                        if (_profile != null && !mqtt) ...[
+                          const SizedBox(height: Ind.space),
+                          KeyedSubtree(key: _memoryAnchor, child: _memoryField()),
+                        ],
                         const SectionHeader('O que é', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)),
                         ChoiceCards<TagDataType>(
                           options: [
@@ -798,46 +962,17 @@ class _TagFormPageState extends State<TagFormPage> {
                           onChanged: _setType,
                         ),
                         if (typeWarning != null && _isMainType(_type)) ...[const SizedBox(height: 12), typeWarning],
-                        SectionHeader(
-                          'Onde fica',
-                          padding: const EdgeInsets.fromLTRB(0, 28, 0, 12),
-                          trailing: AnimatedOpacity(
-                            opacity: _whereChanged && !mqtt ? 1 : 0,
-                            duration: const Duration(milliseconds: 250),
-                            child: Text('mudou com o tipo', style: TextStyle(color: Ind.accent, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                          ),
-                        ),
+                        // Com perfil, "Onde fica" e o endereço Modbus moram em
+                        // "Mais opções": a memória do manual já diz onde (MP-3).
+                        if (!_addressInMore) _whereHeader('Onde fica', const EdgeInsets.fromLTRB(0, 28, 0, 12)),
                         // MQTT: o endereço é o tópico (e o campo do JSON).
                         if (mqtt)
                           KeyedSubtree(
                             key: _addressAnchor,
                             child: MqttAddressBlock(fields: _mq, device: _device, onChanged: _onFieldChanged, onPick: _onMqttPick),
                           )
-                        else ...[
-                        _whereBlock(),
-                        const SizedBox(height: Ind.spaceLarge),
-                        // Bloco do endereço: é aqui que a "Memória do CLP"
-                        // (perfis de fabricante) entra, trocando ou
-                        // complementando o AddressField.
-                        KeyedSubtree(
-                          key: _addressAnchor,
-                          child: AddressField(controller: _address, area: _area, hex: _hex, onChanged: _onFieldChanged),
-                        ),
-                        if (_isBitOfWord) ...[
-                          const SizedBox(height: Ind.space),
-                          KeyedSubtree(
-                            key: _bitAnchor,
-                            child: StepperField(
-                              fieldKey: const ValueKey('campo-bit'),
-                              label: 'Qual bit (0 a 15)',
-                              controller: _bit,
-                              min: 0,
-                              max: 15,
-                              onChanged: _onFieldChanged,
-                            ),
-                          ),
-                        ],
-                        ], // fim do endereço Modbus
+                        else if (!_addressInMore)
+                          ..._modbusAddress(),
                         // Lista é obrigatória para o gráfico de barras: aí fica à vista.
                         if (_lengthInMain && !isText) ...[
                           const SizedBox(height: Ind.space),
@@ -904,6 +1039,47 @@ class _TagFormPageState extends State<TagFormPage> {
       ),
     );
   }
+
+  /// Com perfil de fabricante (e fora do MQTT), o endereço Modbus fica em
+  /// "Mais opções": à vista, só a "Memória do CLP".
+  bool get _addressInMore => _profile != null && !_isMqtt;
+
+  /// Título do bloco de endereço, com o aviso de quando o tipo mudou "Onde
+  /// fica" sozinho.
+  Widget _whereHeader(String title, EdgeInsets padding) => SectionHeader(
+        title,
+        padding: padding,
+        trailing: AnimatedOpacity(
+          opacity: _whereChanged && !_isMqtt ? 1 : 0,
+          duration: const Duration(milliseconds: 250),
+          child: Text('mudou com o tipo', style: TextStyle(color: Ind.accent, fontSize: 12.5, fontWeight: FontWeight.w600)),
+        ),
+      );
+
+  /// "Onde fica", endereço Modbus e bit. À vista no Modbus genérico; com
+  /// perfil, em "Mais opções", preenchidos pela memória (e editáveis).
+  List<Widget> _modbusAddress() => [
+        _whereBlock(),
+        const SizedBox(height: Ind.spaceLarge),
+        KeyedSubtree(
+          key: _addressAnchor,
+          child: AddressField(controller: _address, area: _area, hex: _hex, manual: _profile == null, onChanged: _onFieldChanged),
+        ),
+        if (_isBitOfWord) ...[
+          const SizedBox(height: Ind.space),
+          KeyedSubtree(
+            key: _bitAnchor,
+            child: StepperField(
+              fieldKey: const ValueKey('campo-bit'),
+              label: 'Qual bit (0 a 15)',
+              controller: _bit,
+              min: 0,
+              max: 15,
+              onChanged: _onFieldChanged,
+            ),
+          ),
+        ],
+      ];
 
   /// "Onde fica": os cartões e, para bit de palavra, de qual registrador.
   Widget _whereBlock() {
@@ -994,6 +1170,11 @@ class _TagFormPageState extends State<TagFormPage> {
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_isMqtt) MqttMoreOptions(fields: _mq, writable: _writable && _canWrite, isBool: _type == TagDataType.bool, onChanged: _onFieldChanged),
+          if (_addressInMore) ...[
+            _whereHeader('Endereço Modbus', const EdgeInsets.fromLTRB(0, 8, 0, 12)),
+            ..._modbusAddress(),
+            const SizedBox(height: Ind.space),
+          ],
           if (_type.isNumeric) ...[
             // Escala primeiro: é o que mais se usa aqui ("o
             // manual diz para dividir por 10").

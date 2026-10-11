@@ -9,6 +9,7 @@ import 'package:ihm/core/modbus/modbus_memory.dart';
 import 'package:ihm/main.dart';
 import 'package:ihm/models/device.dart';
 import 'package:ihm/models/tag.dart';
+import 'package:ihm/models/vendor_profiles.dart';
 import 'package:ihm/screens/tags/address_field.dart';
 import 'package:ihm/screens/tags/reading_hints.dart';
 import 'package:ihm/screens/tags/tag_form_page.dart';
@@ -42,6 +43,9 @@ void main() {
       expect(manual.address, isNull);
       expect(AddressInput.read('40101', area: hr).address, 40101, reason: '40101 também é endereço válido');
       expect(AddressInput.read('0x9C45', area: hr).manual, isNull, reason: 'notação de manual é sempre decimal');
+      // MP-4: com perfil de fabricante, 40001–49999 são endereços legítimos.
+      expect(AddressInput.read('400101', area: hr, manual: false).manual, isNull);
+      expect(AddressInput.read('40101', area: hr, manual: false).address, 40101);
     });
 
     test('endereço: − / + mantém o jeito em que foi escrito', () {
@@ -506,6 +510,125 @@ void main() {
     for (final d in extras) {
       DemoRegistry.discard(d.id);
     }
+  });
+
+  // ── Perfil de fabricante no cadastro (MP-3 e MP-4) ─────────────────────────
+
+  const h3u = Device(id: 'h3u', name: 'CLP H3U', kind: DeviceKind.demo, profile: 'inovance-h3u');
+
+  Future<ProjectController> bootWithProfile(WidgetTester tester) async {
+    final c = await boot(tester);
+    c.saveDevice(h3u);
+    await live(tester, 600);
+    return c;
+  }
+
+  Future<void> typeMemory(WidgetTester tester, String text) async {
+    await tester.enterText(find.byKey(const ValueKey('campo-memoria')), text);
+    await live(tester, 300);
+  }
+
+  testWidgets('MP-3: com marca e modelo, "D200" preenche o endereço, e a variável guarda e mantém a memória', (tester) async {
+    final c = await bootWithProfile(tester);
+    final d200 = VendorProfiles.inovanceH3u.parse('D200');
+
+    await open(tester, preferDeviceId: h3u.id);
+    expect(find.byKey(const ValueKey('campo-memoria')), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('campo-nome-variavel')), 'Pressão');
+    await typeMemory(tester, 'd200');
+    expect(find.text(d200.proof), findsOneWidget, reason: 'a linha de prova: D200 → Holding 200');
+    expect(find.byKey(const ValueKey('campo-endereco')), findsNothing, reason: 'com perfil, o endereço Modbus mora em Mais opções');
+    await reveal(tester, find.text('Mais opções'));
+    expect(find.descendant(of: find.byType(ExpansionTile), matching: find.text('HR ${d200.address}')), findsOneWidget, reason: 'o resumo fechado mostra o endereço');
+    await openMore(tester);
+    await reveal(tester, find.byKey(const ValueKey('campo-endereco')));
+    expect(fieldText(tester, 'campo-endereco'), '${d200.address}');
+    await tapKey(tester, 'salvar-variavel', wait: 600);
+    var tag = c.project.tags.firstWhere((t) => t.name == 'Pressão');
+    expect((tag.memory, tag.area, tag.address), ('D200', ModbusArea.holdingRegister, d200.address));
+
+    // Editar outro campo não apaga o "D200" (antes, salvar pelo formulário zerava).
+    await open(tester, tag: tag);
+    expect(fieldText(tester, 'campo-memoria'), 'D200');
+    await tester.enterText(find.byKey(const ValueKey('campo-nome-variavel')), 'Pressão da linha');
+    await tapKey(tester, 'salvar-variavel', wait: 600);
+    tag = c.project.tag(tag.id)!;
+    expect((tag.name, tag.memory), ('Pressão da linha', 'D200'));
+
+    // Mexer no endereço Modbus à mão: a memória acompanha, sem "D200" falso.
+    await open(tester, tag: tag);
+    await openMore(tester);
+    await reveal(tester, find.byKey(const ValueKey('campo-endereco')));
+    await tester.enterText(find.byKey(const ValueKey('campo-endereco')), '${d200.address + 1}');
+    await live(tester, 300);
+    await reveal(tester, find.byKey(const ValueKey('campo-memoria')), up: true);
+    expect(fieldText(tester, 'campo-memoria'), 'D201');
+    await tapKey(tester, 'salvar-variavel', wait: 600);
+    expect(c.project.tag(tag.id)!.memory, 'D201');
+    await shutdown(tester, c);
+    DemoRegistry.discard(h3u.id);
+  });
+
+  testWidgets('MP-3: M vira liga/desliga, X conta em octal e é só leitura, 32 bits no último D é recusado', (tester) async {
+    final c = await bootWithProfile(tester);
+    await open(tester, preferDeviceId: h3u.id);
+    await tester.enterText(find.byKey(const ValueKey('campo-nome-variavel')), 'Entrada 8');
+
+    await typeMemory(tester, 'X8');
+    expect(find.textContaining('octal'), findsOneWidget);
+
+    await typeMemory(tester, 'X10');
+    await reveal(tester, find.byKey(const ValueKey('pode-gravar')));
+    expect(tester.widget<SwitchListTile>(find.byKey(const ValueKey('pode-gravar'))).onChanged, isNull,
+        reason: 'entrada física exposta como coil: o perfil diz que é só leitura');
+    await tapKey(tester, 'salvar-variavel', wait: 600);
+    final x10 = c.project.tags.firstWhere((t) => t.name == 'Entrada 8');
+    final ref = VendorProfiles.inovanceH3u.parse('X10');
+    expect((x10.memory, x10.dataType, x10.area, x10.address, x10.writable), ('X10', TagDataType.bool, ModbusArea.coil, ref.address, false));
+
+    await open(tester, preferDeviceId: h3u.id);
+    await tester.enterText(find.byKey(const ValueKey('campo-nome-variavel')), 'Relé 100');
+    await typeMemory(tester, 'M100');
+    await tapKey(tester, 'salvar-variavel', wait: 600);
+    final m100 = c.project.tags.firstWhere((t) => t.name == 'Relé 100');
+    expect((m100.memory, m100.dataType, m100.area, m100.address), ('M100', TagDataType.bool, ModbusArea.coil, 100));
+
+    // FLOAT32 no último D ocuparia o D seguinte, que não existe.
+    await open(tester, preferDeviceId: h3u.id);
+    await tester.enterText(find.byKey(const ValueKey('campo-nome-variavel')), 'Vazão');
+    await tapKey(tester, 'opcao-${TagDataType.float32}');
+    await typeMemory(tester, 'D8511');
+    expect(find.textContaining('ocuparia D8512'), findsOneWidget);
+    await tapKey(tester, 'salvar-variavel', wait: 600);
+    expect(c.project.tags.where((t) => t.name == 'Vazão'), isEmpty);
+    await shutdown(tester, c);
+    DemoRegistry.discard(h3u.id);
+  });
+
+  testWidgets('MP-4: com perfil, 40101 é endereço (sem sugestão de notação de manual); no genérico, sugere', (tester) async {
+    final c = await bootWithProfile(tester);
+    Future<void> type40101({bool inMore = false}) async {
+      if (inMore) await openMore(tester);
+      await reveal(tester, find.byKey(const ValueKey('campo-endereco')));
+      await tester.enterText(find.byKey(const ValueKey('campo-endereco')), '40101');
+      await live(tester, 300);
+    }
+
+    await open(tester, preferDeviceId: h3u.id);
+    await type40101(inMore: true);
+    expect(find.byKey(const ValueKey('sugestao-endereco')), findsNothing);
+    await reveal(tester, find.byKey(const ValueKey('campo-memoria')), up: true);
+    expect(fieldText(tester, 'campo-memoria'), isNot(isEmpty), reason: 'o perfil dá nome ao endereço digitado');
+    await tester.pageBack();
+    await live(tester, 400);
+    await tapKey(tester, 'descartar', wait: 600);
+
+    await open(tester, preferDeviceId: DemoProject.deviceId);
+    expect(find.byKey(const ValueKey('campo-memoria')), findsNothing);
+    await type40101();
+    expect(find.byKey(const ValueKey('sugestao-endereco')), findsOneWidget);
+    await shutdown(tester, c);
+    DemoRegistry.discard(h3u.id);
   });
 }
 

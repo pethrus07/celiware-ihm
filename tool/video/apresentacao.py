@@ -22,7 +22,6 @@ Saída: tool/video/saida/ware-iot-apresentacao.mp4 (+ capítulos).
 from __future__ import annotations
 
 import ctypes
-import ctypes.wintypes as wt
 import hashlib
 import json
 import os
@@ -358,38 +357,24 @@ def narrar(cena: Cena) -> tuple[Path, float]:
 
 # ── Gravação ─────────────────────────────────────────────────────────────────
 
-def janela_painel_na_frente() -> bool:
+def painel_aberto() -> bool:
+    """A janela do painel existe e não está minimizada (minimizada, a captura para)."""
     u = ctypes.windll.user32
     h = u.FindWindowW(None, PAINEL_TITULO)
     if not h:
         return False
-    HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE = -1, 0x2, 0x1
-    u.SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
-    u.SetForegroundWindow(h)
+    if u.IsIconic(h):
+        u.ShowWindow(h, 9)   # SW_RESTORE
     return True
 
 
-def retangulo_painel() -> tuple[int, int, int, int]:
-    """Posição e tamanho da janela do painel em pixels FÍSICOS (x, y, w, h).
-
-    O gdigrab por título não sabe de DPI: em tela a 250% gravava a janela
-    num quadro errado (conteúdo miúdo no canto, resto preto). Por isso a
-    captura é da área da tela (ddagrab) com o retângulo medido aqui, com o
-    processo marcado como ciente de DPI e sem a sombra da janela (DWM)."""
-    u = ctypes.windll.user32
-    u.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))   # PER_MONITOR_AWARE_V2
-    h = u.FindWindowW(None, PAINEL_TITULO)
-    r = wt.RECT()
-    ctypes.windll.dwmapi.DwmGetWindowAttribute(h, 9, ctypes.byref(r), ctypes.sizeof(r))  # EXTENDED_FRAME_BOUNDS
-    # A janela passa por baixo da barra de tarefas; sem cortar na área útil
-    # do monitor, os ícones da barra entravam no vídeo.
-    class MONITORINFO(ctypes.Structure):
-        _fields_ = [("cbSize", wt.DWORD), ("rcMonitor", wt.RECT), ("rcWork", wt.RECT), ("dwFlags", wt.DWORD)]
-    mi = MONITORINFO(cbSize=ctypes.sizeof(MONITORINFO))
-    u.GetMonitorInfoW(u.MonitorFromWindow(h, 2), ctypes.byref(mi))
-    baixo = min(r.bottom, mi.rcWork.bottom)
-    w, a = (r.right - r.left) // 2 * 2, (baixo - r.top) // 2 * 2   # yuv420p pede lados pares
-    return r.left, r.top, w, a
+# Captura da JANELA do painel (Windows Graphics Capture, ffmpeg ≥ 8): grava o
+# conteúdo dela mesmo com outra janela por cima. A captura anterior era da
+# ÁREA da tela (ddagrab) e, em out/2026, o console do emulador e o VS Code
+# entraram no vídeo no lugar do simulador. Sem a moldura do Windows, em
+# pixels físicos (o gdigrab por título errava com a escala de 250%).
+CAPTURA_PAINEL = ("gfxcapture=window_title=Simulador Modbus TCP.*:capture_cursor=0:max_framerate=30"
+                  ":width=-2:height=-2,hwdownload,format=bgra")
 
 
 def gravar(cena: Cena, c: Celular, minimo: float) -> tuple[Path, Path | None]:
@@ -406,11 +391,10 @@ def gravar(cena: Cena, c: Celular, minimo: float) -> tuple[Path, Path | None]:
                             "--bit-rate", "10000000", "/sdcard/cena.mp4"])
     grab = None
     if pan:
-        janela_painel_na_frente()
-        x, y, w, a = retangulo_painel()
-        dda = f"ddagrab=output_idx=0:framerate=30:offset_x={x}:offset_y={y}:video_size={w}x{a},hwdownload,format=bgra"
+        if not painel_aberto():
+            raise SystemExit("O painel do simulador não está aberto: a cena dividida ficaria sem ele.")
         grab = subprocess.Popen([str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y",
-                                 "-f", "lavfi", "-i", dda,
+                                 "-f", "lavfi", "-i", CAPTURA_PAINEL,
                                  "-c:v", "libx264", "-preset", "ultrafast", "-crf", "16",
                                  "-pix_fmt", "yuv420p", str(pan)], stdin=subprocess.PIPE)
     time.sleep(1.2)   # os dois gravadores levam um instante para começar
@@ -427,6 +411,8 @@ def gravar(cena: Cena, c: Celular, minimo: float) -> tuple[Path, Path | None]:
     rec.wait(timeout=20)
     time.sleep(1.5)   # o screenrecord fecha o mp4 depois do sinal
     c.adb("pull", "/sdcard/cena.mp4", str(cel))
+    if pan and (not pan.exists() or pan.stat().st_size == 0):
+        raise SystemExit(f"A captura do painel falhou na cena {cena.id}.")
     return cel, pan
 
 

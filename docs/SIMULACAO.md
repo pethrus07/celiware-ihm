@@ -132,7 +132,7 @@ Saída em `tool/video/saida/` (fora do git): o `.mp4` e um `.txt` de capítulos.
 
 Armadilhas já resolvidas no script:
 
-- **Captura do painel com DPI alto.** O `gdigrab` por título não conhece a escala do Windows (250% neste notebook) e gravava a janela miúda num canto. A captura é pela área da tela (`ddagrab`), com o retângulo medido em pixels físicos e cortado na área útil do monitor (senão entra a barra de tarefas).
+- **Captura do painel: a janela, não a área da tela.** O `gdigrab` por título não conhece a escala do Windows (250% neste notebook) e gravava a janela miúda num canto; a captura pela área da tela (`ddagrab`) resolvia a escala, mas gravava o que estivesse por cima — em out/2026 o console do emulador e o VS Code entraram no vídeo no lugar do simulador. Agora é `gfxcapture` (Windows Graphics Capture, ffmpeg ≥ 8): grava o conteúdo da janela pelo título, sem moldura, em pixels físicos, mesmo coberta. Só não pode estar minimizada (o script restaura).
 - **Coordenadas de toque** são do Pixel 7 (1080×2400) e medidas nas fotos do ensaio; mudou layout, rode `ensaio` antes.
 - **Teclado numérico** fecha com a tecla voltar (`keyevent 4`), não com ESC.
 - **Capítulos** arredondam antes de dividir (119,6 s virava "01:00").

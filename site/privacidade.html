@@ -60,7 +60,7 @@
 <main id="conteudo">
   <div class="wrap cabeca">
     <h1>Política de privacidade</h1>
-    <p class="dim">Última atualização: 11 de outubro de 2026.</p>
+    <p class="dim">Última atualização: 12 de outubro de 2026.</p>
   </div>
 
   <div class="wrap secao secao--alto">
@@ -74,33 +74,39 @@
       <h2>O que fica no seu celular</h2>
       <p>O app guarda, só na área privada dele no aparelho:</p>
       <ul>
-        <li>o projeto: equipamentos, variáveis, telas e alarmes que você cadastrou;</li>
-        <li>o histórico de alarmes, com os eventos mais recentes;</li>
-        <li>preferências do aparelho, como o tema e os tutoriais já vistos.</li>
+        <li>o projeto: equipamentos, variáveis, telas, alarmes, receitas e regras que você cadastrou, inclusive usuário e senha de equipamento (broker MQTT), quando houver;</li>
+        <li>os históricos de alarmes, de regras e de receitas aplicadas, com o nome digitado em "Quem está aplicando";</li>
+        <li>os registros de dados que você criar (Mais → Registros);</li>
+        <li>preferências do aparelho, como a aparência, a voz e os tutoriais já vistos.</li>
       </ul>
-      <p>Nada disso é enviado para nós nem para ninguém. Para apagar tudo, desinstale o app ou limpe os dados dele nas configurações do Android.</p>
+      <p>Nada disso é enviado para nós nem para ninguém. Com o backup do Android ligado, o próprio Android pode guardar uma cópia do projeto, dos históricos e das preferências na sua conta Google, como faz com os outros apps; os registros de dados ficam de fora. Para apagar tudo, desinstale o app ou limpe os dados dele nas configurações do Android.</p>
 
       <h2>A rede local</h2>
-      <p>Para funcionar, o app conversa com os equipamentos que você cadastrar (CLP, inversor, conversor), no endereço IP que você informar. Essa conversa vai direto do celular para o equipamento, pela sua rede ou pela VPN que você configurar. Não passa por nenhum servidor nosso.</p>
+      <p>Para funcionar, o app conversa com os equipamentos que você cadastrar (CLP, inversor, conversor, broker), no endereço que você informar. Essa conversa vai direto do celular para o equipamento, pela sua rede ou pela VPN que você configurar. Não passa por nenhum servidor nosso.</p>
       <p>O app também consulta em qual rede Wi-Fi o celular está, para usar a rede da máquina e avisar quando a faixa de IP é diferente. Essa informação não sai do aparelho.</p>
 
       <h2>Arquivos</h2>
       <p>O app só abre ou grava arquivos quando você pede:</p>
       <ul>
         <li><strong>Salvar ou enviar o projeto:</strong> você escolhe onde salvar ou com qual app enviar (WhatsApp, e-mail, Drive). A partir daí, vale a política do app que você escolheu.</li>
+        <li><strong>Mandar a planilha de um registro (CSV):</strong> também pela folha de compartilhar do Android, para o app que você escolher.</li>
         <li><strong>Importar um projeto, ou escolher uma imagem ou PDF para a tela:</strong> o app lê só o arquivo que você escolheu.</li>
       </ul>
+      <p>O arquivo do projeto leva as senhas de equipamento cadastradas: envie só para quem pode acessar a máquina.</p>
+
+      <h2>Voz</h2>
+      <p>Os avisos por voz usam o motor de voz do Android (por exemplo, Serviços de fala do Google), que segue a política dele.</p>
 
       <h2>O que o app não faz</h2>
       <ul>
         <li>Não pede cadastro nem login.</li>
-        <li>Não coleta localização, contatos, fotos nem identificadores do aparelho.</li>
+        <li>Não coleta localização, contatos, fotos, áudio nem identificadores do aparelho.</li>
         <li>Não usa anúncios, ferramentas de análise de uso nem relatórios de falha que enviem dados.</li>
         <li>Não vende nem compartilha dados com ninguém.</li>
       </ul>
 
       <h2>Permissões</h2>
-      <p>O app usa só permissões de rede (internet e estado da rede), para falar com os equipamentos e usar o Wi-Fi da máquina. São permissões que o Android concede sem perguntar.</p>
+      <p>O app usa só permissões de rede (internet, estado da rede e troca de rede), para falar com os equipamentos e usar o Wi-Fi da máquina. São permissões que o Android concede sem perguntar.</p>
 
       <h2>Google Play</h2>
       <p>Ao baixar o app, a Google Play pode tratar dados de acordo com a política do Google. Isso acontece na loja, não no Ware IoT.</p>
@@ -112,7 +118,7 @@
       <p>Este site não usa cookies nem ferramentas de análise. A hospedagem (Cloudflare) registra dados técnicos de acesso, como o endereço IP, para entregar as páginas e proteger o site contra ataques. Os links da loja Celiware levam a outro site, com política própria.</p>
 
       <h2>Seus direitos (LGPD)</h2>
-      <p>Como o app não trata dados pessoais, não guardamos nada sobre você para consultar, corrigir ou apagar. Os dados do projeto estão no seu celular, sob o seu controle. Qualquer dúvida, escreva para <a href="mailto:EMAIL_CONTATO">EMAIL_CONTATO</a>.</p>
+      <p>Como nenhum dado sai do seu celular para nós, não guardamos nada sobre você para consultar, corrigir ou apagar. Os dados do projeto estão no seu celular, sob o seu controle. Qualquer dúvida, escreva para <a href="mailto:EMAIL_CONTATO">EMAIL_CONTATO</a>.</p>
 
       <h2>Mudanças</h2>
       <p>Se esta política mudar, a data no topo muda e a versão nova fica nesta página.</p>

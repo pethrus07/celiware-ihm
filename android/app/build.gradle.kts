@@ -7,14 +7,45 @@ plugins {
 }
 
 // Assinatura de release (Play Store). As senhas e o caminho da chave ficam em
-// android/key.properties — FORA do git (.gitignore). Sem esse arquivo, o build
-// de release cai na chave de debug: serve para testar no aparelho, nunca para
-// enviar à loja. Passo a passo em docs/PUBLICACAO.md.
+// android/key.properties — FORA do git (.gitignore; modelo em
+// android/key.properties.exemplo). Sem esse arquivo, o APK de release cai na
+// chave de debug: serve para testar no aparelho, nunca para enviar à loja.
+// Passo a passo em docs/PUBLICACAO.md.
+val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties().apply {
-    val file = rootProject.file("key.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
+    if (keystorePropertiesFile.exists()) keystorePropertiesFile.inputStream().use { load(it) }
 }
-val hasReleaseKey = keystoreProperties.getProperty("storeFile") != null
+val hasReleaseKey = keystorePropertiesFile.exists()
+
+// Portão do build de release. O pacote da loja (.aab) só sai com a chave de
+// upload: a Play recusa pacote assinado com a de debug. E um key.properties
+// pela metade não pode virar assinatura de debug calada, nem no APK. O build
+// de debug não passa por aqui.
+val tarefas = gradle.startParameter.taskNames.map { it.substringAfterLast(':') }
+if (tarefas.any { it.endsWith("Release") }) {
+    val publicacao = "Passo a passo em docs/PUBLICACAO.md."
+    // Sem o registro dos plugins o app compila, instala e trava na abertura
+    // ("No JNI instance is available"). Aconteceu em 12/10: build com --no-pub
+    // depois de um `flutter pub get` que parou no meio (Windows sem o Modo de
+    // Desenvolvedor). Quem gera o arquivo é o `flutter pub get`.
+    if (!file("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java").isFile) {
+        throw GradleException("Plugins sem registro (GeneratedPluginRegistrant.java): rode `flutter pub get` antes do build. $publicacao")
+    }
+    if (!hasReleaseKey && "bundleRelease" in tarefas) {
+        throw GradleException("Sem android/key.properties: o .aab da loja precisa da chave de upload. $publicacao")
+    }
+    if (hasReleaseKey) {
+        val faltam = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+            .filter { keystoreProperties.getProperty(it).isNullOrBlank() }
+        if (faltam.isNotEmpty()) {
+            throw GradleException("android/key.properties sem ${faltam.joinToString()}. Modelo em android/key.properties.exemplo.")
+        }
+        val chave = file(keystoreProperties.getProperty("storeFile"))
+        if (!chave.isFile) {
+            throw GradleException("Chave de upload não encontrada em $chave (storeFile de android/key.properties). $publicacao")
+        }
+    }
+}
 
 android {
     namespace = "com.celiware.ihm"
@@ -45,7 +76,8 @@ android {
     signingConfigs {
         if (hasReleaseKey) {
             create("release") {
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                // Vazio só chega aqui no build de debug, que não usa esta chave.
+                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
@@ -55,6 +87,7 @@ android {
 
     buildTypes {
         release {
+            // Sem a chave de upload, só o APK de teste (o .aab para acima).
             signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }

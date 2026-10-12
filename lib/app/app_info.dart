@@ -12,4 +12,8 @@ class AppInfo {
   /// — incharia o download da loja. Enquanto for nulo, a tela de tutoriais diz
   /// que os vídeos estão em produção, em vez de mostrar lista falsa.
   static const String? videosUrl = null;
+
+  /// Política de privacidade publicada (a mesma URL vai no Play Console).
+  /// Mudou o domínio do site (`site/README.md`), mude aqui também.
+  static const privacyUrl = 'https://ware-iot.pages.dev/privacidade';
 }

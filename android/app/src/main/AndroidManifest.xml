@@ -11,11 +11,13 @@
          normal: o Android não pergunta nada ao usuário. -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
 
-    <!-- Backup: o histórico dos registros fica de fora (res/xml/*_rules.xml). -->
+    <!-- Backup: o histórico dos registros fica de fora (res/xml/*_rules.xml).
+         O projeto entra: trocar de celular não pode perder as telas. -->
     <application
         android:label="Ware IoT"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules">
         <activity

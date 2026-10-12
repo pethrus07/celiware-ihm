@@ -71,6 +71,9 @@ abstract class DeviceDriver {
         return S7Driver(device);
       case DeviceKind.raw:
         return RawDriver(device);
+      case DeviceKind.usbSerial:
+        // Pelo cabo fala Modbus (RTU/ASCII) ou a mensagem de um Arduino.
+        return device.serial.isRaw ? RawDriver(device) : ModbusDriver(clientFactory(device));
       case DeviceKind.calc:
         // As contas leem o projeto e o TagStore: quem monta o CalcDriver é o
         // HmiRuntime, que tem os dois. Aqui só chega um "Testar conexão".

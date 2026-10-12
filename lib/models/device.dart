@@ -4,6 +4,7 @@ import '../core/modbus/modbus_framing.dart';
 import 'mqtt_config.dart';
 import 's7_config.dart';
 import 'raw_config.dart';
+import 'serial_config.dart';
 
 /// Como o app chega até o equipamento.
 enum DeviceKind {
@@ -34,6 +35,14 @@ enum DeviceKind {
   /// Equipamento virtual das variáveis calculadas ([CalcDevice]): não fala com
   /// nada, faz as contas com o que as outras variáveis leram.
   calc,
+
+  /// Cabo USB-OTG no celular com adaptador RS-485/RS-232 (CH340, FTDI,
+  /// CP210x, PL2303) ou o próprio USB de um Arduino. Fala Modbus RTU/ASCII
+  /// ou a mensagem do Arduino (perfil em [Device.raw]); adaptador, velocidade
+  /// e protocolo ficam em [Device.serial]. Um tipo só para o cabo — e não um
+  /// "meio" ao lado de cada protocolo — porque o que muda é o lugar onde o
+  /// equipamento está, como "na rede" ou "demonstração".
+  usbSerial,
 }
 
 extension DeviceKindMeta on DeviceKind {
@@ -53,6 +62,8 @@ extension DeviceKindMeta on DeviceKind {
         return 'Arduino, ESP ou balança (mensagem própria)';
       case DeviceKind.calc:
         return 'Variáveis calculadas';
+      case DeviceKind.usbSerial:
+        return 'Cabo USB (RS-485/RS-232)';
     }
   }
 
@@ -85,6 +96,7 @@ class Device {
     this.mqtt = const MqttBroker(),
     this.s7 = const S7Config(),
     this.raw = const RawConfig(),
+    this.serial = const SerialConfig(),
   });
 
   final String id;
@@ -118,15 +130,28 @@ class Device {
 
   /// CLP em [DeviceKind.s7]: família (rack e slot).
   final S7Config s7;
-  /// Em [DeviceKind.raw]: TCP ou UDP e o perfil da mensagem.
+  /// Em [DeviceKind.raw]: TCP ou UDP e o perfil da mensagem. No cabo USB
+  /// com Arduino, só o perfil.
   final RawConfig raw;
+
+  /// Em [DeviceKind.usbSerial]: adaptador, velocidade, bits, paridade e o que
+  /// fala pelo cabo.
+  final SerialConfig serial;
 
   bool get isDemo => kind == DeviceKind.demo;
 
   /// Variável aponta para área + endereço Modbus (a demonstração também:
   /// ela simula um CLP Modbus). S7, MQTT e os outros têm endereço próprio —
   /// ficam fora do "Criar várias", que gera faixas de memória Modbus.
-  bool get usesModbusMemory => kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.demo;
+  bool get usesModbusMemory =>
+      kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.demo || (isUsb && !serial.isRaw);
+
+  /// Pelo cabo USB-OTG.
+  bool get isUsb => kind == DeviceKind.usbSerial;
+
+  /// Fala a mensagem própria de um Arduino (pela rede ou pelo cabo): as
+  /// variáveis apontam para um campo da mensagem, não para memória Modbus.
+  bool get speaksRaw => kind == DeviceKind.raw || (isUsb && serial.isRaw);
   /// O equipamento virtual das calculadas — fica fora de Equipamentos.
   bool get isCalc => kind == DeviceKind.calc;
 
@@ -146,6 +171,8 @@ class Device {
           ? '$host:$port · ${s7.label}'
           : kind == DeviceKind.raw
           ? '$host:$port · Arduino · ${raw.transport.label}'
+          : isUsb
+          ? 'Cabo USB · ${serial.label}${serial.isRaw ? '' : ' · ID $unitId'}'
           : '$host:$port · ${kind == DeviceKind.modbusRtuTcp ? '${framing.label} · ' : ''}ID $unitId';
 
   Device copyWith({
@@ -160,6 +187,7 @@ class Device {
     MqttBroker? mqtt,
     S7Config? s7,
     RawConfig? raw,
+    SerialConfig? serial,
   }) =>
       Device(
         id: id,
@@ -174,6 +202,7 @@ class Device {
         mqtt: mqtt ?? this.mqtt,
         s7: s7 ?? this.s7,
         raw: raw ?? this.raw,
+        serial: serial ?? this.serial,
         profile: profile,
       );
 
@@ -192,6 +221,7 @@ class Device {
         mqtt: mqtt,
         s7: s7,
         raw: raw,
+        serial: serial,
         profile: profile,
       );
 
@@ -205,7 +235,8 @@ class Device {
       framing == other.framing &&
       mqtt == other.mqtt &&
       s7 == other.s7 &&
-      raw == other.raw;
+      raw == other.raw &&
+      serial == other.serial;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -223,6 +254,9 @@ class Device {
         // S7 de fábrica (1200/1500) não grava nada; família diferente, só ela.
         if (kind == DeviceKind.s7 && s7.toJson().isNotEmpty) 's7': s7.toJson(),
         if (kind == DeviceKind.raw) 'raw': raw.toJson(),
+        if (isUsb) 'serial': serial.toJson(),
+        // Arduino no cabo: só o perfil (TCP/UDP não existem aqui).
+        if (isUsb && serial.isRaw) 'raw': {'profile': raw.profile.toJson()},
       };
 
   factory Device.fromJson(Map<String, dynamic> j) => Device(
@@ -239,5 +273,6 @@ class Device {
         mqtt: j['mqtt'] is Map ? MqttBroker.fromJson(Map<String, dynamic>.from(j['mqtt'] as Map)) : const MqttBroker(),
         s7: j['s7'] is Map ? S7Config.fromJson(Map<String, dynamic>.from(j['s7'] as Map)) : const S7Config(),
         raw: j['raw'] is Map ? RawConfig.fromJson(Map<String, dynamic>.from(j['raw'] as Map)) : const RawConfig(),
+        serial: j['serial'] is Map ? SerialConfig.fromJson(Map<String, dynamic>.from(j['serial'] as Map)) : const SerialConfig(),
       );
 }

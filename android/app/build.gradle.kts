@@ -69,3 +69,10 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Cabo USB-OTG (PortaSerialUsb.kt): drivers CH340/CH341, CP210x, FTDI,
+    // PL2303 e CDC (Arduino) em Java puro — nada de biblioteca nativa no APK.
+    // MIT. Só publicada na JitPack (repositório em android/build.gradle.kts).
+    implementation("com.github.mik3y:usb-serial-for-android:3.11.0")
+}

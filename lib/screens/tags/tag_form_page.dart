@@ -194,7 +194,8 @@ class _TagFormPageState extends State<TagFormPage> {
   Device? get _device => AppScope.of(context).controller.project.device(_deviceId ?? '');
   bool get _isMqtt => _device?.kind == DeviceKind.mqtt;
   bool get _isS7 => _device?.kind == DeviceKind.s7;
-  bool get _isRaw => _device?.kind == DeviceKind.raw;
+  // Arduino pela rede ou pelo cabo USB: campo da mensagem.
+  bool get _isRaw => _device?.speaksRaw ?? false;
 
   /// MQTT e cru não têm área, endereço, ordem de bytes nem lista Modbus.
   bool get _notModbus => _isMqtt || _isRaw;

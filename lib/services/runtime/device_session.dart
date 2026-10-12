@@ -9,6 +9,7 @@ import '../../core/modbus/modbus_client.dart';
 import '../../core/modbus/modbus_client_serial.dart';
 import '../../core/modbus/modbus_client_simulated.dart';
 import '../../core/modbus/modbus_client_tcp.dart';
+import '../../core/serial/usb_serial_link.dart';
 import '../../models/device.dart';
 import '../../models/tag.dart';
 import '../demo/demo_process.dart';
@@ -97,6 +98,20 @@ class DeviceSession {
         unitId: d.unitId,
         responseTimeout: Duration(milliseconds: d.timeoutMs),
         label: '${d.host}:${d.port}',
+      );
+    }
+    if (d.isUsb) {
+      // Cabo USB-OTG: a porta do adaptador é dividida com os outros
+      // equipamentos da mesma linha RS-485 (UsbSerialPool).
+      final s = d.serial;
+      final label = 'USB ${s.port?.label ?? ''}'.trim();
+      return ModbusClientSerial(
+        link: UsbSerialPool.acquire(port: s.port, params: s.params, label: label),
+        framing: s.framing,
+        unitId: d.unitId,
+        responseTimeout: Duration(milliseconds: d.timeoutMs),
+        discardEcho: s.discardEcho,
+        label: label,
       );
     }
     if (d.isDemo) {

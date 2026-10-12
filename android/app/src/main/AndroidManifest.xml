@@ -10,6 +10,11 @@
          internet e os dados móveis estão ligados (RedeLocal.kt). Permissão
          normal: o Android não pergunta nada ao usuário. -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+    <!-- Cabo USB-OTG (adaptador RS-485/RS-232, Arduino). required="false": a
+         loja continua oferecendo o app a aparelho sem USB host — lá o cabo
+         só não aparece funcionando. A permissão de cada adaptador é pedida
+         na hora de usar (PortaSerialUsb.kt), não aqui. -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
 
     <!-- Backup: o histórico dos registros fica de fora (res/xml/*_rules.xml). -->
     <application
@@ -39,6 +44,15 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Plugou um adaptador USB-serial conhecido: o Android oferece
+                 abrir o Ware IoT e, com "usar sempre", já deixa usar o
+                 adaptador sem perguntar. Os chips em res/xml/usb_adaptadores.xml. -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/usb_adaptadores"/>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

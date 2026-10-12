@@ -304,12 +304,13 @@ class HmiRuntime {
       } else {
         await driver.ping();
       }
-      final nets = device.isDemo ? null : await LocalNetwork.list();
+      // Rede só se diagnostica em equipamento de rede (cabo USB não passa por ela).
+      final nets = device.isNetwork ? await LocalNetwork.list() : null;
       return ProbeResult(ok: true, message: 'Conectado', elapsedMs: sw.elapsedMilliseconds, value: value,
           network: LocalNetwork.routeTo(device.host, nets)?.label);
     } on CommError catch (e) {
       final refused = e.refused;
-      final nets = device.isDemo ? null : await LocalNetwork.list();
+      final nets = device.isNetwork ? await LocalNetwork.list() : null;
       return ProbeResult(ok: false, message: e.userMessage, elapsedMs: sw.elapsedMilliseconds, refused: refused,
           // Recusou = achou o aparelho; a rede está certa, não vale diagnosticar.
           hint: refused ? null : LocalNetwork.diagnose(device.host, nets),

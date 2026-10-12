@@ -59,6 +59,7 @@ Script livre (JavaScript) na variável ficou de fora de propósito: a escala lin
 | MQTT | Cliente MQTT 3.1.1 do pacote `mqtt_client` (Dart puro, MIT) — seção 4.18. |
 | Siemens S7 | Cliente S7 clássico (ISO-on-TCP, PUT/GET) próprio, em Dart puro — seção 4.16. |
 | Arduino / ESP (cru) | Sockets TCP e UDP do `dart:io` e um interpretador próprio de perfil de mensagem, sem biblioteca — seção 4.17. |
+| Cabo USB-OTG (serial) | Canal Kotlin próprio (`celiware/usb`) sobre a usb-serial-for-android 3.11.0 (MIT, Java puro, via JitPack); Modbus RTU/ASCII e protocolo cru em Dart — seção 4.20. |
 | Persistência | JSON num arquivo na pasta privada do app (`path_provider`). Histórico dos registros em SQLite (`sqflite`, o do Android — §6.10). |
 | Arquivos | Exportar/importar projeto e escolher imagem (`file_picker`). |
 | PDF | Página de PDF → imagem, para a imagem por etapa (`printing`, que usa o renderizador do próprio Android). |
@@ -136,6 +137,7 @@ lib/
 │   │   └── s7_test_server.dart       CLP S7 em Dart (testes de integração).
 │   ├── mqtt/                         Regras de tópico (curingas) e erro de comunicação MQTT.
 │   ├── link/byte_link.dart           Cano de bytes: TCP e UDP (protocolos sem cabeçalho de tamanho).
+│   ├── serial/                       Cabo USB-OTG: parâmetros da linha, fronteira com o Android, porta dividida (§4.20).
 │   ├── rawlink/                      Protocolo cru: perfil, interpretador, cliente, conexão dividida, Arduino falso.
 │   ├── theme/app_theme.dart          Tokens de cor, tipografia, tema Material.
 │   └── utils/                        ids, validação de IP, redução de imagem.
@@ -148,6 +150,7 @@ lib/
 │   ├── mqtt_config.dart              Broker do equipamento e tópico da variável (MQTT).
 │   ├── s7_config.dart                Família do CLP (rack/slot) e endereço S7 da variável.
 │   ├── raw_config.dart               TCP/UDP e perfil do equipamento cru; campo da variável; modelos prontos.
+│   ├── serial_config.dart            Cabo USB: adaptador, velocidade, bits, paridade, parada, protocolo, eco.
 │   ├── log_group.dart                Grupo de registro de dados (§6.10).
 │   ├── recipe.dart                   Tipo de receita, máquina, receita e versões (§6.11).
 │   ├── hmi_screen.dart               Tela e elemento posicionado na grade.
@@ -178,7 +181,7 @@ lib/
 │   ├── screens_page.dart             Lista de telas com planta em miniatura.
 │   ├── screen_run_page.dart          Tela em operação.
 │   ├── editor/                       Editor, paleta, configuração de elemento (a da tabela em table_config.dart).
-│   ├── devices/                      Lista e cadastro de equipamento (Testar conexão); editor da mensagem crua.
+│   ├── devices/                      Lista e cadastro de equipamento (Testar conexão); editor da mensagem crua; campos do cabo USB.
 │   ├── tags/                         Lista e cadastro de variável (Lendo agora); cadastro de calculada.
 │   ├── logs/                         Registros: lista, folha do grupo, histórico.
 │   ├── recipes/                      Receitas: lista, receita, tipo e máquina, aplicar, histórico.
@@ -344,7 +347,7 @@ O "Testar conexão" usa a mesma informação: mostra por onde a conexão sai ("W
 `targetSdk` está **fixo em 36** no `build.gradle.kts`: com alvo 37 o Android exige a permissão `ACCESS_LOCAL_NETWORK` e, sem pedi-la, toda conexão com CLP falha. Subir o alvo só numa versão que já peça essa permissão.
 ### 4.15. Modbus RTU/ASCII (gateway serial)
 
-Muito inversor e CLP pequeno só fala Modbus **RTU** pela RS-485. Atrás de um conversor RS-485 → Ethernet que repassa os bytes sem converter, o app fala RTU (ou ASCII) "cru" pelo TCP: equipamento do tipo `modbusRtuTcp`, escolhido em **Na rede → Mais opções → Protocolo**. As funções Modbus são as mesmas (vêm de `ModbusClient`); muda só o envelope (`ModbusFrames`: CRC16 no RTU, LRC no ASCII) e como se acha o fim da resposta — pelo código da função, porque serial não tem cabeçalho de tamanho e o silêncio de 3,5 caracteres da norma não é confiável atrás de USB e de gateways. `ModbusClientSerial` roda sobre um `ByteLink` (TCP hoje; USB-OTG é o próximo), um pedido por vez, com opção de descartar o eco de adaptadores que devolvem o que foi enviado. Resposta de outro escravo é ignorada; CRC/LRC errado vira "resposta inválida".
+Muito inversor e CLP pequeno só fala Modbus **RTU** pela RS-485. Atrás de um conversor RS-485 → Ethernet que repassa os bytes sem converter, o app fala RTU (ou ASCII) "cru" pelo TCP: equipamento do tipo `modbusRtuTcp`, escolhido em **Na rede → Mais opções → Protocolo**. As funções Modbus são as mesmas (vêm de `ModbusClient`); muda só o envelope (`ModbusFrames`: CRC16 no RTU, LRC no ASCII) e como se acha o fim da resposta — pelo código da função, porque serial não tem cabeçalho de tamanho e o silêncio de 3,5 caracteres da norma não é confiável atrás de USB e de gateways. `ModbusClientSerial` roda sobre um `ByteLink` (TCP do gateway ou o cabo USB-OTG, §4.20), um pedido por vez, com opção de descartar o eco de adaptadores que devolvem o que foi enviado (e, numa leitura, o eco é percebido sozinho). A resposta começa com o ID e a função pedida: o que vem antes é descartado; CRC/LRC errado vira "resposta inválida". No cabo USB entram também o tempo entre caracteres pela velocidade e a divisão da linha entre os equipamentos dela (§4.20).
 
 Testes: `ModbusSerialTcpServer` (escravo RTU/ASCII em Dart, por socket real) e o simulador Python com `--framer rtu|ascii`.
 
@@ -425,7 +428,7 @@ O modelo troca a delimitação, o checksum e os campos; quem fala primeiro, vali
 
 **Testar conexão** diz se chegou mensagem **e** se o perfil entendeu: "Chegou mensagem e o perfil entendeu", "Conectou, mas nenhuma mensagem chegou em 5 s" (o equipamento só responde a pergunta? UDP mandando para outra porta?) ou "Chegou mensagem, mas o perfil não entendeu: checksum errado" (ajuste a mensagem — a prévia mostra). Espera até a validade do perfil (2 a 10 s) ou três mensagens não entendidas.
 
-Falta: a serial por USB-OTG (e COM no Windows) e o teste com um Arduino de verdade. Testes: `FakeArduinoServer` (Dart, TCP e UDP), `test/runtime/raw_device_test.dart`, `test/widgets/raw_forms_test.dart` e `sim/arduino_falso.py` (SIMULACAO §7).
+O Arduino ligado no celular pelo cabo USB é o mesmo protocolo sobre outro cano (§4.20). Falta: COM no Windows e o teste com um Arduino de verdade. Testes: `FakeArduinoServer` (Dart, TCP e UDP), `test/runtime/raw_device_test.dart`, `test/widgets/raw_forms_test.dart` e `sim/arduino_falso.py` (SIMULACAO §7).
 ### 4.18. MQTT (broker na rede local)
 
 Equipamento do tipo `mqtt`, escolhido em **Na rede → Mais opções → Protocolo → MQTT**: o IP e a porta passam a ser os do broker (1883; 8883 com TLS) e somem ID do escravo e "ler a cada". Cliente MQTT 3.1.1 do `mqtt_client`, com ID de cliente novo a cada conexão (dois celulares com o mesmo projeto não se derrubam no broker), usuário e senha opcionais, sinal de vida (keep-alive) de 10 s — é ele que percebe o Wi-Fi que caiu sem fechar o socket — e o mesmo vínculo à rede local do Modbus (`LocalNetwork.prepare`, 4.14).
@@ -448,20 +451,138 @@ Testes: `test/support/mqtt_test_broker.dart`, broker 3.1.1 mínimo em Dart (CONN
 
 Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; TLS só com certificado em que o Android confia (broker com certificado autoassinado não conecta); Sparkplug B e MQTT 5 ficam para a fase 2.
 
+### 4.20. Serial por USB-OTG (cabo USB)
+
+Adaptador USB ↔ RS-485/RS-232 (CH340, CP210x, FTDI, PL2303) ou o próprio USB de um Arduino, ligado no celular por um cabo OTG. Equipamento do tipo `usbSerial`, escolhido no cartão **Cabo USB** do cadastro, ao lado de "Na rede" e "Demonstração". Pelo cabo falam Modbus RTU, Modbus ASCII ou a mensagem própria do Arduino (§4.17). Requisitos RT-1 a RT-3 (REQUISITOS-ETAPA4 §8.2). **Nada disto passou por adaptador nem equipamento de verdade:** tudo foi validado contra uma porta simulada (fim da seção), e o lado Android só foi compilado.
+
+**Plugin × canal próprio** (pub.dev e GitHub em 12/10/2026):
+
+| Opção | Situação |
+|---|---|
+| `usb_serial` 0.5.2 | Última versão em 12/07/2024; o dono procura quem assuma (#121). Issues abertas: paridade 7E1 errada (#129), justamente a do Modbus ASCII; build ainda com jcenter (#131); DTR na interface errada em aparelho composto (#133); sem PL2303 G/HXN (#134); 16 KB (#130). Usa a felHR85/UsbSerial. |
+| `skio_usb_serial` 0.2.1 | De 03/10/2026, 1 like e 651 downloads em 30 dias. JNI + FFI (`jni`, `jni_flutter`): biblioteca nativa no APK, 4 ABIs e alinhamento de 16 KB por conta de terceiros. Por baixo usa a mesma usb-serial-for-android. |
+| **Canal próprio** (escolhido) | `PortaSerialUsb.kt` sobre a usb-serial-for-android 3.11.0 (MIT, de 18/07/2026, ~5,7 mil estrelas, Java puro — nada nativo no APK). Chips CH340/CH341, CP210x, FTDI, PL2303 (inclusive G/HXN) e CDC (Arduino, CH343/CH9102); 7E1 direto na `setParameters`. E o controle do que importa aqui: permissão sem caixa atrás de caixa, horário de cada leitura (RT-2), DTR só no Arduino, latência de 1 ms no FTDI, queda ao puxar o cabo. |
+
+O custo: a biblioteca só é publicada na JitPack, que compila do GitHub. O repositório entra em `android/build.gradle.kts` com `includeGroup("com.github.mik3y")` — nenhuma outra dependência vem de lá — e a versão é fixa.
+
+**Camadas**
+
+```
+PortaSerialUsb.kt (canal celiware/usb)        listar · permissão · abrir · configurar · escrever · fechar
+                                              eventos: dados + horário da leitura · caiu · plugou/tirou
+  └ UsbSerialPlatform (core/serial/usb_serial.dart)       ← a fronteira; nos testes, a porta simulada
+      └ UsbSerialPool → SerialLink (usb_serial_link.dart)  acha o adaptador, divide a porta, mede as pausas
+          ├ ModbusClientSerial (RTU/ASCII) → ModbusDriver
+          └ RawClient (mensagem própria)   → RawDriver
+```
+
+O Kotlin é fino de propósito; tudo o que tem regra é Dart e roda nos testes.
+
+**O adaptador** (`UsbPortRef`). É achado pelo que é — VID:PID, a porta e, quando o chip tem, o número de série —, nunca pelo caminho no Android, que muda a cada vez que é plugado. Sem escolha no cadastro, vale o único adaptador serial plugado; com dois ou mais, é preciso escolher. A lista mostra o chip de cada um ("CH340 · USB2.0-Serial", "FTDI · FT232R USB UART") e se atualiza ao plugar e ao tirar. Aparelho USB sem driver serial aparece apagado, como "não é um adaptador serial conhecido" — já é meio diagnóstico.
+
+**Uma porta, vários equipamentos** (`UsbSerialPool`). O Android abre um adaptador uma vez só, e a RS-485 é multiponto: o inversor ID 1 e o ID 2 ficam no mesmo par de fios. Cada um que precisa da porta (a varredura de cada equipamento, o Testar conexão, a prévia do editor, o Ouvir o equipamento) recebe um `SerialLink` pendurado na mesma porta aberta: todos recebem todos os bytes e a porta fecha com o último. Os pedidos Modbus passam por `SerialLink.exclusive`, então um pedido e a sua resposta nunca se misturam com os de outro equipamento. Cada um vai nos parâmetros do seu cadastro: testar a 19200 com a tela lendo a 9600 não estraga nenhum dos dois. Cada escravo da linha é um cadastro com o seu ID e o mesmo adaptador.
+
+**RT-1 — cadastro** (`lib/screens/devices/usb_device_fields.dart`; o formulário só ganhou ganchos)
+
+| À vista | Em "Mais opções" (fechado: "Modbus RTU · 9600 8N1 · ID 1") |
+|---|---|
+| Onde está: **Cabo USB** (RS-485 · RS-232) · Nome · **Adaptador USB** no lugar do IP (o escolhido e se está plugado, ou o que fazer) · **Testar conexão**. Arduino: também **Mensagem do equipamento** (o editor da §4.17). | O que fala pelo cabo (Modbus RTU · Modbus ASCII · Arduino) · velocidade de 1200 a 115200 (9600 de partida) · bits 7/8 · paridade · parada 1/2. No Modbus: ID do escravo (1 a 247), descartar eco, tempo de resposta, ler a cada e **Marca e modelo** — o INVT IVC1, o WEG TPW04 e os inversores MD500/GD20 só falam RTU (§4.6). |
+
+Trocar para ASCII leva junto o 7E1 de costume se os bits ainda não foram mexidos.
+
+**Por que um tipo novo** (`DeviceKind.usbSerial`, no fim do enum) **e não um "meio" ao lado de cada protocolo.** Para o operador, o cabo é *onde o equipamento está*, como "na rede" e "demonstração", e é a primeira escolha do cadastro. O protocolo do cabo fica dentro dele (`SerialConfig.protocol`). Um meio solto pediria `modbusRtuTcp` com meio USB (o nome mentiria) e um `RawTransport.usb` para o cru: dois jeitos de dizer a mesma coisa. Quem pergunta "é cru?" ou "usa memória Modbus?" passou a usar `Device.speaksRaw` e `Device.usesModbusMemory`, que já contam o cabo.
+
+**Arquivo do projeto.** `serial` só vai em equipamento `usbSerial`, e só com o que difere do padrão (Modbus RTU, 9600 8N1, sem forçar o eco). Um RTU 9600 8N1 de fábrica grava só `{"usb": {"vendorId": 6790, "productId": 29987, "chip": "CH340", "product": "USB2.0-Serial"}}`. O Arduino no cabo leva `raw` só com o perfil, porque no cabo não há TCP/UDP. Equipamento de rede fica byte a byte igual e o `schemaVersion` segue 1. Velocidade impossível num arquivo editado à mão volta a 9600 8N1. Já um app 1.4.0 lê o `kind` desconhecido como Modbus TCP sem IP: o equipamento não conecta, mas o resto do projeto abre.
+
+**RT-2 — fim do quadro** (`ModbusClientSerial`; o tempo vale quando o cano é um `SerialLink`, a ressincronia e o eco valem também para o gateway TCP)
+
+- **O fim é o tamanho esperado** (`rtuResponseLength`): a resposta completa sai na hora, sem esperar silêncio.
+- **Tempo entre caracteres pela velocidade.** t3.5 = 3,5 × (1 + bits + paridade + parada) ÷ baud: 3,6 ms a 9600 8N1, e 1,75 ms fixo acima de 19200, como manda a norma.
+  - Dentro de uma resposta, uma pausa maior que t3.5 + 20 ms de folga do USB descarta o começo (ruído, quadro cortado), e o que vem depois ainda pode formar a resposta.
+  - A folga existe porque o adaptador entrega em pacotes (o FTDI de fábrica, a cada 16 ms; o canal pede 1 ms a ele). Só pelo silêncio, a resposta se partiria.
+  - A pausa é medida no horário da leitura do USB (`SerialChunk.gapBefore`), não quando o Dart vê os bytes: interface ocupada não vira "silêncio na linha".
+  - No ASCII a norma aceita até 1 s.
+- **Linha quieta antes do pedido.** Espera t3.5 depois do último byte recebido. Depois de um tempo esgotado, espera t3.5 + 40 ms e descarta o que chegar nesse meio-tempo: a resposta atrasada do pedido anterior tem o mesmo formato e viraria a resposta deste.
+- **Ressincronia.** A resposta RTU começa com o ID e a função pedida (ou a exceção dela); o que vem antes sai — é o byte espúrio do transceptor virando a linha. No ASCII sai tudo antes do `:`.
+- **Bytes que não formam resposta.** Se no fim do prazo chegaram bytes e nenhum formou resposta, a mensagem é "chegaram bytes que não formam uma resposta" (`ModbusProtocolError.garbled`), e não "sem resposta": é o sinal de velocidade ou paridade diferente, ou de eco.
+- **Eco do RS-485 de 2 fios.** "Descartar eco" força o descarte desde o primeiro pedido. Sem ele, uma leitura cujo começo é exatamente o pedido revela o eco, e daí em diante ele sai sozinho. Só leitura serve de prova: em FC05/06 a resposta normal é igual ao pedido. Bytes que não batem com o pedido nunca são jogados fora como eco.
+
+**RT-3 — Android**
+
+- **Manifesto.** `uses-feature android.hardware.usb.host` com `required="false"`: a loja continua oferecendo o app a aparelho sem USB host. O `intent-filter` `USB_DEVICE_ATTACHED` com `res/xml/usb_adaptadores.xml` (FTDI, CP210x, PL2303, CH340/CH341/CH343/CH9102, Arduino) faz o Android oferecer abrir o app ao plugar; com "usar sempre", a permissão vem junto, sem pergunta. Com o app aberto, `onNewIntent` avisa o cadastro.
+- **Permissão.** É pedida na hora de usar (`UsbManager.requestPermission`). No cadastro, antes da caixa do Android, vem a explicação: "O Android vai perguntar se o Ware IoT pode usar o CH340 · USB2.0-Serial. Toque em OK: sem essa permissão o app não fala com o equipamento pelo cabo." A varredura pergunta uma vez por adaptador plugado. Se a pessoa negou, a reconexão (a cada 1 a 10 s) não pergunta de novo até replugar o adaptador ou tocar em Testar conexão.
+- **DTR ligado só no Arduino.** O Leonardo e o Micro só mandam com ele; o Uno reinicia, como no Monitor Serial. No adaptador RS-485 o sinal fica como está, porque alguns viram a linha por DTR/RTS.
+- **Cabo puxado.** A leitura do USB para com erro (ou chega `USB_DEVICE_DETACHED`) e o canal avisa `caiu`. As variáveis ficam "sem comunicação" com o último valor e o selo mostra "adaptador USB não encontrado". Plugado de novo (com outro caminho no Android), a próxima tentativa reabre sozinha.
+
+**Testar conexão** — o que conferir, na ordem em que os problemas costumam aparecer:
+
+| Resultado | O cartão diz | O que conferir |
+|---|---|---|
+| Adaptador não encontrado | Não conectou: adaptador USB não encontrado | Cabo OTG encaixado e LED do adaptador aceso? OTG ligado nas configurações do celular? O aparelho aparece como "não é um adaptador serial conhecido"? |
+| Dois adaptadores e nenhum escolhido | Não conectou: escolha o adaptador… | Escolher em "Adaptador USB". |
+| Sem permissão | Não conectou: sem permissão… | Testar de novo e tocar OK; marcar "usar sempre". |
+| Sem resposta | Sem resposta do equipamento ("O adaptador abriu. Confira, nesta ordem:") | Velocidade, bits, paridade e parada; A e B (D+ e D−) invertidos; ID do escravo; equipamento ligado com Modbus na serial (RS-232: TX↔RX e GND). |
+| Bytes sem resposta | Chegaram bytes que não formam uma resposta | Velocidade e paridade; eco; outro mestre ou ID repetido na linha. |
+| CRC errado | Resposta inválida do equipamento | Interferência: par trançado, terra (GND), 120 Ω nas pontas de linha longa; velocidade e paridade. |
+| Arduino mudo ou não entendido | (como na §4.17) | A velocidade do `Serial.begin()`; "O app pergunta"; o reinício ao abrir a porta (1 a 2 s). |
+
+**Testes sem hardware.** `test/support/fake_usb_serial.dart` faz o papel do Android e da linha:
+
+- adaptadores plugados e tirados, com caminho novo a cada vez;
+- a permissão, contando quantas caixas apareceram;
+- abertura única por adaptador;
+- a linha: tempo de cada caractere pela velocidade, eco, resposta em pacotes do USB com pausa entre eles;
+- os equipamentos: escravos Modbus RTU/ASCII (vários na mesma linha), Arduino mandando `T=25.3;P=1`;
+- velocidade ou paridade diferente embaralhando os bytes nos dois sentidos.
+
+O carimbo de cada pacote anda só com o fio, então as pausas medidas não dependem do relógio do Windows nem do relógio simulado dos testes de tela. Acima disso é o código do app, pelo caminho de produção (`HmiRuntime` → fábrica → driver → `UsbSerialPool`).
+
+**Roteiro da primeira bancada** (nada do lado físico foi testado):
+
+1. **Material.** Celular Android com OTG, cabo OTG, adaptador USB↔RS-485 com CH340 (e um FTDI, se houver) e um escravo Modbus RTU: CLP ou inversor, ou um PC com um segundo adaptador rodando um escravo serial (Modbus Slave, ou pymodbus com `StartAsyncSerialServer`), ligando A com A e B com B.
+2. **Primeira plugada.** Com o app fechado, plugar o adaptador: o Android deve oferecer abrir o Ware IoT. Marcar "usar sempre" e tocar OK. Conferir que o app abre e não pergunta permissão depois.
+3. **Adaptador.** Equipamentos → + → **Cabo USB**: a linha "Adaptador USB" deve mostrar "CH340 · USB2.0-Serial · conectado". Tirar e pôr o adaptador com a tela aberta: a linha muda sozinha.
+4. **Teste certo.** Em Mais opções, velocidade, paridade e ID iguais aos do escravo → Testar conexão → "Equipamento respondeu em N ms". Anotar N.
+5. **Erros de propósito, um de cada vez** (anotar a mensagem):
+   - velocidade diferente;
+   - A e B invertidos;
+   - ID errado;
+   - adaptador desplugado;
+   - sem permissão: Configurações → Apps → Ware IoT → Abrir por padrão → limpar; replugar; Testar → primeiro a explicação, depois a caixa do Android; "Agora não" → cartão de permissão.
+6. **Operação.** Uma variável HR numa tela: valor ao vivo; gravar um valor e conferir no escravo.
+7. **Cabo puxado com a tela aberta.** O valor esmaece e o selo diz "adaptador USB não encontrado". Replugar: volta sozinho (com "usar sempre", sem pergunta). Anotar quanto demora.
+8. **Dois escravos na mesma linha** (IDs 1 e 2), com dois cadastros no mesmo adaptador: os dois lendo juntos.
+9. **Eco.** Com adaptador de 2 fios com eco e "Descartar eco" desligado: a primeira leitura funciona (eco percebido sozinho); depois gravar.
+10. **ASCII 7E1**, se houver escravo ASCII.
+11. **Velocidades das pontas.** A 1200 e a 115200, com uma leitura de 100 registradores: ver o tempo no selo e se há falha intermitente. "Chegaram bytes que não formam uma resposta" esporádico com tudo certo quer dizer que a folga de 20 ms é curta para aquele chip: anotar qual.
+12. **Arduino Uno** (CH340 ou 16U2) com um sketch que faz `Serial.begin(9600)`, manda `T=25.3;P=1` a cada 500 ms e obedece `SET P=x`: Cabo USB → Arduino → Testar → "Chegou mensagem e o perfil entendeu" (uns 2 s depois do reinício); gravar P.
+13. **Leonardo ou Micro** (USB nativo): o mesmo teste. Sem DTR, ele não mandaria nada.
+
+**Limites e em aberto**
+
+- COM no Windows ficou de fora; a pesquisa aponta o `serial_port_win32`.
+- Com o app em segundo plano a porta fecha junto com a varredura (§2.4).
+- Adaptador de várias portas (FT2232, FT4232) é listado porta a porta, sem teste.
+- A folga de 20 ms do USB e a espera de 40 ms depois de um tempo esgotado são estimativas, a confirmar na bancada.
+- Dois CH340 no mesmo hub não se distinguem (o chip não tem número de série): vale o primeiro.
+- Arduino pela RS-485 de 2 fios não tem descarte de eco.
+- A biblioteca vem da JitPack.
+
 ## 5. Modelo de dados
 
 ### 5.1. Equipamento (`Device`)
 
 | Campo | Significado |
 |---|---|
-| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker), `demo` (máquina simulada no aparelho), `s7` (CLP Siemens), `raw` (Arduino/ESP com mensagem própria) ou `calc` (o equipamento virtual "Cálculos", das variáveis calculadas — §6.12; fica fora de `Project.equipment`). |
+| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker), `demo` (máquina simulada no aparelho), `s7` (CLP Siemens), `raw` (Arduino/ESP com mensagem própria), `calc` (o equipamento virtual "Cálculos", das variáveis calculadas — §6.12; fica fora de `Project.equipment`) ou `usbSerial` (cabo USB-OTG — §4.20). |
 | host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). Em S7, porta 102; o ID não é usado. No cru, a porta do sketch (5030 de partida). |
 | timeoutMs | Tempo máximo por resposta (1500 ms). |
 | pollMs | Intervalo entre varreduras (500 ms). |
 | profile | Perfil de fabricante (`inovance-h3u`, `invt-ivc1`…); ausente = Modbus genérico. Só vai para o arquivo quando existe (4.6). |
 | mqtt | Só em equipamento MQTT, e só o que difere do padrão: tls, username, password, keepAliveSec (10), clientId (vazio = automático), statusTopic e offlinePayload do testamento. |
 | s7 | Só em equipamento S7, e só o que difere do padrão (1200/1500, rack 0, slot 1): family (`s7300`, `s7400`, `s71200`, `other`) e, em `other`, rack e slot. |
-| raw | Só em equipamento cru: transport (`tcp` · `udp`), localPort (UDP, quando não é 0) e profile — o perfil da mensagem inteiro (framing, checksum, fields, mode, poll, pollMs, staleAfterMs, commands, charset, decimalComma, maxFrameBytes; bytes na notação `\n`, `\xAA`). |
+| raw | Só em equipamento cru: transport (`tcp` · `udp`), localPort (UDP, quando não é 0) e profile — o perfil da mensagem inteiro (framing, checksum, fields, mode, poll, pollMs, staleAfterMs, commands, charset, decimalComma, maxFrameBytes; bytes na notação `\n`, `\xAA`). No cabo USB com Arduino, só profile. |
+| serial | Só em equipamento `usbSerial`, e só o que difere do padrão (Modbus RTU, 9600 8N1): usb (vendorId, productId, portIndex quando não é 0, serialNumber, chip e product para mostrar), baud, dataBits, parity (`even` · `odd`), stopBits, protocol (`ascii` · `raw`) e discardEcho. |
 
 ### 5.2. Variável (`Tag`)
 
@@ -590,7 +711,7 @@ Botão: seis modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira 
 
 ### 6.5. Equipamentos
 
-Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à vista: onde está (rede ou demonstração), nome, IP e **Testar conexão**. Marca e modelo (perfil de fabricante, 4.6), porta, ID, tempo-limite e ritmo ficam em "Mais opções" (o resumo "Porta 502 · ID 1 · Inovance H3U" aparece fechado). O teste responde na hora; quando falha, mostra o que conferir, na ordem em que os problemas costumam acontecer (mesmo Wi-Fi, IP, Modbus ligado no equipamento, porta/ID). Quando o equipamento **recusa** a conexão (o IP respondeu na hora, mas nada escuta na porta — errno 111 no Android, 10061 no Windows), a mensagem vira "o equipamento recusou a conexão nesta porta" e só sobram as duas conferências que fazem sentido: porta e Modbus ligado. "Mais opções" rola a tela sozinho ao abrir, nos dois formulários. No Arduino/ESP (protocolo cru, 4.17) entra uma quinta coisa à vista, **Mensagem do equipamento**, que abre o editor do perfil com a prévia ao vivo; o teste diz se a mensagem chegou e se o perfil a entendeu.
+Lista com nome, endereço e selo de comunicação. Cadastro com quatro coisas à vista: onde está (rede, cabo USB ou demonstração), nome, IP e **Testar conexão**. No **Cabo USB** o IP dá lugar ao **Adaptador USB**, e "Mais opções" traz protocolo, velocidade, bits, paridade, parada e ID (§4.20). Marca e modelo (perfil de fabricante, 4.6), porta, ID, tempo-limite e ritmo ficam em "Mais opções" (o resumo "Porta 502 · ID 1 · Inovance H3U" aparece fechado). O teste responde na hora; quando falha, mostra o que conferir, na ordem em que os problemas costumam acontecer (mesmo Wi-Fi, IP, Modbus ligado no equipamento, porta/ID). Quando o equipamento **recusa** a conexão (o IP respondeu na hora, mas nada escuta na porta — errno 111 no Android, 10061 no Windows), a mensagem vira "o equipamento recusou a conexão nesta porta" e só sobram as duas conferências que fazem sentido: porta e Modbus ligado. "Mais opções" rola a tela sozinho ao abrir, nos dois formulários. No Arduino/ESP (protocolo cru, 4.17) entra uma quinta coisa à vista, **Mensagem do equipamento**, que abre o editor do perfil com a prévia ao vivo; o teste diz se a mensagem chegou e se o perfil a entendeu.
 
 ### 6.6. Variáveis
 
@@ -879,7 +1000,7 @@ Corrigir uma tabela não muda sozinho o endereço das variáveis já criadas (el
 
 Desde a etapa 4 o motor é dividido em dois. A `DeviceSession` é dona do laço, da espera crescente depois de uma queda e da saúde da conexão — vale para todo protocolo. O que é de protocolo mora num **driver** (`lib/services/runtime/drivers/`), atrás do contrato `DeviceDriver`: `connect`, `scan` (lê as variáveis em uso e publica no `TagStore`), `readOnce`, `write`, `ping` e `tagsChanged`. Falha de comunicação sai como `CommError` (`lib/core/comm/`), que a sessão trata igual para todos: "sem comunicação" com o último valor esmaecido. Falha de uma variável só (endereço inexistente, pedido fora do limite) o driver resolve publicando a qualidade daquela variável.
 
-`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.18) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `S7Driver` (4.16) é o modelo para outro protocolo de varredura: planejador e codec ao lado do driver (`s7_tag_codec.dart`), o endereço da variável num objeto opcional da `Tag` (`Tag.s7`, como `Tag.mqtt`), a configuração num da `Device` (`Device.s7`), e os campos dos cadastros em arquivos próprios (`s7_device_fields.dart`, `s7_tag_fields.dart`) com ganchos pequenos nos formulários (`if (s7) … else if (mqtt) … else`). `RawDriver` (4.17) também é de assinatura: o `scan` só confere validades, e o socket é dividido pelo `RawLinkPool` com as ferramentas do cadastro. Variável de um protocolo num equipamento de outro (tópico MQTT, endereço S7 ou campo cru num Modbus; endereço Modbus num cru) vira erro de configuração daquela variável — nunca uma leitura do HR 0 no lugar dela. O `CalcDriver` (§6.12) é o driver sem rede: lê o `TagStore` e publica o resultado das contas, e o `HmiRuntime` o entrega à sessão do equipamento virtual pelo `driverFactory`. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
+`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.18) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `S7Driver` (4.16) é o modelo para outro protocolo de varredura: planejador e codec ao lado do driver (`s7_tag_codec.dart`), o endereço da variável num objeto opcional da `Tag` (`Tag.s7`, como `Tag.mqtt`), a configuração num da `Device` (`Device.s7`), e os campos dos cadastros em arquivos próprios (`s7_device_fields.dart`, `s7_tag_fields.dart`) com ganchos pequenos nos formulários (`if (s7) … else if (mqtt) … else`). `RawDriver` (4.17) também é de assinatura: o `scan` só confere validades, e o socket é dividido pelo `RawLinkPool` com as ferramentas do cadastro. Variável de um protocolo num equipamento de outro (tópico MQTT, endereço S7 ou campo cru num Modbus; endereço Modbus num cru) vira erro de configuração daquela variável — nunca uma leitura do HR 0 no lugar dela. O cabo USB (§4.20) não é protocolo novo: é outro cano (`SerialLink`) para dois que já existiam, e o `forDevice` escolhe `ModbusDriver` ou `RawDriver` pelo `SerialConfig.protocol`; um meio novo (COM no Windows) seria outra `UsbSerialPlatform` ou outro `SerialLink`, sem mexer em driver. O `CalcDriver` (§6.12) é o driver sem rede: lê o `TagStore` e publica o resultado das contas, e o `HmiRuntime` o entrega à sessão do equipamento virtual pelo `driverFactory`. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
 
 ### 10.4. Mudar o formato do arquivo
 
@@ -953,6 +1074,9 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/runtime/raw_device_test.dart` | Equipamento cru pelo caminho de produção contra o Arduino falso: TCP em streaming (testar, ler na hora, gravar pelo comando e a confirmação), polling, escala desfeita e comando próprio da variável, valor que não cabe e falta de comando, checksum errado descartado, teste "não entendeu" × "nada chegou", equipamento mudo e volta na hora, campo que parou de vir, queda e reconexão, UDP em streaming para a porta local e em polling com comando, um socket só para telas + teste + ouvir + prévia, prévia reinterpretando ao mexer no perfil e mandando a pergunta do polling, "Lendo agora" (campo que não veio, nada chegou, soltar ao sair), variável do protocolo errado, arquivo do projeto ida e volta, codec e modelos prontos. |
 | `test/widgets/raw_forms_test.dart` | Cadastro com Arduino: protocolo em Mais opções, TCP/UDP e porta deste celular, mensagem à vista; variável com campo e comando do equipamento como dica; editor do perfil com a prévia ao vivo contra o Arduino falso (problema, trocar o modelo e dar nomes reinterpreta sem mensagem nova, checksum errado), "Testar conexão" falhando e passando; "Ouvir o equipamento" preenche campo, tipo e nome. |
 | `test/runtime/rtu_device_test.dart` | Equipamento atrás de gateway RS-485 pelo caminho de produção (fábrica → driver → sessão): testar, ler na varredura e gravar em RTU e ASCII; envelope no arquivo do projeto. |
+| `test/core/usb_serial_test.dart` | Cabo USB contra a porta simulada (`test/support/fake_usb_serial.dart`). Parâmetros da linha: tempo de caractere, t3.5 (1,75 ms acima de 19200), JSON. Adaptador escolhido × plugado (número de série, mapa do Android). Porta dividida: uma abertura para vários canos, fecha com o último, parâmetros de cada um na fila, cabo puxado avisando todos e reabrindo noutro caminho, permissão negada sem caixa atrás de caixa. RT-2: quadro partido em pacotes de 1 byte, ASCII 7E1 com lixo antes do `:`, eco com e sem "descartar eco" (e eco percebido sozinho), byte espúrio, pausa no meio do quadro, pacotes com pausa de 16 ms não partindo o quadro, CRC errado, velocidade diferente, bytes sem resposta, t3.5 entre quadros a 1200, cabo puxado com pedido no ar, dois escravos na mesma linha. |
+| `test/runtime/usb_device_test.dart` | Cabo USB pelo caminho de produção (`HmiRuntime` → fábrica → driver → `UsbSerialPool` → porta simulada): RTU e ASCII testando, lendo na varredura e gravando; eco; quadro partido com byte espúrio; CRC errado; velocidade/paridade e ID errados; cabo puxado (último valor esmaecido, motivo no selo) e volta sozinho; dois inversores no mesmo adaptador com o teste na fila; nenhum adaptador, dois sem escolha, sem permissão, fora do Android; permissão negada perguntada uma vez só pela varredura; Arduino no cabo (testar, ler, gravar pelo comando, DTR) e com velocidade errada; arquivo do projeto (só o que difere, Arduino só com o perfil, rede igual, arquivo impossível). |
+| `test/widgets/usb_forms_test.dart` | Cadastro com o cabo USB: terceiro cartão, adaptador no lugar do IP achado sozinho, Mais opções (protocolo, velocidade, paridade, ID; ASCII com 7E1 só se os bits não foram mexidos; Marca e modelo), salvar e reabrir; testar conexão com a explicação antes da pergunta do Android ("Agora não" e "Continuar"), respondendo e falhando com o que conferir; lista dos adaptadores com o chip e o aparelho sem driver apagado; adaptador tirado; Arduino no cabo (mensagem à vista, sem ID nem marca, teste entendendo, variável com campo da mensagem). |
 | `test/runtime/device_driver_test.dart` | Contrato do driver com um driver de mentira (não Modbus): a sessão publica, grava e trata queda igual. |
 | `test/core/mqtt_codec_test.dart` | Curingas `+`/`#` e `$SYS`, filtro válido; mensagem → valor (vírgula, escala, liga/desliga em várias convenções, texto, JSON com caminho e posição de lista, campo que não veio); valor → comando (formatos de liga/desliga, escala, passo, JSON com o campo); campos para o "ouvir". |
 | `test/runtime/mqtt_device_test.dart` | Equipamento MQTT pelo caminho de produção contra o broker de teste: testar, ler e gravar; "lendo agora" esperando e soltando o broker ao sair; número, texto, booleano e JSON; retain na hora; comando no tópico certo sem retain; validade vencida; broker que cai e volta; testamento do equipamento; troca de tópico sem reconectar e keep-alive; porta recusada e senha errada; ouvir o broker; variável do protocolo errado; arquivo do projeto ida e volta. |
@@ -996,6 +1120,7 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Perfis de fabricante:** validar em bancada (Inovance H3U/H5U primeiro, o manual da série H não foi aberto).
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
 - **Siemens S7:** conferir num S7-1200 de verdade (kit) — PUT/GET, DB não otimizado, família no "Testar conexão" e o tempo da varredura com PDU 240.
+- **Cabo USB:** primeira bancada com adaptador CH340/FTDI e um CLP ou escravo serial — roteiro na §4.20.
 - **Ideias registradas:** script livre na variável (as calculadas da §6.12 cobrem as contas; JavaScript segue fora), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.
 - **Alarme e registro com o app fechado:** serviço em primeiro plano + notificação do Android (hoje alarmes, voz e registros só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.

@@ -106,7 +106,7 @@ class _DeviceCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(color: Ind.surfaceHigh, borderRadius: BorderRadius.circular(12)),
-                child: Icon(device.isDemo ? Icons.smart_toy_outlined : Icons.router_outlined, color: Ind.accent),
+                child: Icon(device.isDemo ? Icons.smart_toy_outlined : device.isUsb ? Icons.usb_rounded : Icons.router_outlined, color: Ind.accent),
               ),
               const SizedBox(width: 18),
               Expanded(

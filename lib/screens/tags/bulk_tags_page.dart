@@ -468,9 +468,10 @@ class _Preview extends StatelessWidget {
     final errors = batch.errors;
     final muted = TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35);
     final warn = TextStyle(color: Ind.textFor(Ind.warn), fontSize: 13, height: 1.35, fontWeight: FontWeight.w600);
-    // Atrás de gateway RS-485, 125 registradores a 19200 bps levam ~150 ms
-    // por leitura (conta da pesquisa): oito leituras já passam do ciclo.
-    final slowLink = device.kind == DeviceKind.modbusRtuTcp && reads * 150 > device.pollMs;
+    // Atrás de gateway RS-485 (ou pelo cabo USB), 125 registradores a 19200
+    // bps levam ~150 ms por leitura (conta da pesquisa): oito leituras já
+    // passam do ciclo.
+    final slowLink = (device.kind == DeviceKind.modbusRtuTcp || device.isUsb) && reads * 150 > device.pollMs;
 
     return Container(
       key: const ValueKey('previa'),

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../core/comm/comm_error.dart';
 import '../../core/link/byte_link.dart';
 import '../../core/modbus/modbus_client_serial.dart' show isConnectionRefused;
 import '../../core/rawlink/message_parser.dart';
@@ -11,7 +12,7 @@ import '../../core/rawlink/message_profile.dart';
 import '../../core/rawlink/raw_link_error.dart';
 import '../../core/rawlink/raw_link_pool.dart';
 import '../../models/device.dart';
-import '../net/local_network.dart';
+import 'drivers/raw_driver.dart';
 
 enum RawPreviewLink { connecting, connected, failed }
 
@@ -91,15 +92,8 @@ class RawPreview extends ChangeNotifier {
     _state = RawPreviewLink.connecting;
     _error = null;
     _notify();
-    final raw = device.raw;
-    final link = _link ??= RawLinkPool.acquire(
-      udp: raw.isUdp,
-      host: device.host,
-      port: device.port,
-      localPort: raw.localPort,
-      connectionTimeout: Duration(milliseconds: max(1000, device.timeoutMs)),
-      beforeConnect: LocalNetwork.prepare,
-    );
+    // Socket TCP/UDP ou a porta do cabo USB — o mesmo cano das telas.
+    final link = _link ??= RawDriver.linkFor(device);
     _sub ??= link.input.listen(_onChunk);
     link.onClosed = (_) {
       _pollTimer?.cancel();
@@ -112,7 +106,11 @@ class RawPreview extends ChangeNotifier {
     } catch (e) {
       if (_disposed) return;
       _state = RawPreviewLink.failed;
-      _error = isConnectionRefused(e) ? 'o equipamento recusou a conexão nesta porta' : 'sem conexão com o equipamento';
+      _error = e is CommError
+          ? e.userMessage
+          : isConnectionRefused(e)
+              ? 'o equipamento recusou a conexão nesta porta'
+              : 'sem conexão com o equipamento';
       _notify();
       return;
     }

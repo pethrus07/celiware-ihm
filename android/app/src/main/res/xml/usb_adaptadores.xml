@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptadores USB-serial que abrem o Ware IoT ao plugar (manifesto,
+     USB_DEVICE_ATTACHED). São os chips que a usb-serial-for-android reconhece;
+     números em decimal, como o Android pede. Um chip fora desta lista ainda
+     funciona se a biblioteca tiver driver: só não abre o app sozinho. -->
+<resources>
+    <!-- FTDI (0x0403) -->
+    <usb-device vendor-id="1027" product-id="24577" /> <!-- 0x6001 FT232R -->
+    <usb-device vendor-id="1027" product-id="24592" /> <!-- 0x6010 FT2232H -->
+    <usb-device vendor-id="1027" product-id="24593" /> <!-- 0x6011 FT4232H -->
+    <usb-device vendor-id="1027" product-id="24596" /> <!-- 0x6014 FT232H -->
+    <usb-device vendor-id="1027" product-id="24597" /> <!-- 0x6015 FT230X / FT231X -->
+
+    <!-- Silicon Labs CP210x (0x10C4) -->
+    <usb-device vendor-id="4292" product-id="60000" /> <!-- 0xEA60 CP2102 e outros de 1 porta -->
+    <usb-device vendor-id="4292" product-id="60016" /> <!-- 0xEA70 CP2105 -->
+    <usb-device vendor-id="4292" product-id="60017" /> <!-- 0xEA71 CP2108 -->
+
+    <!-- Prolific PL2303 (0x067B) -->
+    <usb-device vendor-id="1659" product-id="8963" />  <!-- 0x2303 PL2303HX/TA -->
+    <usb-device vendor-id="1659" product-id="9123" />  <!-- 0x23A3 PL2303GC -->
+    <usb-device vendor-id="1659" product-id="9139" />  <!-- 0x23B3 PL2303GB -->
+    <usb-device vendor-id="1659" product-id="9155" />  <!-- 0x23C3 PL2303GT -->
+    <usb-device vendor-id="1659" product-id="9171" />  <!-- 0x23D3 PL2303GL -->
+    <usb-device vendor-id="1659" product-id="9187" />  <!-- 0x23E3 PL2303GE -->
+    <usb-device vendor-id="1659" product-id="9203" />  <!-- 0x23F3 PL2303GS -->
+
+    <!-- QinHeng CH34x (0x1A86): o mais comum nos adaptadores RS-485 baratos -->
+    <usb-device vendor-id="6790" product-id="29987" /> <!-- 0x7523 CH340 -->
+    <usb-device vendor-id="6790" product-id="21795" /> <!-- 0x5523 CH341A -->
+    <usb-device vendor-id="6790" product-id="21971" /> <!-- 0x55D3 CH343 (CDC) -->
+    <usb-device vendor-id="6790" product-id="21972" /> <!-- 0x55D4 CH9102 (CDC) -->
+
+    <!-- Arduino com USB próprio (CDC) -->
+    <usb-device vendor-id="9025" />                    <!-- 0x2341 Arduino LLC -->
+    <usb-device vendor-id="10755" />                   <!-- 0x2A03 Arduino SRL -->
+</resources>

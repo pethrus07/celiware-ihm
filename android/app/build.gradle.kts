@@ -69,3 +69,10 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Câmeras IP (CameraRtsp.kt): o ExoPlayer só com o RTSP — sem HLS, DASH
+    // e SmoothStreaming, que o `video_player` traria junto.
+    implementation("androidx.media3:media3-exoplayer:1.9.2")
+    implementation("androidx.media3:media3-exoplayer-rtsp:1.9.2")
+}

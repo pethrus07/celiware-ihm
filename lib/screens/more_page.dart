@@ -9,13 +9,16 @@ import '../app/app_info.dart';
 import '../app/app_scope.dart';
 import '../app/appearance.dart';
 import '../core/theme/app_theme.dart';
+import '../models/camera.dart';
 import '../models/project.dart';
+import '../services/cameras/camera_vault.dart';
 import '../services/demo/demo_project.dart';
 import '../services/storage/project_repository.dart';
 import '../widgets/common/adaptive.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/write_actions.dart';
 import '../widgets/tour/tour.dart';
+import 'cameras/cameras_page.dart';
 import 'devices/devices_page.dart';
 import 'editor/screen_editor_page.dart';
 import 'logs/logs_page.dart';
@@ -107,6 +110,14 @@ class MorePage extends StatelessWidget {
             title: const Text('Regras'),
             subtitle: Text(_rulesSummary(p)),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RulesPage())),
+          ),
+          // Câmeras IP das máquinas (§9.2, CM-1 a CM-5).
+          ListTile(
+            key: const ValueKey('cameras'),
+            leading: const Icon(Icons.videocam_outlined),
+            title: const Text('Câmeras'),
+            subtitle: Text(CamerasPage.summary(p)),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CamerasPage())),
           ),
           const SectionHeader('Aparência'),
           Padding(
@@ -239,7 +250,9 @@ class MorePage extends StatelessWidget {
     try {
       final files = await FilePicker.pickFiles(dialogTitle: 'Importar projeto');
       if (files.isEmpty || !context.mounted) return;
-      final project = ProjectRepository.decode(await files.first.readAsBytes());
+      // Senha de câmera não vem no arquivo: a câmera ganha chave nova no
+      // cofre e pede a senha de novo, neste aparelho ou em outro (CM-5).
+      final project = ProjectRepository.decode(await files.first.readAsBytes()).withFreshCameraSecrets();
       if (!context.mounted) return;
       await _replace(context, project,
           'Importar "${project.name}"? (${project.equipment.length} equipamentos · ${project.tags.length} variáveis · ${project.screens.length} telas)');
@@ -265,6 +278,8 @@ class MorePage extends StatelessWidget {
     );
     if (ok != true || !context.mounted) return;
     await AppScope.of(context).controller.replace(next);
+    // Senhas das câmeras do projeto que saiu: não servem para mais nada.
+    await CameraVault.instance.prune(next.cameraSecretRefs);
     if (context.mounted) WriteActions.toast(context, 'Projeto "${next.name}" aberto.');
   }
 }

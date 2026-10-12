@@ -103,8 +103,9 @@ class ElementInfo {
 ///
 /// | tipo        | props                                                                                   |
 /// |-------------|-----------------------------------------------------------------------------------------|
-/// | button      | tagId, label, mode (toggle·momentary·set·reset·value·screen), value (num, modo value), |
-/// |             | color, feedbackTagId (retorno: o que acende o botão), goTo (modo screen)                |
+/// | button      | tagId, label, mode (toggle·momentary·set·reset·value·screen·camera), value (num, modo   |
+/// |             | value), color, feedbackTagId (retorno: o que acende o botão), goTo (modo screen),       |
+/// |             | cameraId (modo camera: a câmera que abre em tela cheia)                                 |
 /// | lamp        | tagId, label, onText, offText, color                                                    |
 /// | value       | tagId, label                                                                            |
 /// | input       | tagId, label, min, max                                                                  |

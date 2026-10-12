@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
+import '../models/camera.dart';
 import '../models/device.dart';
 import '../models/hmi_screen.dart';
 import '../models/log_group.dart';
@@ -105,6 +106,8 @@ class ProjectController extends ChangeNotifier {
   void deleteRecipe(String id) => _commit(_project.removeRecipe(id));
   void saveRule(LogicRule r) => _commit(_project.upsertRule(r));
   void deleteRule(String id) => _commit(_project.removeRule(id));
+  void saveCamera(IpCamera c) => _commit(_project.upsertCamera(c));
+  void deleteCamera(String id) => _commit(_project.removeCamera(id));
 
   /// Move a tela [id] para a posição [index] na lista.
   void reorderScreen(String id, int index) {

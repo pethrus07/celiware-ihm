@@ -31,6 +31,10 @@ dependencies:
   # Registro de dados (Mais → Registros): o SQLite do próprio Android, sem
   # biblioteca nativa no APK.
   sqflite: ^2.4.4+1
+  # Senha das câmeras IP no cofre do Android (Keystore), nunca no projeto.
+  # O vídeo das câmeras não vem de pacote: é o ExoPlayer (Media3) direto,
+  # em android/app/.../CameraRtsp.kt.
+  flutter_secure_storage: ^11.2.0
 
 dev_dependencies:
   flutter_test:

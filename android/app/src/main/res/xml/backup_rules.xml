@@ -2,7 +2,11 @@
 <!-- Backup automático do Android até a versão 11 (android:fullBackupContent).
      O histórico dos registros (Mais → Registros, pasta app_flutter/registros)
      é do aparelho e passa fácil de 25 MB — acima disso o Android desiste do
-     backup INTEIRO, inclusive do projeto. Fica de fora; o resto entra. -->
+     backup INTEIRO, inclusive do projeto. Fica de fora; o resto entra.
+     O cofre das senhas das câmeras também fica: está cifrado com uma chave do
+     Keystore, que não vai junto — restaurado, não abriria. -->
 <full-backup-content>
     <exclude domain="root" path="app_flutter/registros/" />
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+    <exclude domain="sharedpref" path="FlutterSecureKeyStorage.xml" />
 </full-backup-content>

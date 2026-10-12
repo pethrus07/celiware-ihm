@@ -1,3 +1,4 @@
+import 'camera.dart';
 import 'device.dart';
 import 'hmi_screen.dart';
 import 'log_group.dart';
@@ -24,6 +25,7 @@ class Project {
     this.recipeTypes = const [],
     this.recipes = const [],
     this.rules = const [],
+    this.cameras = const [],
   });
 
   static const int schemaVersion = 1;
@@ -43,6 +45,10 @@ class Project {
   final List<Recipe> recipes;
   /// Regras entre máquinas (Mais → Regras, LG-4 a LG-7).
   final List<LogicRule> rules;
+
+  /// Câmeras IP das máquinas (Mais → Câmeras, CM-1). Sem a senha: ela fica
+  /// no cofre do aparelho. Edições em `camera.dart`.
+  final List<IpCamera> cameras;
 
   bool get isEmpty => devices.isEmpty && tags.isEmpty && screens.isEmpty;
 
@@ -72,6 +78,7 @@ class Project {
     List<RecipeType>? recipeTypes,
     List<Recipe>? recipes,
     List<LogicRule>? rules,
+    List<IpCamera>? cameras,
   }) =>
       Project(
         name: name ?? this.name,
@@ -82,6 +89,7 @@ class Project {
         recipeTypes: recipeTypes ?? this.recipeTypes,
         recipes: recipes ?? this.recipes,
         rules: rules ?? this.rules,
+        cameras: cameras ?? this.cameras,
       );
 
   // ── Edições (sempre devolvem um projeto novo) ────────────────────────────────
@@ -137,6 +145,8 @@ class Project {
         if (recipes.isNotEmpty) 'recipes': [for (final r in recipes) r.toJson()],
         // Idem: projeto sem regra fica igual ao de antes.
         if (rules.isNotEmpty) 'rules': [for (final r in rules) r.toJson()],
+        // Idem: projeto sem câmera fica igual ao de antes.
+        if (cameras.isNotEmpty) 'cameras': [for (final c in cameras) c.toJson()],
       };
 
   factory Project.fromJson(Map<String, dynamic> j) => Project(
@@ -168,6 +178,10 @@ class Project {
         rules: [
           for (final r in (j['rules'] as List? ?? const []))
             if (r is Map && r['id'] is String) LogicRule.fromJson(Map<String, dynamic>.from(r)),
+        ],
+        cameras: [
+          for (final c in (j['cameras'] as List? ?? const []))
+            if (c is Map && c['id'] is String) IpCamera.fromJson(Map<String, dynamic>.from(c)),
         ],
       );
 

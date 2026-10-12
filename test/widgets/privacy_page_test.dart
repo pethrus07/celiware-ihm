@@ -75,6 +75,7 @@ void main() {
     for (final fato in [
       'broker MQTT',
       'servidor OPC UA',
+      'cofre do Android',
       'Quem está aplicando',
       'Mais → Registros',
       'backup do Android',

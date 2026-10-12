@@ -7,11 +7,13 @@ import 'package:flutter/services.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/comm/comm_error.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/camera.dart';
 import '../../../models/hmi_screen.dart';
 import '../../../models/tag.dart';
 import '../../../services/runtime/hmi_runtime.dart';
 import '../../../services/runtime/tag_codec.dart';
 import '../../../services/runtime/tag_store.dart';
+import '../../../screens/cameras/camera_view_page.dart';
 import '../hmi_frame.dart';
 import '../write_actions.dart';
 
@@ -37,6 +39,9 @@ enum ButtonMode {
 
   /// Não grava nada: abre outra tela do projeto (`goTo`).
   screen,
+
+  /// Não grava nada: abre a câmera da máquina em tela cheia (`cameraId`).
+  camera,
 }
 
 extension ButtonModeMeta on ButtonMode {
@@ -54,6 +59,8 @@ extension ButtonModeMeta on ButtonMode {
         return 'Grava um valor';
       case ButtonMode.screen:
         return 'Ir para tela';
+      case ButtonMode.camera:
+        return 'Abrir câmera';
     }
   }
 
@@ -71,13 +78,15 @@ extension ButtonModeMeta on ButtonMode {
         return 'VALOR';
       case ButtonMode.screen:
         return 'TELA';
+      case ButtonMode.camera:
+        return 'CÂMERA';
     }
   }
 
   bool get needsNumber => this == ButtonMode.value;
 
-  /// Modo que grava numa variável (todos menos "Ir para tela").
-  bool get needsTag => this != ButtonMode.screen;
+  /// Modo que grava numa variável (todos menos "Ir para tela" e "Abrir câmera").
+  bool get needsTag => this != ButtonMode.screen && this != ButtonMode.camera;
 
   /// Modo de liga/desliga, em que o retorno da máquina faz sentido.
   bool get isBit => needsTag && !needsNumber;
@@ -176,6 +185,7 @@ class _ButtonElementState extends State<ButtonElement> {
             description: 'Gravar ${TagCodec.format(tag, v)}? (atual: ${TagCodec.format(tag, r.value)})');
       case ButtonMode.momentary:
       case ButtonMode.screen:
+      case ButtonMode.camera:
         break;
     }
   }
@@ -330,10 +340,52 @@ class _ButtonElementState extends State<ButtonElement> {
     return Semantics(button: true, child: GestureDetector(key: ValueKey('ir-${e.id}'), onTap: () => nav(target), child: face));
   }
 
+  /// "Abrir câmera": como o "Ir para tela", não grava nada e funciona em
+  /// tela só de acompanhamento. O vídeo abre por cima, em tela cheia; voltar
+  /// fecha o vídeo e devolve a tela de operação como estava.
+  Widget _cameraButton(BuildContext context, HmiScreenContext screen) {
+    final project = AppScope.watch(context).controller.project;
+    final id = e.props['cameraId'] as String?;
+    final camera = id == null ? null : project.camera(id);
+    final color = StateColorMeta.fromName(e.prop<String>('color', 'blue'), StateColor.blue).color;
+    final label = e.prop<String>('label', camera?.name ?? 'Câmera');
+    final face = camera == null
+        ? _face(label: label, color: color, lit: false,
+            hint: Text(id == null ? 'ESCOLHA A CÂMERA' : 'CÂMERA APAGADA', style: TextStyle(color: Ind.accent, fontSize: 11, fontWeight: FontWeight.w700)))
+        : CustomPaint(
+            foregroundPainter: CardEdge(rev: Ind.revision),
+            child: Container(
+              decoration: Ind.card(color: Ind.surfaceHigh, border: color.withValues(alpha: 0.5), width: 1.2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.videocam_outlined, size: 22, color: Ind.textFor(color)),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: FitText(label.toUpperCase(),
+                      style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 20, letterSpacing: 0.5, color: Ind.text)),
+                ),
+              ]),
+            ),
+          );
+    if (screen.editMode) return face;
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        key: ValueKey('camera-${e.id}'),
+        onTap: () => camera == null
+            ? WriteActions.toast(context, id == null ? 'Este botão ainda não tem câmera.' : 'A câmera deste botão foi apagada.', error: id != null)
+            : CameraViewPage.open(context, camera.id),
+        child: face,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screen = HmiScreenContext.of(context);
     if (mode == ButtonMode.screen) return _screenButton(context, screen);
+    if (mode == ButtonMode.camera) return _cameraButton(context, screen);
     final feedbackId = mode.isBit ? e.props['feedbackTagId'] as String? : null;
     return TagBuilder(
       tagId: e.tagId,

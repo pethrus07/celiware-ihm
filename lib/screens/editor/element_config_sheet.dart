@@ -7,10 +7,12 @@ import 'package:printing/printing.dart';
 import '../../app/app_scope.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/image_util.dart';
+import '../../models/camera.dart';
 import '../../models/hmi_screen.dart';
 import '../../models/project.dart';
 import '../../models/tag.dart';
 import '../../services/runtime/tag_codec.dart';
+import '../../widgets/cameras/camera_pick.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/element_catalog.dart';
 import '../../widgets/hmi/elements/control_elements.dart';
@@ -102,8 +104,8 @@ class ElementConfigSheet extends StatelessWidget {
     // Equipamentos que a tela já usa: vêm primeiro na lista de variáveis.
     final screenDevices = {for (final id in project.screen(screenId)?.tagIds ?? const <String>{}) ?project.tag(id)?.deviceId};
 
-    // ── Variável ── ("Ir para tela" não grava nada: não pede variável)
-    if (info.fit != TagFit.none && buttonMode != ButtonMode.screen) {
+    // ── Variável ── ("Ir para tela" e "Abrir câmera" não gravam: não pedem variável)
+    if (info.fit != TagFit.none && (buttonMode?.needsTag ?? true)) {
       if (e.type == ElementType.table) {
         w.add(const SectionHeader('Variáveis (até ${TableElement.maxRows})', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
         w.add(TableRowsEditor(project: project, element: e, preferDevices: screenDevices, onChanged: (ids) => set('tagIds', ids)));
@@ -154,6 +156,7 @@ class ElementConfigSheet extends StatelessWidget {
             ChoiceOption(value: ButtonMode.reset, title: 'Só desliga', icon: Icons.power_off_outlined),
             ChoiceOption(value: ButtonMode.value, title: 'Grava valor', icon: Icons.onetwothree_rounded),
             ChoiceOption(value: ButtonMode.screen, title: 'Ir para tela', icon: Icons.arrow_forward_rounded),
+            ChoiceOption(value: ButtonMode.camera, title: 'Abrir câmera', icon: Icons.videocam_outlined),
           ],
           selected: mode,
           onChanged: (m) {
@@ -163,9 +166,28 @@ class ElementConfigSheet extends StatelessWidget {
             if (tag != null && (m.needsNumber != mode.needsNumber || !m.needsTag)) next = next.withProp('tagId', null);
             if (!m.isBit) next = next.withProp('feedbackTagId', null);
             if (!m.needsTag && next.props['label'] == tag?.name) next = next.withProp('label', '');
+            if (m != ButtonMode.camera) next = next.withProp('cameraId', null);
             save(next);
           },
         ));
+        if (mode == ButtonMode.camera) {
+          w.add(const SectionHeader('Abre a câmera', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+          w.add(CameraPick(
+            project: project,
+            selected: e.props['cameraId'] as String?,
+            preferDevices: {...screenDevices.whereType<String>()},
+            onChanged: (id) {
+              var next = e.withProp('cameraId', id);
+              final label = e.props['label'] as String?;
+              final old = project.camera(e.props['cameraId'] as String? ?? '')?.name;
+              // A câmera pode ter acabado de nascer ("Nova câmera"): o nome vem do projeto de agora.
+              final name = AppScope.of(context).controller.project.camera(id)?.name;
+              if (name != null && (label == null || label.isEmpty || label == old || label == 'Botão')) next = next.withProp('label', name);
+              save(next);
+            },
+          ));
+          break;
+        }
         if (mode == ButtonMode.screen) {
           w.add(const SectionHeader('Abre a tela', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
           w.add(_ScreenPick(
@@ -301,7 +323,7 @@ class ElementConfigSheet extends StatelessWidget {
         break;
     }
 
-    if (tag != null && info.writes && !tag.canWrite && buttonMode != ButtonMode.screen) {
+    if (tag != null && info.writes && !tag.canWrite && (buttonMode?.needsTag ?? true)) {
       w.add(const SizedBox(height: 16));
       w.add(_Hint(icon: Icons.lock_outline_rounded, color: Ind.warn,
           text: '"${tag.name}" está como só leitura. Para este elemento gravar, abra a variável e marque "Pode ser alterada pela tela".'));

@@ -2,9 +2,17 @@
 <!-- Backup na nuvem do Android 12 em diante (android:dataExtractionRules).
      Mesmo motivo de backup_rules.xml: o histórico dos registros não sobe (o
      teto de 25 MB derrubaria o backup do projeto junto). Na troca de aparelho
-     por cabo ou Wi-Fi não há teto, então ele vai junto. -->
+     por cabo ou Wi-Fi não há teto, então ele vai junto.
+     O cofre das senhas das câmeras não vai em nenhum dos dois: a chave do
+     Keystore fica no aparelho, e no novo a câmera pede a senha de novo. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="root" path="app_flutter/registros/" />
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureKeyStorage.xml" />
     </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureKeyStorage.xml" />
+    </device-transfer>
 </data-extraction-rules>

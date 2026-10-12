@@ -28,6 +28,10 @@ class PrivacyPage extends StatelessWidget {
       'O app conversa com os equipamentos que você cadastrar (CLP, inversor, conversor, broker), no endereço que você informar ou pelo cabo USB ligado ao celular. A conversa vai direto do celular para o equipamento, pela sua rede, pela VPN que você configurar ou pelo cabo, sem passar por servidor nosso.',
       'O app também consulta em qual Wi-Fi o celular está, para usar a rede da máquina e avisar quando a faixa de IP é diferente. Isso não sai do aparelho.',
     ]),
+    ('Câmeras', [
+      'O vídeo das câmeras que você cadastrar vai direto da câmera para o celular, pela sua rede, e só é mostrado na tela: o app não grava vídeo nem guarda foto. A foto só sai do aparelho quando você toca em Enviar e escolhe para onde.',
+      'A senha da câmera fica no cofre do Android (Android Keystore), fora do projeto: não vai no arquivo exportado nem no backup. Quem importar o projeto digita a senha de novo.',
+    ]),
     ('Arquivos', [
       'O app só abre ou grava arquivo quando você pede: enviar ou salvar o projeto, mandar a planilha de um registro, importar um projeto, escolher uma imagem ou um PDF para a tela.',
       'O arquivo do projeto leva as senhas de equipamento cadastradas: envie só para quem pode acessar a máquina. Depois de enviado, vale a política do app que você escolheu (WhatsApp, e-mail, Drive).',

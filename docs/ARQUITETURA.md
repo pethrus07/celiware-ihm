@@ -66,6 +66,7 @@ Script livre (JavaScript) na variável ficou de fora de propósito: a escala lin
 | PDF | Página de PDF → imagem, para a imagem por etapa (`printing`, que usa o renderizador do próprio Android). |
 | Marcas por aparelho | "Tutorial já visto", aparência, preferências de voz (`shared_preferences`). |
 | Voz | Avisos de alarme e narração de eventos no fone (`flutter_tts`), com fila própria em Dart (§6.9). |
+| Câmeras IP | Vídeo RTSP pelo ExoPlayer (Media3 1.9.2, só o módulo RTSP) num canal próprio (`CameraRtsp.kt`) que desenha numa textura do Flutter; senha no cofre do Android (`flutter_secure_storage`) — §6.14. |
 | Logs | `logging`. |
 | Estado | `ValueNotifier` / `ChangeNotifier` / `InheritedNotifier` — sem biblioteca de estado. |
 | Simulação | Simulador interno em Dart + simulador externo em Python (pymodbus 3.8.6). |
@@ -163,6 +164,7 @@ lib/
 │   ├── serial_config.dart            Cabo USB: adaptador, velocidade, bits, paridade, parada, protocolo, eco.
 │   ├── log_group.dart                Grupo de registro de dados (§6.10).
 │   ├── recipe.dart                   Tipo de receita, máquina, receita e versões (§6.11).
+│   ├── camera.dart                   Câmera IP: endereços, fluxo leve, senha fora do projeto (§6.14).
 │   ├── hmi_screen.dart               Tela e elemento posicionado na grade.
 │   └── project.dart                  Projeto inteiro (unidade de arquivo).
 ├── services/
@@ -182,6 +184,7 @@ lib/
 │   ├── rules/rule_engine.dart        Motor das regras entre máquinas (§6.12).
 │   ├── logging/                      Registro de dados: motor, banco SQLite, CSV (§6.10).
 │   ├── recipes/                      Receitas: regras puras, ler/preparar/aplicar, histórico (§6.11).
+│   ├── cameras/                      Câmeras: sessão (estado, atraso, reconexão), player nativo, cofre, foto (§6.14).
 │   ├── demo/
 │   │   ├── demo_process.dart         "Programa do CLP" da cortadora simulada.
 │   │   └── demo_project.dart         Projeto de demonstração (duas telas, receitas, uma calculada, uma regra desligada).
@@ -197,7 +200,8 @@ lib/
 │   ├── logs/                         Registros: lista, folha do grupo, histórico.
 │   ├── recipes/                      Receitas: lista, receita, tipo e máquina, aplicar, histórico.
 │   ├── rules/                        Regras: lista com o estado de cada uma e cadastro.
-│   ├── more_page.dart                Projeto, registros, receitas, regras, tutoriais, sobre.
+│   ├── cameras/                      Câmeras: lista por máquina, cadastro, tela cheia.
+│   ├── more_page.dart                Projeto, registros, receitas, regras, câmeras, tutoriais, sobre.
 │   ├── privacy_page.dart             Política de privacidade em texto (Mais → Sobre), a mesma do site.
 │   └── tours.dart                    Textos de todas as trilhas de tutorial.
 └── widgets/
@@ -208,6 +212,7 @@ lib/
     │   ├── live_tags.dart            "Estas variáveis ao vivo enquanto eu estiver na tela."
     │   ├── write_actions.dart        Regras de escrita + teclado numérico grande.
     │   └── elements/                 Renderizadores (controle, indicador, gráfico, estático, tabela).
+    ├── cameras/                      Selo de estado da câmera, diálogo da senha, escolha da câmera do botão.
     ├── tour/tour.dart                Motor de tutorial (realce, balão, "já vi").
     └── common/
         ├── common.dart               Estado vazio, selo de conexão, cartões de escolha...
@@ -215,7 +220,7 @@ lib/
 
 sim/            Simulador Modbus TCP externo (Python) — ver SIMULACAO.md.
 test/           Testes: protocolo, TCP real, codec, planejador, runtime, fluxos de tela.
-tool/           Gerador de ícone e da documentação em Word; bench/ mede a rolagem em modo profile (§8); loja/ gera e confere as imagens e os textos da Play.
+tool/           Gerador de ícone e da documentação em Word; bench/ mede a rolagem em modo profile (§8); loja/ gera e confere as imagens e os textos da Play; camera/ é a câmera IP falsa (§6.14).
 store/          Ícone 512 da Play Store.
 docs/loja/      Ficha da Play (textos, imagens, formulários); roteiro em docs/PUBLICACAO.md.
 ```
@@ -695,7 +700,7 @@ A tela é uma grade de **6 colunas de células quadradas**; a célula mede largu
 
 | Tipo | Propriedades |
 |---|---|
-| button | tagId, label, mode (toggle · momentary · set · reset · value · screen), value, color, feedbackTagId (retorno), goTo (modo screen) |
+| button | tagId, label, mode (toggle · momentary · set · reset · value · screen · camera), value, color, feedbackTagId (retorno), goTo (modo screen), cameraId (modo camera) |
 | lamp | tagId, label, onText, offText, color |
 | value | tagId, label |
 | input | tagId, label, min, max |
@@ -729,7 +734,7 @@ O projeto inteiro é um JSON (`projeto.ihm.json` na pasta privada; `nome-data.ih
 }
 ```
 
-Campos opcionais, que só vão para o arquivo quando há algum (projeto sem eles fica byte a byte igual ao de antes, `schemaVersion` segue 1): `logGroups` (§6.10), `recipeTypes` e `recipes` (§5.5, §6.11), `rules` (§5.6, §6.12).
+Campos opcionais, que só vão para o arquivo quando há algum (projeto sem eles fica byte a byte igual ao de antes, `schemaVersion` segue 1): `logGroups` (§6.10), `recipeTypes` e `recipes` (§5.5, §6.11), `rules` (§5.6, §6.12), `cameras` (§5.7, §6.14).
 
 A gravação é atômica (grava `.tmp` e renomeia): se a bateria acabar no meio, sobra o arquivo anterior inteiro. Arquivo ilegível é guardado como cópia `.corrompido-…` em vez de apagado. Arquivo de versão mais nova é recusado com mensagem pedindo para atualizar o app.
 
@@ -757,6 +762,22 @@ Em `Project.rules` (chave `rules`, só vai para o arquivo quando há alguma; `sc
 | mode | `propose` (padrão, não vai para o arquivo) ou `automatic` — só com valor 0; `normalized()` devolve a "propor" a automática que ligaria, e modo desconhecido (versão mais nova) também cai em "propor". |
 | enabled | Ligada (padrão; só `false` vai para o arquivo). |
 
+### 5.7. Câmera (`IpCamera`)
+
+Em `Project.cameras` (chave `cameras`, só vai para o arquivo quando há alguma; `schemaVersion` segue 1). Modelo e edições em `lib/models/camera.dart` (extensão `ProjectCameras`, para `project.dart` mudar o mínimo). §6.14.
+
+| Campo | Significado |
+|---|---|
+| id, name | `name` aparece na lista, no botão e na tela cheia. |
+| deviceId | Máquina (equipamento do projeto) a que a câmera pertence; ausente = nenhuma. Agrupa a lista e põe as câmeras da máquina da tela primeiro na escolha do botão. |
+| url | Fluxo principal, `rtsp://ip:554/…`, **sem** usuário e senha dentro. |
+| substreamUrl | Fluxo leve (substream); é o que a tela cheia abre quando existe. Só vai para o arquivo quando existe. |
+| snapshotUrl | Foto pela URL HTTP; vazio = sem o botão de foto. Só vai para o arquivo quando existe. |
+| username | Usuário da câmera. Só vai para o arquivo quando existe. |
+| secretRef | Chave da senha no cofre do aparelho; ausente = câmera sem senha. **A senha nunca vai para o arquivo.** |
+
+`IpCamera.fromJson` aceita arquivo editado à mão com a senha dentro da URL: o usuário vai para o campo, a senha é descartada e a câmera ganha uma `secretRef` nova — passa a pedir a senha.
+
 ## 6. Funcionalidades por tela
 
 ### 6.1. Telas (início)
@@ -781,7 +802,7 @@ Grade pontilhada; "+ Elemento" abre a paleta (ícone, nome e uma frase curta). O
 
 Prévia ao vivo no topo, na proporção real. A variável aparece numa linha só; tocar abre uma folha com as variáveis compatíveis (cada uma com o valor atual) e "Criar variável" sem sair do editor. Campos só do que faz sentido para o tipo (modo do botão, cores de estado, limites, estados do indicador, janela do gráfico, texto, imagem). Aviso quando a variável escolhida é só leitura num elemento que grava.
 
-Botão: seis modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira o nome dela) e, nos modos liga/desliga, **Retorno da máquina** — por padrão "Mesma variável do comando", tocar escolhe outra. Imagem: **Fixa** ou **Muda com a variável**; no segundo, a variável da etapa e a lista código → imagem, com "Acrescentar imagens" (várias de uma vez) e "Importar PDF". Tabela (`table_config.dart`): as variáveis na ordem das linhas, cada uma com o valor ao vivo, **x** para tirar e a alça para arrastar; **Escolher variáveis** abre a lista com caixas de marcar (agrupada por equipamento, busca a partir de 8): cada toque marca ou desmarca e a tabela muda na hora, na ordem dos toques, até 30; "Pronto · 12 variáveis" fecha. O rótulo vira **Título (opcional)**, e o texto de ligado/desligado só aparece quando a tabela tem alguma linha liga/desliga. Demais elementos: **Ao tocar, abrir a tela** (Nada ou uma das telas), só quando o projeto tem mais de uma tela.
+Botão: sete modos, entre eles **Ir para tela** (escolhe a tela; o rótulo vira o nome dela), **Abrir câmera** (escolhe a câmera — as da máquina da tela primeiro — ou cria uma ali mesmo; o rótulo vira o nome dela, §6.14) e, nos modos liga/desliga, **Retorno da máquina** — por padrão "Mesma variável do comando", tocar escolhe outra. Imagem: **Fixa** ou **Muda com a variável**; no segundo, a variável da etapa e a lista código → imagem, com "Acrescentar imagens" (várias de uma vez) e "Importar PDF". Tabela (`table_config.dart`): as variáveis na ordem das linhas, cada uma com o valor ao vivo, **x** para tirar e a alça para arrastar; **Escolher variáveis** abre a lista com caixas de marcar (agrupada por equipamento, busca a partir de 8): cada toque marca ou desmarca e a tabela muda na hora, na ordem dos toques, até 30; "Pronto · 12 variáveis" fecha. O rótulo vira **Título (opcional)**, e o texto de ligado/desligado só aparece quando a tabela tem alguma linha liga/desliga. Demais elementos: **Ao tocar, abrir a tela** (Nada ou uma das telas), só quando o projeto tem mais de uma tela.
 
 ![Editor com elemento selecionado](imagens/editor.png)
 ![Configuração do elemento](imagens/configurar-elemento.png)
@@ -806,7 +827,7 @@ Na escolha de variável do editor, a lista é **agrupada por equipamento** (os q
 
 ### 6.7. Mais
 
-Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Dados: **Registros** (§6.10) , **Receitas** (§6.11) e **Regras** (§6.12). Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças; **Privacidade**, a política em texto (a Play pede a política também dentro do app, e na rede da máquina um link não abriria).
+Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Dados: **Registros** (§6.10) , **Receitas** (§6.11), **Regras** (§6.12) e **Câmeras** (§6.14). Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças; **Privacidade**, a política em texto (a Play pede a política também dentro do app, e na rede da máquina um link não abriria).
 
 ### 6.8. Alarmes
 
@@ -991,6 +1012,61 @@ Capturas para a ficha da loja (TB-7) em `docs/imagens/tablet/`: Pixel Tablet emu
 
 ![Variáveis com o cadastro ao lado](imagens/tablet/02-variaveis.png)
 ![Editor com o painel lateral](imagens/tablet/04-editor.png)
+
+### 6.14. Câmeras
+
+REQUISITOS-ETAPA4 §9.2, CM-1 a CM-5: câmera IP ligada à máquina, aberta em tela cheia por um botão da tela de operação ou por Mais → **Câmeras**. Peças: modelo em `lib/models/camera.dart`; sessão, player, cofre e foto em `lib/services/cameras/`; telas em `lib/screens/cameras/`; selo, senha e escolha do botão em `lib/widgets/cameras/`; o vídeo em `android/app/src/main/kotlin/com/celiware/ihm/CameraRtsp.kt`.
+
+**Cadastro (CM-1).** À vista: nome, **máquina** (os equipamentos em chips; projeto de uma máquina só já vem com ela), **endereço do vídeo** (RTSP), usuário e senha. "Não sabe o endereço?": **Hikvision** ou **Intelbras / Dahua** pedem só o IP e preenchem vídeo, fluxo leve e foto. Endereço colado com usuário e senha dentro (`rtsp://admin:1234@…`, inclusive com `%40`) é separado na hora: usuário e senha vão para os campos e o endereço fica limpo. Quando o endereço segue um padrão conhecido — Hikvision `/Streaming/Channels/101` (e o `/main/` do firmware antigo), Intelbras/Dahua `subtype=0`, Tapo `/stream1` —, uma sugestão põe o **fluxo leve** com um toque. Em Mais opções: fluxo leve e endereço da foto; erro lá dentro abre a seção. "Descartar alterações?" como nos outros cadastros; apagar diz quantos botões ficam sem câmera e tira a senha do cofre. A lista agrupa por máquina e avisa "falta a senha neste aparelho" (projeto importado).
+
+**Por que um modo do Botão e não um elemento próprio (CM-2).** Abrir a câmera é navegação, como o "Ir para tela": não grava, não lê variável e funciona em tela só de acompanhamento. A tela de operação não toca vídeo embutido (vídeo na grade gastaria rede e bateria o tempo todo), então um elemento próprio seria só um botão com outro nome na paleta — e mexeria em enum, catálogo, renderizador e paleta. O Botão já traz tamanho, cor, rótulo e o caminho sem variável; a mudança ficou no modo `camera` com `cameraId` (`control_elements.dart`) e numa seção da configuração (`CameraPick`). Versão antiga do app lê o modo desconhecido como liga/desliga sem variável: aparece "escolha a variável" e nada é gravado. Câmera apagada vira "CÂMERA APAGADA" no botão, e o toque avisa em vez de abrir uma tela vazia.
+
+**Tela cheia (CM-2, CM-3).** Fundo preto, barras do Android escondidas (voltam com um gesto), o vídeo na proporção dele e, no alto, o nome e o selo. Sem imagem, o centro mostra o estado em letra grande, o motivo e o único botão que resolve. Menu: alta qualidade (fluxo principal) ou fluxo leve, usuário e senha, editar. Com endereço de foto, o botão de foto. A sessão (`CameraSession`) traduz o player:
+
+| Situação | Na tela |
+|---|---|
+| Abrindo | "Conectando…". |
+| Imagem andando | "Ao vivo · atraso ~0,3 s". |
+| Câmera desligada, IP ou porta errados | "Sem sinal" com o motivo — recusou a conexão (IP e porta 554), não respondeu, endereço que a câmera não conhece, celular em outra rede ("o celular está em 192.168.0.x e a câmera em 192.168.1.64", pelo `LocalNetwork` de §4.14) — e a mesma espera crescente dos equipamentos (1, 2, 4, 8, 10 s), com a contagem no selo e **Tentar agora**. A nova tentativa continua "Sem sinal · tentando…" até a imagem voltar; volta sozinha. |
+| Câmera ligada sem imagem | O RTSP do player dá fim de entrada em 4 s sem pacote; a sessão também vigia imagem parada (5 s) e o primeiro quadro (15 s). Vira "Sem sinal" e tenta de novo. |
+| Senha errada (RTSP 401) | "Senha recusada", **sem** tentar de novo sozinha — muita câmera bloqueia o usuário depois de algumas tentativas erradas — e **Digitar a senha**. |
+| Senha que não está no aparelho (projeto importado) | "Falta a senha": o diálogo abre sozinho, antes de qualquer conexão. |
+| App em segundo plano, tela fechada | O player é **descartado**: nada fica recebendo nem decodificando. Na volta ao app, abre de novo. |
+
+**Latência (CM-3).** O selo mostra o atraso que o aparelho põe: vídeo já recebido e ainda não mostrado (posição carregada − posição na tela), em média móvel, de 0,1 em 0,1 s. É o piso do atraso: não conta a câmera codificando, a rede nem a tela. Medida ponta a ponta no emulador (AVD Pixel 7, Android 36) com a câmera falsa, que grava o relógio do PC com milissegundos na imagem: captura feita pelo próprio emulador (`screenrecord screenshot` no console, que responde em 1–2 ms) × hora do PC no envio do comando. Com a GPU do PC e o decodificador do emulador: 0,95 · 0,90 · 0,89 · 1,05 · 0,94 · 0,93 s (média 0,94 s), selo em ~0,3 s; com GPU e decodificador por software, 1,16–1,19 s, selo em ~0,6 s. A diferença entre o selo e o total é o caminho do emulador (rede NAT, decodificador, composição). Falta medir num aparelho com câmera de verdade.
+
+**O player: ExoPlayer num canal próprio.** Os dois caminhos usam o mesmo ExoPlayer (Media3 1.9.2); o tamanho foi medido no APK arm64 release, sobre o mesmo `main`:
+
+| | `video_player` 2.14.1 | Canal próprio (`CameraRtsp.kt`) |
+|---|---|---|
+| RTSP no Android | sim | sim |
+| Começar a tocar | depois de 2,5 s de vídeo guardado (buffer padrão do ExoPlayer; o plugin só deixa mudar o "back buffer") → atraso mínimo de 2,5 s | com 250 ms; passou de 0,7 s guardado, acelera 25% até ~0,35 s; passou de 3 s, pula para perto do fim |
+| Fluxo ao vivo | duração 0: a posição fica presa em 0 e `isCompleted` liga ao abrir (no emulador, o vídeo "terminava" e reabria a cada 3–4 s) | posição e carregado a cada 500 ms (o atraso do selo) |
+| Erro | só "Source error": não distingue senha recusada de câmera desligada | o código do erro e a causa ("DESCRIBE 401", "ECONNREFUSED", "timeout") |
+| Módulos | Media3 + HLS + DASH + SmoothStreaming + RTSP | Media3 + RTSP |
+| APK, com o cofre da senha | +675.704 B (0,64 MB): `classes.dex` +662 KB, sem contar o Dart das câmeras | +543.828 B (0,52 MB): `classes.dex` +338 KB e o Dart das câmeras +192 KB |
+| Licença | BSD-3 (Media3 Apache-2.0) | Apache-2.0 (Media3) |
+
+Base: 22.403.498 bytes; com as câmeras: 22.947.326 bytes. `media_kit`/libmpv (+~6 MB por ABI, LGPL) e `fvp` (libmdk fechada, ~10 MB) não se justificaram: o ExoPlayer configurado fica abaixo de 1 s. Fora do Android o canal não existe e o player vira "este celular não consegue mostrar o vídeo", sem travar (a versão Windows pediria o `fvp`, como na pesquisa).
+
+Detalhes do canal `celiware/camera`: `abrir` cria uma textura (`SurfaceProducer`) e o ExoPlayer com `RtspMediaSource` (4 s sem pacote = fim, em vez de 8: tenta TCP mais cedo e percebe a câmera parada); `fechar` solta player e textura; o nativo manda `estado` (fase, erro, posição, carregado, largura, altura). Ao saber o tamanho do vídeo, a textura recebe `setSize` e o player a superfície nova. O RTSP tenta UDP e cai para TCP. Câmera sem som: volume zero, para não tirar a música nem a voz dos alarmes do fone.
+
+**Senha (CM-5).** O projeto guarda só `secretRef`; a senha vai para o cofre (`CameraVault`: `flutter_secure_storage` 11.2.0, AES-GCM com a chave no Android Keystore, chave `camera-senha:<ref>`). O arquivo exportado é o mesmo JSON: sem senha. **Importar** troca toda `secretRef` por uma nova (`withFreshCameraSecrets`), então a senha é pedida de novo — em outro aparelho e também no mesmo (a chave antiga podia existir aqui e daria a senha de outra câmera). Trocar o projeto (importar, restaurar a demonstração, começar do zero) apaga do cofre as senhas que ficaram sem câmera (`prune`). O cofre fica fora do backup do Android (`backup_rules.xml`, `data_extraction_rules.xml`): restaurado sem a chave do Keystore, não abriria. Para o player, a senha vai dentro da URL (`rtsp://usuário:senha@…`, com `@ : / #` codificados); o ExoPlayer responde ao Basic e ao Digest da câmera. A URL com senha não aparece na tela nem em log.
+
+**Foto (CM-4).** Com o endereço HTTP da câmera (Hikvision `/ISAPI/Streaming/channels/101/picture`, Intelbras/Dahua `/cgi-bin/snapshot.cgi`), o botão de foto busca um JPEG na hora (`CameraSnapshot`: `HttpClient` do Dart com Basic e Digest, uma tentativa só com a senha, 6 s de tempo-limite, até 12 MB, e confere pelos primeiros bytes que é JPEG ou PNG — câmera às vezes devolve a página de login com 200). A folha mostra a foto com a data e a hora e **Enviar** (`share_plus`). Antes da foto e do vídeo, `LocalNetwork.prepare` (§4.14).
+
+**Fora desta entrega.** *Descoberta ONVIF:* é WS-Discovery por multicast UDP, que a rede do emulador (NAT) não deixa passar, e no Android pede `MulticastLock`; sem câmera não dá para testar ponta a ponta, e uma busca que falha calada é pior que digitar o IP — os modelos por marca cobrem o caso comum. Também: gravação, vídeo embutido na grade, Windows, opção "forçar TCP" (hoje: UDP e, sem pacote em 4 s, TCP) e H.265 (depende do decodificador do aparelho).
+
+**Achado: H.264 com várias fatias por quadro.** Pelo RTSP do Media3 1.9.2, um fluxo com cada quadro cortado em fatias (o `-tune zerolatency` do x264 faz uma por núcleo; `--fatias 4` na câmera falsa) aparece cinza com o decodificador do emulador e só com a faixa de baixo com o decodificador por software; o mesmo fluxo abre limpo no ffmpeg. Com uma fatia por quadro — o padrão da câmera falsa —, normal. Conferir na primeira câmera de verdade.
+
+**Testar sem câmera** (`tool/camera/camera_falsa.dart`). O ffmpeg sozinho não serve RTSP a um player (o `-rtsp_flags listen` é só de entrada). A câmera falsa usa o ffmpeg para gerar barras de teste com o relógio do PC com milissegundos e manda o RTP para um servidor RTSP mínimo em Dart: OPTIONS, DESCRIBE (com SPS/PPS no SDP, que o ExoPlayer exige), SETUP (461 ao UDP, e o player passa para TCP), PLAY (começa no quadro-chave, com o `RTP-Info` dele), GET_PARAMETER e TEARDOWN, com o vídeo intercalado na conexão TCP. `--usuario`/`--senha` pedem Basic do DESCRIBE em diante; `--http` serve a foto; o PID do ffmpeg sai na partida, para simular "câmera ligada sem imagem". No emulador o PC é `10.0.2.2`; não use a porta 8554, que é o gRPC do emulador.
+
+```
+dart run tool/camera/camera_falsa.dart --porta 18554 --http 18080 [--usuario admin --senha 1234] [--fatias 4]
+rtsp://10.0.2.2:18554/live    http://10.0.2.2:18080/foto.jpg
+```
+
+Conferido no emulador com ela: abrir e ver a imagem, latência, derrubar a câmera (sem sinal) e religar (volta sozinha), encoder parado, senha faltando, errada (uma tentativa, "Senha recusada") e certa pelo diálogo, foto com senha, segundo plano soltando o player e reabrindo.
 
 ## 7. Tutoriais dentro do app
 
@@ -1192,6 +1268,11 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/widgets/table_element_test.dart` | Tabela de valores (GR-7): tamanhos nas duas grades, arquivo ida e volta, `liveTagIds` sem as linhas, "usada em" aceitando texto; valores ao vivo com unidade, liga/desliga com o texto da tabela e texto lido, na ordem configurada; endereço recusado só na linha dele, alarme marcando a linha, queda com o último valor esmaecido e volta; tocar na linha gravável abre o teclado, confirma e grava (liga/desliga, só leitura e tela só acompanhamento não); tabela que rola lê só as linhas à vista e troca a inscrição ao rolar; pelo editor: paleta na grade fina, escolher várias, reordenar pela alça, tirar. GR-8: 390×844 dp com barras de Android e de recorte de câmera, contando as variáveis inteiras à vista (46 e 44). |
 | `test/widgets/privacy_page_test.dart` | Mais → Privacidade abre a política em texto; o texto do app e `site/privacidade.html` dizem as mesmas coisas (senha de broker, "Quem está aplicando", backup, voz, permissões) e têm as mesmas seções. |
 | `test/widgets/grid_performance_test.dart` | GR-9: tela fina de 48 elementos (a mesma de `tool/bench/gr9_rolagem.dart`) com varredura de 500 ms, contando reconstruções por leitura e camadas repintadas: nada muda → 0; três mudam → 3, e só esses repintam; rolar ~1 s → nenhum elemento repinta; tudo muda → 58 e 48 (contraprova de que o contador conta). |
+| `test/models/camera_test.dart` | Câmera no arquivo: projeto sem câmera igual byte a byte e `schemaVersion` 1; câmera ida e volta sem senha; campos vazios fora; URL com senha num arquivo editado à mão (a senha some e a câmera passa a pedir); importar troca a chave do cofre só de quem tem senha; apagar. Endereços: separar usuário e senha da URL (com `%40` e `@` no caminho), juntar codificado para o player, IP, erros em palavras, fluxo leve de Hikvision, Intelbras/Dahua e Tapo (nunca devolvendo a senha), modelos das marcas. |
+| `test/services/camera_session_test.dart` | Sessão com player falso e relógio simulado: fluxo leve com usuário e senha codificados, ao vivo com o atraso e a resolução; alta qualidade com player novo; câmera desligada → sem sinal com o motivo, espera de 1 e 2 s com a contagem, "tentando" continua sem sinal, volta e zera; senha recusada sem nova tentativa e senha nova reabrindo; imagem parada (5 s) e primeiro quadro (15 s); segundo plano solta o player e a volta reabre; senha fora do aparelho pede sem abrir; câmera sem senha; erros do ExoPlayer em palavras (401 dentro de IP ou porta não é senha). |
+| `test/services/camera_snapshot_test.dart` | Foto contra um servidor HTTP de verdade no teste: senha Basic respondendo ao pedido da câmera, câmera sem senha, senha errada com uma tentativa só, 404, página no lugar da foto, câmera muda (tempo-limite), JPEG e PNG pelos primeiros bytes. |
+| `test/services/exo_camera_player_test.dart` | Lado Dart do player nativo com o canal `celiware/camera` simulado: abrir, estado do ExoPlayer traduzido (fase, posição, carregado, tamanho, erro com o 401), estado de outro player ignorado, fechar a textura; descartado antes da resposta fecha a textura nova; sem o canal vira erro de vídeo. |
+| `test/widgets/cameras_test.dart` | Câmeras pela interface com player falso e cofre em memória: cadastro com URL colada com senha (separa, sugere o fluxo leve, máquina já escolhida), senha no cofre e fora do arquivo; tela cheia de "Conectando…" a "Ao vivo · atraso ~0,6 s", segundo plano soltando e reabrindo, alta qualidade pelo menu, sem sinal com o motivo e a contagem, fechar para o fluxo; senha recusada sem insistir e senha nova pelo diálogo; projeto importado avisando na lista e pedindo a senha antes do vídeo; botão "Abrir câmera" configurado no editor (sem variável), abrindo em tela só de acompanhamento e avisando quando a câmera foi apagada. |
 
 Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstração e animações avançam por passos, sem depender da velocidade da máquina. Toque que não acerta o alvo é falha, não aviso (`hitTestWarningShouldBeFatal`). Eles já pegaram seis defeitos reais antes do aparelho: quatro transbordos de layout (cartão de tela, legenda do gráfico, lâmpada estreita em dois tamanhos), leitura publicando depois do encerramento e toque sem retorno em tela só acompanhamento.
 
@@ -1203,6 +1284,7 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **OPC UA:** conferir num servidor industrial (S7-1500 com a licença, Kepware, CODESYS) e num CLP; depois Sign/SignAndEncrypt (40–60 h) e Subscription (12–20 h) — `docs/pesquisa-etapa4/7-spike-opcua.md`.
 - **Siemens S7:** conferir num S7-1200 de verdade (kit) — PUT/GET, DB não otimizado, família no "Testar conexão" e o tempo da varredura com PDU 240.
 - **Cabo USB:** primeira bancada com adaptador CH340/FTDI e um CLP ou escravo serial — roteiro na §4.20.
+- **Câmeras:** prova com câmera de verdade (uma H.264 e uma H.265, do tipo que o cliente vende): latência filmando um cronômetro, Digest, várias fatias por quadro (§6.14), Wi-Fi caindo, 10 aberturas sem vazar memória. Depois disso, decidir a descoberta ONVIF.
 - **Ideias registradas:** script livre na variável (as calculadas da §6.12 cobrem as contas; JavaScript segue fora), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.
 - **Alarme e registro com o app fechado:** serviço em primeiro plano + notificação do Android (hoje alarmes, voz e registros só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.

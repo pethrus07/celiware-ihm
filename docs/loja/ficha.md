@@ -55,6 +55,7 @@ contra `docs/ARQUITETURA.md` em 12/10/2026):
 | Registro, gráfico e CSV | §6.10 |
 | Receitas com comparação e uma confirmação | §6.11 |
 | Calculadas e regras que perguntam antes | §6.12 |
+| Câmeras IP por botão, senha no cofre | §5.7 e §6.14; **sem câmera de verdade ainda** (testado com câmera falsa e ffmpeg) — por isso "ainda em conferência" |
 | Tutoriais, claro e escuro, tablet | §7, §8, §6.13 |
 | Só com o app aberto; não é função de segurança (NR-12) | §6.8–6.12 "Limite desta versão"; §6.12 (PS-7) |
 | Serial por conversor ou cabo USB-OTG | §4.15 e §4.20 (USB: `uses-feature` opcional, sem permissão nova; adaptador validado só com porta simulada) |

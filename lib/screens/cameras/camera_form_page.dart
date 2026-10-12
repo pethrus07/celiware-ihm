@@ -106,7 +106,9 @@ class _CameraFormPageState extends State<CameraFormPage> {
 
   Future<void> _fromBrand(CameraBrand brand) async {
     final ip = await askText(context,
-        title: 'IP da câmera ${brand.name}', label: 'IP', hint: 'Ex.: 192.168.1.64', initial: CameraUrl.host(_url.text) ?? '');
+        title: 'IP da câmera ${brand.name}', label: 'IP', hint: 'Ex.: 192.168.1.64', initial: CameraUrl.host(_url.text) ?? '',
+        // O mesmo teclado do IP do equipamento: números e ponto, sem trocar de teclado.
+        keyboardType: const TextInputType.numberWithOptions(decimal: true));
     if (ip == null || !mounted) return;
     final err = Validators.host(ip);
     if (err != null) {
@@ -367,7 +369,9 @@ class _CameraFormPageState extends State<CameraFormPage> {
                     controller: _more,
                     onExpansionChanged: (open) => revealAfterExpand(_moreKey, open),
                     tilePadding: EdgeInsets.zero,
-                    childrenPadding: const EdgeInsets.only(bottom: 8),
+                    // O primeiro filho é um campo: o rótulo dele flutua acima da caixa
+                    // e era cortado pela borda da seção.
+                    childrenPadding: const EdgeInsets.only(top: 10, bottom: 8),
                     expandedCrossAxisAlignment: CrossAxisAlignment.start,
                     title: const Text('Mais opções'),
                     subtitle: Text(_moreSummary(), style: TextStyle(color: Ind.textMuted, fontSize: 13)),

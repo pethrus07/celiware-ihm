@@ -249,11 +249,15 @@ class ElementConfigSheet extends StatelessWidget {
       case ElementType.gauge:
         w.add(const SectionHeader('Escala e faixas', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
         w.add(_MinMax(e: e, set: set, defaults: (0, 100)));
+        // "A partir de" vai na frase: no rótulo, metade da largura do
+        // celular, virava "Atenção a partir…".
+        w.add(const SizedBox(height: Ind.space));
+        w.add(Text('O arco fica amarelo e vermelho a partir destes valores. Vazio = sem faixa.', style: TextStyle(color: Ind.textDim)));
         w.add(const SizedBox(height: 10));
         w.add(Row(children: [
-          Expanded(child: _NumProp(label: 'Atenção a partir de', value: e.props['warn'] as num?, onChanged: (v) => set('warn', v), color: Ind.warn)),
+          Expanded(child: _NumProp(key: const ValueKey('faixa-atencao'), label: 'Atenção', value: e.props['warn'] as num?, onChanged: (v) => set('warn', v), color: Ind.warn)),
           const SizedBox(width: 10),
-          Expanded(child: _NumProp(label: 'Alarme a partir de', value: e.props['alarm'] as num?, onChanged: (v) => set('alarm', v), color: Ind.alarm)),
+          Expanded(child: _NumProp(key: const ValueKey('faixa-alarme-medidor'), label: 'Alarme', value: e.props['alarm'] as num?, onChanged: (v) => set('alarm', v), color: Ind.alarm)),
         ]));
       case ElementType.multistate:
         w.add(const SectionHeader('Estados', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
@@ -654,7 +658,7 @@ class _TextProp extends StatelessWidget {
 }
 
 class _NumProp extends StatelessWidget {
-  const _NumProp({required this.label, required this.value, required this.onChanged, this.color});
+  const _NumProp({super.key, required this.label, required this.value, required this.onChanged, this.color});
   final String label;
   final num? value;
   final ValueChanged<num?> onChanged;
@@ -743,19 +747,23 @@ class _StatesEditor extends StatelessWidget {
           key: ValueKey('estado-$i-${states.length}'),
           padding: const EdgeInsets.only(bottom: 8),
           child: Row(children: [
+            // Largo o bastante para "Código" não virar "Có…", e na mesma
+            // altura de linha do campo de texto ao lado (os dois alinhados).
             SizedBox(
-              width: 70,
+              width: 88,
               child: TextFormField(
+                key: ValueKey('estado-codigo-$i'),
                 initialValue: '${states[i]['value'] ?? ''}',
                 keyboardType: TextInputType.number,
-                style: Ind.number(16),
-                decoration: const InputDecoration(labelText: 'Código'),
+                style: Ind.number(16).copyWith(height: 1.5),
+                decoration: const InputDecoration(labelText: 'Código', contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 18)),
                 onChanged: (t) => update(i, 'value', int.tryParse(t.trim())),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: TextFormField(
+                key: ValueKey('estado-texto-$i'),
                 initialValue: '${states[i]['text'] ?? ''}',
                 decoration: const InputDecoration(labelText: 'Texto'),
                 textCapitalization: TextCapitalization.characters,

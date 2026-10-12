@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:logging/logging.dart';
 
 import 'app/app_scope.dart';
@@ -174,6 +175,12 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
         title: 'Ware IoT',
         debugShowCheckedModeBanner: false,
         theme: Ind.theme,
+        // Só português do Brasil: o que vem do próprio Flutter (licenças,
+        // dicas dos botões, copiar/colar, leitor de tela) segue o app, não
+        // o idioma do celular.
+        locale: const Locale('pt', 'BR'),
+        supportedLocales: const [Locale('pt', 'BR')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
         navigatorKey: _navigator,
         navigatorObservers: [AlarmBannerHost.observer],
         // Faixa de alarme acima de TODAS as telas: alarme só na tela que

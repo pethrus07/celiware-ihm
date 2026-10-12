@@ -72,7 +72,7 @@ class Tours {
         const TourStep(essential: true, title: 'Mesma rede', body: 'O celular precisa estar no mesmo Wi-Fi do equipamento.'),
       ]);
 
-  /// v2: o passo dos ícones do topo (ƒ e Criar várias), que chegaram na
+  /// v2: o passo dos ícones do topo (Σ e Criar várias), que chegaram na
   /// etapa 4 sem explicação.
   // Recursos de Mais: só texto, no "?" de cada página (não abrem sozinhos).
 
@@ -98,6 +98,6 @@ class Tours {
       TourSpec(id: 'variaveis', version: 2, title: 'Criar uma variável', steps: [
         TourStep(target: list, essential: true, title: 'Variáveis', body: 'Um nome para uma memória: "Velocidade" em vez de "registrador 2".'),
         TourStep(target: add, essential: true, title: 'Criar', body: 'Enquanto você digita o endereço, o app já mostra o valor lido.'),
-        TourStep(target: more, title: 'Outros jeitos', body: 'ƒ: variável que é uma conta com outras. Ao lado: várias de uma vez, por faixa (D0 a D99) ou planilha.'),
+        TourStep(target: more, title: 'Outros jeitos', body: 'Σ: variável que é uma conta com outras. Ao lado: várias de uma vez, por faixa (D0 a D99) ou planilha.'),
       ]);
 }

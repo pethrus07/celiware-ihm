@@ -200,7 +200,7 @@ void main() {
     unawaited(nav.push(MaterialPageRoute<Tag>(builder: (_) => CalcTagFormPage(tag: c.project.tag('calc_f')))));
     await live(tester, 900);
     await type(tester, '[Temperatura do motor] * 2');
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
     expect(find.byKey(const ValueKey('descartar-alteracoes')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('descartar')));

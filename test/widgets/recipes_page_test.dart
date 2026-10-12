@@ -116,7 +116,7 @@ void main() {
     await live(tester, 600);
 
     // Histórico de aplicações, no aparelho: quem, qual receita, como terminou.
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 600);
     await tester.tap(find.byKey(const ValueKey('historico-receitas')));
     await live(tester, 2500);
@@ -125,7 +125,7 @@ void main() {
     expect(find.textContaining('Receita aplicada'), findsOneWidget);
 
     // Na próxima, o nome já vem escrito; e Cancelar não grava nada.
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 600);
     final created2 = c.project.recipes.firstWhere((r) => r.name == 'Produto teste');
     memory().pokeRegister(hr, DemoMap.hrLabelLength, 200);

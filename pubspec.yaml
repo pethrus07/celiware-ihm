@@ -12,6 +12,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Textos do próprio Flutter em português (licenças, dicas dos botões,
+  # copiar/colar, leitor de tela). Sem isto saíam em inglês.
+  flutter_localizations:
+    sdk: flutter
 
   # Pasta privada do app, onde o projeto (.ihm.json) é salvo.
   path_provider: ^2.1.6

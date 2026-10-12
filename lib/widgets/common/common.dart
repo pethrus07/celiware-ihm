@@ -148,16 +148,27 @@ class ChoiceCards<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, box) {
       final cols = box.maxWidth < 340 ? 1 : columns;
-      final w = (box.maxWidth - (cols - 1) * 12) / cols;
-      return Wrap(
-        spacing: 12,
-        runSpacing: 12,
+      // Linha a linha, cada cartão com a altura do mais alto da linha: com
+      // uma explicação de duas linhas ao lado de uma de uma, os cartões
+      // ficavam desencontrados ("Na rede" × "Cabo USB").
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final o in options)
-            SizedBox(
-              width: w,
-              child: _ChoiceCard(option: o, selected: o.value == selected, onTap: () => onChanged(o.value)),
+          for (var i = 0; i < options.length; i += cols) ...[
+            if (i > 0) const SizedBox(height: 12),
+            IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                for (var j = i; j < i + cols; j++) ...[
+                  if (j > i) const SizedBox(width: 12),
+                  Expanded(
+                    child: j < options.length
+                        ? _ChoiceCard(option: options[j], selected: options[j].value == selected, onTap: () => onChanged(options[j].value))
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ]),
             ),
+          ],
         ],
       );
     });
@@ -252,7 +263,9 @@ class StepperField extends StatelessWidget {
             // sinal, só algarismos entram ("5020." virava erro no Salvar).
             inputFormatters: [if (min >= 0) FilteringTextInputFormatter.digitsOnly],
             style: Ind.number(20),
-            decoration: InputDecoration(labelText: label, helperText: helper),
+            // O campo divide a largura com − e +: a dica quebra em mais
+            // linhas que num campo inteiro, e não pode acabar em "…".
+            decoration: InputDecoration(labelText: label, helperText: helper, helperMaxLines: 6),
             onChanged: (_) => onChanged?.call(),
             validator: (t) {
               final v = int.tryParse(t ?? '');

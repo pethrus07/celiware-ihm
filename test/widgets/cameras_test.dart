@@ -143,6 +143,29 @@ void main() {
     await shutdown(tester, c);
   });
 
+  // QA visual de 12/10: o IP pela marca abria o teclado de letras, e o
+  // rótulo do "Fluxo leve" saía cortado no alto de "Mais opções".
+  testWidgets('cadastro: IP da marca com teclado de números; rótulo do fluxo leve inteiro em Mais opções', (tester) async {
+    final c = await boot(tester, const Project(name: 'P', devices: [prensa], screens: [tela]));
+    await openCameras(tester);
+    await tapKey(tester, 'nova-camera', wait: 700);
+    await tapKey(tester, 'marca-Hikvision');
+    final ip = tester.widget<TextField>(find.byKey(const ValueKey('campo-nome')));
+    expect(ip.keyboardType, const TextInputType.numberWithOptions(decimal: true));
+    await tester.enterText(find.byKey(const ValueKey('campo-nome')), '192.168.1.64');
+    await tapKey(tester, 'ok-nome');
+    expect(find.text('rtsp://192.168.1.64:554/Streaming/Channels/101'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Mais opções'));
+    await live(tester, 100);
+    await tester.tap(find.text('Mais opções'));
+    await live(tester, 900);
+    final header = tester.getRect(find.ancestor(of: find.text('Mais opções'), matching: find.byType(ListTile)).first);
+    final label = tester.getRect(find.descendant(of: find.byKey(const ValueKey('campo-fluxo-leve')), matching: find.text('Fluxo leve (substream)')));
+    expect(label.top, greaterThanOrEqualTo(header.bottom), reason: 'o rótulo flutua acima da caixa e a seção o cortava');
+    await shutdown(tester, c);
+  });
+
   testWidgets('tela cheia: conectando → ao vivo com o atraso; segundo plano e fechar soltam o player', (tester) async {
     vault.entries['ref1'] = '1234';
     final c = await boot(tester, const Project(name: 'P', devices: [prensa], screens: [tela], cameras: [cam]));

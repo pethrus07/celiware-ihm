@@ -206,27 +206,27 @@ void main() {
   testWidgets('EM-1: voltar sem mudança sai direto; com mudança pergunta, e continuar ou descartar funcionam', (tester) async {
     final c = await boot(tester);
     await open(tester, tag: c.project.tag('demo_vel'));
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 600);
     expect(find.byType(TagFormPage), findsNothing);
     expect(find.byKey(const ValueKey('descartar-alteracoes')), findsNothing);
 
     // Variável nova sem nada digitado também sai direto.
     await open(tester);
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 600);
     expect(find.byType(TagFormPage), findsNothing);
 
     await open(tester, tag: c.project.tag('demo_vel'));
     await tester.enterText(find.byKey(const ValueKey('campo-nome-variavel')), 'Velocidade da linha');
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
     expect(find.text('Descartar alterações?'), findsOneWidget);
     await tapKey(tester, 'continuar-editando', wait: 400);
     expect(find.byType(TagFormPage), findsOneWidget);
     expect(fieldText(tester, 'campo-nome-variavel'), 'Velocidade da linha');
 
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
     await tapKey(tester, 'descartar', wait: 600);
     expect(find.byType(TagFormPage), findsNothing);
@@ -243,7 +243,7 @@ void main() {
     await tapKey(tester, 'acrescentar-alarme');
     await tapKey(tester, 'alarmes-pronto', wait: 700);
 
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
     expect(find.textContaining('inclusive os alarmes'), findsOneWidget);
     await tapKey(tester, 'salvar-e-sair', wait: 600);
@@ -675,7 +675,7 @@ void main() {
     expect(find.byKey(const ValueKey('sugestao-endereco')), findsNothing);
     await reveal(tester, find.byKey(const ValueKey('campo-memoria')), up: true);
     expect(fieldText(tester, 'campo-memoria'), isNot(isEmpty), reason: 'o perfil dá nome ao endereço digitado');
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
     await tapKey(tester, 'descartar', wait: 600);
 

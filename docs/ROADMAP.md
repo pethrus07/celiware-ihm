@@ -123,6 +123,9 @@ emulador antes de seguir.
    junto o **pulo da tela** quando a faixa de alarme aparece (tudo desce
    ~70 dp e o toque seguinte cai no lugar errado — hoje amortecido porque
    todo comando pede confirmação): o espaço da faixa passa a ser reservado.
+   **Feito em 12/10 só para o diálogo:** com diálogo, folha ou menu aberto a
+   faixa entra por cima e não move nada; a tela em si ainda desce quando o
+   diálogo fecha (ou quando não há diálogo).
 2. **Miniatura real das telas.** A lista de telas mostra um desenho genérico;
    passar a mostrar a tela em miniatura, para reconhecer de relance.
 3. **Tablet com barra lateral e duas colunas.** Foi a pior nota do QA (4).

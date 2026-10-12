@@ -70,3 +70,4 @@ sim/.comando
 
 # Cópias de trabalho dos agentes do Claude Code (worktrees) — nunca vão para o git.
 .claude/
+tool/site/saida/

@@ -1,1 +1,15 @@
-{"name":"celiware-ihm-tools","private":true,"description":"Geradores da documentação (Word) a partir de docs/ARQUITETURA.md","dependencies":{"docx":"^9.7.2"}}
+{
+  "name": "celiware-ihm-tools",
+  "private": true,
+  "description": "Ferramentas do projeto: documentação em Word (gerar_docx.js) e conferência do site com Playwright (site/conferir_site.js)",
+  "dependencies": {
+    "docx": "^9.7.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
+  },
+  "scripts": {
+    "conferir-site": "node site/conferir_site.js",
+    "gerar-docx": "node gerar_docx.js"
+  }
+}

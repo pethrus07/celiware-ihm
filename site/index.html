@@ -57,9 +57,9 @@
     { "@type": "Question", "name": "Precisa de internet?",
       "acceptedAnswer": { "@type": "Answer", "text": "Não. O celular só precisa estar na mesma rede Wi-Fi da máquina. Internet só para baixar o app ou para ver a máquina de longe, pelo roteador 4G." } },
     { "@type": "Question", "name": "Quais CLPs e protocolos funcionam?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede. O app também fala Siemens S7, MQTT e a mensagem própria de um Arduino ou ESP. Esses três são novos: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede ou por um cabo USB-OTG ligado no celular. O app também fala Siemens S7, OPC UA (sem criptografia), MQTT e a mensagem própria de um Arduino ou ESP. Esses protocolos e o cabo USB são novos: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real." } },
     { "@type": "Question", "name": "Funciona com RS-485?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Sim, com um conversor RS-485 → Wi-Fi. O conversor fica ligado no fio da máquina e o celular conversa com ele pela rede." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "Sim, com um conversor RS-485 → Wi-Fi: ele fica ligado no fio da máquina e o celular conversa com ele pela rede. Ou com um cabo USB-OTG e um adaptador RS-485 ligados direto no celular (novo no app, ainda em conferência com equipamento real)." } },
     { "@type": "Question", "name": "Meus dados vão para a nuvem?",
       "acceptedAnswer": { "@type": "Answer", "text": "Não. Telas, variáveis e histórico ficam só no celular. Para levar o projeto para outro aparelho, você mesmo envia o arquivo, por WhatsApp, e-mail ou Drive." } },
     { "@type": "Question", "name": "Dá para ver a máquina de longe?",
@@ -236,11 +236,11 @@
         </details>
         <details>
           <summary>Quais CLPs e protocolos funcionam?</summary>
-          <div class="resposta"><p>Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede.</p><p>O app também fala Siemens S7, MQTT e a mensagem própria de um Arduino ou ESP. Esses três são novos: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real.</p></div>
+          <div class="resposta"><p>Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede ou por um cabo USB-OTG ligado no celular.</p><p>O app também fala Siemens S7, OPC UA (sem criptografia), MQTT e a mensagem própria de um Arduino ou ESP. Esses protocolos e o cabo USB são novos: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real.</p></div>
         </details>
         <details>
           <summary>Funciona com RS-485?</summary>
-          <div class="resposta"><p>Sim, com um conversor RS-485 → Wi-Fi. O conversor fica ligado no fio da máquina e o celular conversa com ele pela rede. <a href="como-conectar#rs485">Veja como ligar</a>.</p></div>
+          <div class="resposta"><p>Sim, com um conversor RS-485 → Wi-Fi: ele fica ligado no fio da máquina e o celular conversa com ele pela rede. Ou com um cabo USB-OTG e um adaptador RS-485 ligados direto no celular (novo no app, ainda em conferência com equipamento real). <a href="como-conectar#rs485">Veja como ligar</a>.</p></div>
         </details>
         <details>
           <summary>Meus dados vão para a nuvem?</summary>

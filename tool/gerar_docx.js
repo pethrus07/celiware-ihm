@@ -1,15 +1,16 @@
 /**
- * Gera docs/Documentacao_Tecnica_Celiware_IHM.docx a partir de docs/ARQUITETURA.md.
+ * Gera docs/Documentacao_Tecnica_Ware_IoT.docx a partir de docs/ARQUITETURA.md.
  *
  * O Markdown é a FONTE; o Word é derivado. Assim os dois nunca divergem:
  * mudou a documentação, edita o .md e roda `node tool/gerar_docx.js`.
  *
  * Subconjunto de Markdown entendido (o que ARQUITETURA.md usa):
- *   # Título (capa)   ## Seção   ### Subseção   parágrafo   **negrito**   `código`
+ *   # Título (capa)   ## Seção   ### Subseção   parágrafo   **negrito**   *itálico*   `código`
  *   - lista   1. lista numerada   > nota   ```bloco de código```
  *   | tabela |   ![legenda](imagens/x.png)  (imagens seguidas saem lado a lado)
  *
  * Uso: cd tool && npm install && node gerar_docx.js
+ * (Num worktree sem node_modules: NODE_PATH=<repositório>/tool/node_modules.)
  */
 const fs = require('fs');
 const path = require('path');
@@ -21,8 +22,10 @@ const {
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'docs', 'ARQUITETURA.md');
-const OUT = path.join(ROOT, 'docs', 'Documentacao_Tecnica_Celiware_IHM.docx');
-const VERSION = '1.3.2';
+const OUT = path.join(ROOT, 'docs', 'Documentacao_Tecnica_Ware_IoT.docx');
+// A versão vem do pubspec.yaml (a mesma do app), para o rodapé não ficar
+// para trás a cada versão nova.
+const VERSION = /^version:\s*([\d.]+)/m.exec(fs.readFileSync(path.join(ROOT, 'pubspec.yaml'), 'utf8'))[1];
 
 // Identidade (lib/core/theme/app_theme.dart) — versão para papel.
 const C = {
@@ -36,15 +39,18 @@ const MONO = 'Consolas';
 const PAGE_W = 11906, MARGIN = 1134; // A4, margens de 2 cm
 const CONTENT_W = PAGE_W - 2 * MARGIN;
 
-// ── Texto com **negrito** e `código` ─────────────────────────────────────────
+// ── Texto com **negrito**, *itálico* e `código` ──────────────────────────────
+// Itálico só com o asterisco colado no texto dos dois lados ("*Quando*"):
+// "[Velocidade] * 60" continua sendo uma conta, não vira itálico.
 function runs(text, base = {}) {
   const out = [];
-  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  const re = /(\*\*[^*]+\*\*|`[^`]+`|(?<![\w*])\*(?=[^\s*])[^*]+?(?<=[^\s*])\*(?![\w*]))/g;
   let last = 0, m;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(new TextRun({ text: text.slice(last, m.index), ...base }));
     const t = m[0];
     if (t.startsWith('**')) out.push(new TextRun({ text: t.slice(2, -2), bold: true, ...base }));
+    else if (t.startsWith('*')) out.push(new TextRun({ text: t.slice(1, -1), italics: true, ...base }));
     else out.push(new TextRun({ text: t.slice(1, -1), font: MONO, size: (base.size || 21) - 2, color: C.grafite, shading: { type: ShadingType.CLEAR, fill: C.code, color: 'auto' } }));
     last = m.index + t.length;
   }
@@ -132,6 +138,7 @@ function parse(md) {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   const blocks = [];
   let title = '', subtitle = '';
+  let steps = 0; // listas numeradas já vistas
   let i = 0;
   while (i < lines.length) {
     const l = lines[i];
@@ -173,7 +180,10 @@ function parse(md) {
       i++; continue;
     }
     if (/^\d+\. /.test(l)) {
-      blocks.push(new Paragraph({ numbering: { reference: 'steps', level: 0 }, spacing: { after: 60 }, children: runs(l.replace(/^\d+\. /, '')) }));
+      // Cada lista numerada recomeça do 1: uma instância de numeração por
+      // lista (sem isso a segunda lista do documento começava no 8).
+      if (!/^\d+\. /.test(lines[i - 1] || '')) steps++;
+      blocks.push(new Paragraph({ numbering: { reference: 'steps', level: 0, instance: steps }, spacing: { after: 60 }, children: runs(l.replace(/^\d+\. /, '')) }));
       i++; continue;
     }
     if (l.startsWith('> ')) {
@@ -200,12 +210,15 @@ function parse(md) {
 
 // ── Documento ────────────────────────────────────────────────────────────────
 const { title, subtitle, blocks } = parse(fs.readFileSync(SRC, 'utf8'));
-const productName = title.split('—')[0].trim().toUpperCase();
+// Sem caixa alta: "Ware IoT" perde o "o" minúsculo, que é parte do nome.
+const productName = title.split('—')[0].trim();
+// O título do Markdown já diz "Documentação Técnica": não repetir.
+const docTitle = /documenta/i.test(title) ? title : `${title} — Documentação Técnica`;
 
 const cover = [
   new Paragraph({ spacing: { before: 3000 }, children: [] }),
   new Paragraph({ children: [new TextRun({ text: productName, font: 'Calibri', bold: true, size: 72, color: C.ink })] }),
-  new Paragraph({ spacing: { after: 240 }, border: { bottom: { style: BorderStyle.SINGLE, size: 24, color: C.amber, space: 10 } }, children: [new TextRun({ text: 'IHM portátil no celular · Modbus TCP', size: 30, color: C.dim })] }),
+  new Paragraph({ spacing: { after: 240 }, border: { bottom: { style: BorderStyle.SINGLE, size: 24, color: C.amber, space: 10 } }, children: [new TextRun({ text: 'IHM portátil no celular · Modbus, Siemens S7, MQTT e Arduino', size: 30, color: C.dim })] }),
   new Paragraph({ spacing: { before: 480 }, children: [new TextRun({ text: 'Documentação Técnica', bold: true, size: 40, color: C.grafite })] }),
   new Paragraph({ children: [new TextRun({ text: 'Arquitetura • Comunicação • Telas • Manutenção', size: 24, color: C.dim })] }),
   new Paragraph({ spacing: { before: 2400 }, children: [new TextRun({ text: subtitle, size: 22, color: C.dim })] }),
@@ -218,7 +231,7 @@ const cover = [
 
 const doc = new Document({
   creator: 'Celiware',
-  title: `${title} — Documentação Técnica`,
+  title: docTitle,
   description: 'Gerado de docs/ARQUITETURA.md por tool/gerar_docx.js',
   features: { updateFields: true },
   styles: {

@@ -256,7 +256,7 @@ void main() {
 
   testWidgets('lista com 2.000 variáveis: monta e lê só as visíveis, e rola até a última', (tester) async {
     final runtime = _CountingRuntime();
-    final demo = DemoProject.build().devices.single;
+    final demo = DemoProject.build().equipment.single;
     final c = await boot(tester, runtime: runtime, project: Project(name: 'Grande', devices: [demo]));
     // 1000 registradores + 1000 bits: a memória da demonstração tem 1000 de cada.
     c.saveTags([

@@ -11,6 +11,7 @@ import '../../services/recipes/recipe_applier.dart';
 import '../../services/recipes/recipe_history.dart';
 import '../../services/recipes/recipe_logic.dart';
 import '../../services/runtime/hmi_runtime.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/write_actions.dart';
 import '../screens_page.dart' show askText;
@@ -320,7 +321,8 @@ class _RecipePageState extends State<RecipePage> {
           ),
         ],
       ),
-      body: ListView(
+      // No tablet, valores, Comparar e Aplicar com no máximo 640 dp (TB-3).
+      body: FormWidth(child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           if (machines.length > 1)
@@ -398,8 +400,8 @@ class _RecipePageState extends State<RecipePage> {
               ),
             ),
         ],
-      ),
-      bottomNavigationBar: SafeArea(
+      )),
+      bottomNavigationBar: FormWidth(child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(Ind.page, 8, Ind.page, 12),
           child: Row(children: [
@@ -422,7 +424,7 @@ class _RecipePageState extends State<RecipePage> {
             ),
           ]),
         ),
-      ),
+      )),
     );
   }
 }

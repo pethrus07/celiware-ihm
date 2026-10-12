@@ -86,8 +86,15 @@ void main() {
   });
 
   test('projeto antigo (sem calculada nem regra) abre e grava igual, schemaVersion 1', () {
+    // A demonstração de hoje traz uma calculada e uma regra de exemplo: sem
+    // elas, é o projeto de antes da etapa 4.
     final demo = DemoProject.build();
-    final old = jsonDecode(utf8.decode(ProjectRepository.encode(demo))) as Map<String, dynamic>;
+    final before = demo.copyWith(
+      devices: demo.equipment,
+      tags: [for (final t in demo.tags) if (!t.isCalc) t.copyWith(ruleWritable: false)],
+      rules: const [],
+    );
+    final old = jsonDecode(utf8.decode(ProjectRepository.encode(before))) as Map<String, dynamic>;
     expect(old.containsKey('rules'), isFalse);
     expect(jsonEncode(old).contains('"calc"'), isFalse);
     expect(jsonEncode(old).contains('ruleWritable'), isFalse);
@@ -99,7 +106,7 @@ void main() {
   test('projeto com calculada e regra passa pelo arquivo', () {
     final demo = DemoProject.build();
     final p = demo.copyWith(
-      devices: [...demo.devices, CalcDevice.device],
+      devices: [...demo.equipment, CalcDevice.device],
       tags: [
         ...demo.tags,
         const Tag(id: 'c', name: 'Dobro', deviceId: CalcDevice.id, dataType: TagDataType.float32, calc: CalcSpec(expression: '{demo_vel} * 2')),

@@ -17,11 +17,13 @@ import '../../services/calc/calc_expression.dart';
 import '../../services/calc/calc_graph.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../services/runtime/tag_store.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/live_tags.dart';
 import 'alarm_editor.dart';
 import 'calc_expression_field.dart';
 import 'narration_editor.dart';
+import 'tag_uses.dart';
 
 enum _Leave { save, discard, keep }
 
@@ -235,20 +237,11 @@ class _CalcTagFormPageState extends State<CalcTagFormPage> {
     });
   }
 
+  /// O mesmo aviso do cadastro de variável: telas, contas e regras que usam
+  /// esta calculada.
   Future<void> _delete() async {
     final c = AppScope.of(context).controller;
-    final uses = c.project.screensUsingTag(_id);
-    final feeds = [for (final t in c.project.tags) if (t.calc?.inputIds.contains(_id) ?? false) t.name];
-    if (!await confirmDelete(
-      context,
-      title: 'Apagar "${widget.tag!.name}"?',
-      body: [
-        uses.isEmpty ? 'A variável sai do projeto.' : 'Ela é usada em: ${uses.map((s) => s.name).join(', ')}. Esses elementos vão ficar pedindo "Escolha a variável".',
-        if (feeds.isNotEmpty) 'Ela entra na conta de: ${feeds.join(', ')}. Essas contas vão dar erro até serem corrigidas.',
-      ].join(' '),
-    )) {
-      return;
-    }
+    if (!await confirmDelete(context, title: 'Apagar "${widget.tag!.name}"?', body: TagUse.deleteNotice(c.project, _id))) return;
     c.deleteTag(_id);
     if (mounted) Navigator.pop(context);
   }
@@ -283,18 +276,22 @@ class _CalcTagFormPageState extends State<CalcTagFormPage> {
               if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
             ],
           ),
-          bottomNavigationBar: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: FilledButton.icon(
-                key: const ValueKey('salvar-calculada'),
-                onPressed: _save,
-                icon: const Icon(Icons.check_rounded),
-                label: const Text('Salvar'),
+          // No tablet, campos e Salvar com no máximo 640 dp (TB-3), como no
+          // cadastro de variável.
+          bottomNavigationBar: FormWidth(
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: FilledButton.icon(
+                  key: const ValueKey('salvar-calculada'),
+                  onPressed: _save,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Salvar'),
+                ),
               ),
             ),
           ),
-          body: Form(
+          body: FormWidth(child: Form(
             key: _form,
             autovalidateMode: _autovalidate,
             child: Column(children: [
@@ -354,7 +351,7 @@ class _CalcTagFormPageState extends State<CalcTagFormPage> {
                 ),
               ),
             ]),
-          ),
+          )),
         ),
       ),
     );

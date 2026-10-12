@@ -14,6 +14,7 @@ import '../../services/calc/calc_evaluator.dart';
 import '../../services/calc/calc_expression.dart';
 import '../../services/calc/calc_graph.dart';
 import '../../services/runtime/tag_store.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/live_tags.dart';
 import '../tags/calc_expression_field.dart';
@@ -286,13 +287,14 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
               if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
             ],
           ),
-          bottomNavigationBar: SafeArea(
+          // No tablet, campos e Salvar com no máximo 640 dp (TB-3).
+          bottomNavigationBar: FormWidth(child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: FilledButton.icon(key: const ValueKey('salvar-regra'), onPressed: _save, icon: const Icon(Icons.check_rounded), label: const Text('Salvar')),
             ),
-          ),
-          body: Form(
+          )),
+          body: FormWidth(child: Form(
             key: _form,
             autovalidateMode: _autovalidate,
             child: ListView(
@@ -367,7 +369,7 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
                 ),
               ],
             ),
-          ),
+          )),
         ),
       ),
     );

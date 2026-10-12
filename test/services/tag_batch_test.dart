@@ -6,6 +6,7 @@ import 'package:ihm/app/project_controller.dart';
 import 'package:ihm/core/modbus/modbus_memory.dart';
 import 'package:ihm/models/alarm.dart';
 import 'package:ihm/models/device.dart';
+import 'package:ihm/models/narration.dart';
 import 'package:ihm/models/project.dart';
 import 'package:ihm/models/tag.dart';
 import 'package:ihm/models/vendor_profiles.dart';
@@ -151,6 +152,27 @@ void main() {
       final over = replace.firstWhere((t) => t.address == 5);
       expect((over.id, over.name, over.dataType, over.memory), ('ja', 'D5', TagDataType.int16, 'D5'));
       expect(over.alarms.single.id, 'a1');
+    });
+
+    test('substituir mantém também as narrações, a marca de escrita por regra e a memória do manual', () {
+      final marked = Tag(
+        id: 'ja',
+        name: 'Velocidade',
+        deviceId: _h3u.id,
+        address: 5,
+        writable: true,
+        memory: 'D5',
+        ruleWritable: true,
+        narrations: const [EventNarration(id: 'n1', value: 3, text: 'Etapa três')],
+      );
+      final p = _project.copyWith(tags: [marked]);
+      final over = _range(_h3u, 'D', '5', '5', writable: true, project: p).resolve(ConflictPolicy.replace).single;
+      expect((over.id, over.name, over.memory), ('ja', 'D5', 'D5'));
+      expect(over.acceptsRuleWrite, isTrue, reason: 'a regra que grava aqui continua valendo');
+      expect(over.narrations.single.id, 'n1');
+      // CSV com o endereço Modbus direto (sem memória do manual): fica o "D5" da antiga.
+      final csv = _csv('HR 5;Velocidade nova;;sim', project: p).resolve(ConflictPolicy.replace).single;
+      expect((csv.id, csv.name, csv.memory, csv.ruleWritable, csv.narrations.length), ('ja', 'Velocidade nova', 'D5', true, 1));
     });
 
     test('bit de registrador só conflita com o mesmo bit', () {

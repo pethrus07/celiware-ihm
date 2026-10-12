@@ -44,6 +44,12 @@ Troque só o marcador, por um endereço **sem `?`**. Se o endereço do produto j
 tiver `?`, troque o `?` do rastreio por `&` nesses links. Os links da Play levam
 o mesmo rastreio no parâmetro `referrer` (aparece no Play Console, em Aquisição).
 
+**Instituto Automação** (item 184 da lista do cliente). Um link discreto,
+"Quero aprender automação", no fim das perguntas do início e no fim dos
+tutoriais, para `https://institutoautomacao.com.br/` com o mesmo rastreio
+(`utm_campaign=ware-iot`, `utm_medium` = página, `utm_content` = posição). Já é o
+endereço definitivo: não há marcador para trocar.
+
 **Nunca escreva preço nem nome comercial de produto no site.** O preço fica na
 loja. Os cartões usam descrições genéricas de propósito.
 

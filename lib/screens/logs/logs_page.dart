@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../models/log_group.dart';
 import '../../models/tag.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import 'log_history_page.dart';
 
@@ -44,7 +45,8 @@ class LogsPage extends StatelessWidget {
                   label: const Text('Criar registro'),
                 ),
               )
-            : ListView(
+            // No tablet, a coluna dos registros não estica até a borda (TB-3).
+            : FormWidth(child: ListView(
                 padding: const EdgeInsets.only(top: 8, bottom: 100),
                 children: [
                   if (scope.logger.problem != null)
@@ -60,7 +62,7 @@ class LogsPage extends StatelessWidget {
                         style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.4)),
                   ),
                 ],
-              ),
+              )),
       ),
     );
   }

@@ -46,8 +46,9 @@ enum ConflictPolicy {
   /// Deixa a que existe como está e não cria a nova.
   skip,
 
-  /// A que existe ganha a definição nova, mas **mantém o id e os alarmes**:
-  /// os elementos de tela que apontavam para ela continuam ligados.
+  /// A que existe ganha a definição nova, mas **mantém o id, os alarmes, as
+  /// narrações e a marca "Aceita escrita por regra"**: telas, contas e regras
+  /// que apontavam para ela continuam ligadas e funcionando.
   replace,
 }
 
@@ -87,7 +88,11 @@ class TagBatch {
             _over(i.existing!, i.tag),
       ];
 
-  /// A definição nova no lugar da antiga, com o id e os alarmes da antiga.
+  /// A definição nova no lugar da antiga, com o que a pessoa configurou na
+  /// antiga: id, alarmes, narrações e a permissão de escrita por regra (sem
+  /// ela, a regra que grava aqui pararia em silêncio). A memória do manual
+  /// vem da nova; se a nova não tem (endereço Modbus direto), fica a da
+  /// antiga — o conflito é no mesmo endereço, então o nome continua certo.
   static Tag _over(Tag old, Tag t) => Tag(
         id: old.id,
         name: t.name,
@@ -105,7 +110,9 @@ class TagBatch {
         offset: t.offset,
         description: t.description,
         alarms: old.alarms,
-        memory: t.memory,
+        narrations: old.narrations,
+        memory: t.memory ?? old.memory,
+        ruleWritable: old.ruleWritable,
       ).normalized();
 }
 

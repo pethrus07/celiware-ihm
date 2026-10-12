@@ -57,7 +57,7 @@ upgrade de R$ [valor].
 |---|---|---|---|
 | 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | **Feito (1.3.2).** Falta a prova em celular real com Wi-Fi sem internet + 4G. |
 | 1 | Publicação na Play Store | reunião | Falta. Roteiro em `PUBLICACAO.md`; decidir o `applicationId` antes do 1º envio. |
-| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100). Falta publicar: links da loja, e-mail e domínio (marcadores no `site/README.md`). |
+| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100), com o link "Quero aprender automação" para o Instituto (item 184) e os protocolos novos marcados como ainda sem teste em equipamento real (12/10). Falta publicar: links da loja, e-mail e domínio (marcadores no `site/README.md`). |
 | 3 | ~~Versão para Windows do próprio app~~ — **adiada em 11/10/2026** (decisão do Pedro) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
 | 4 | Grade maior e mais variáveis por tela | reunião | **Feito:** grade fina 6 ↔ 12 colunas, mover e redimensionar sem arrastar, Tabela de valores (até 30 variáveis), ≥ 40 variáveis numa tela de celular (GR-1 a GR-10). |
 | 5 | Correções no "editar memória" | 2, 11 · reunião | **Feito:** nada se perde calado, sugestões de sinal e CDAB, hexadecimal, bit de registrador de entrada (EM-1 a EM-12). |

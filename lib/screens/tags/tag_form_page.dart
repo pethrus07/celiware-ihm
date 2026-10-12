@@ -848,16 +848,11 @@ class _TagFormPageState extends State<TagFormPage> {
     });
   }
 
+  /// Antes de apagar, diz o que deixa de funcionar: elementos de tela, contas
+  /// de calculadas e regras que usam a variável.
   Future<void> _delete() async {
     final c = AppScope.of(context).controller;
-    final uses = c.project.screensUsingTag(_id);
-    if (!await confirmDelete(context,
-        title: 'Apagar "${widget.tag!.name}"?',
-        body: uses.isEmpty
-            ? 'A variável sai do projeto.'
-            : 'Ela é usada em: ${uses.map((s) => s.name).join(', ')}. Esses elementos vão ficar pedindo "Escolha a variável".')) {
-      return;
-    }
+    if (!await confirmDelete(context, title: 'Apagar "${widget.tag!.name}"?', body: TagUse.deleteNotice(c.project, _id))) return;
     c.deleteTag(_id);
     if (mounted) Navigator.pop(context);
   }

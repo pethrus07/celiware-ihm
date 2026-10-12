@@ -50,7 +50,7 @@ tool/             Gerador de ícone, da documentação em Word e do vídeo de ap
 | Arquivo | Conteúdo |
 |---|---|
 | `docs/ARQUITETURA.md` | Documentação técnica completa: arquitetura, comunicação, modelo de dados, telas, tutoriais, padrões, manutenção, código crítico. |
-| `docs/Documentacao_Tecnica_Celiware_IHM.docx` | O mesmo documento em Word (gerado de `ARQUITETURA.md` por `node tool/gerar_docx.js`). |
+| `docs/Documentacao_Tecnica_Ware_IoT.docx` | O mesmo documento em Word (gerado de `ARQUITETURA.md` por `node tool/gerar_docx.js`). |
 | `docs/SIMULACAO.md` | Como testar sem equipamento: demonstração, simulador Python, Modbus Slave, celular por Wi-Fi. |
 | `docs/PUBLICACAO.md` | Roteiro da Play Store (conta, chave, pacote, ficha). |
 | `docs/ROADMAP.md` | Versões entregues e tudo o que ainda falta fazer. |

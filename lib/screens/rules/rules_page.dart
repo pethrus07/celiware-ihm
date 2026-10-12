@@ -7,6 +7,7 @@ import '../../models/project.dart';
 import '../../services/calc/calc_graph.dart';
 import '../../services/rules/rule_engine.dart';
 import '../../services/runtime/tag_codec.dart';
+import '../../widgets/common/adaptive.dart';
 import 'rule_editor_page.dart';
 
 /// Mais → Regras (LG-4 a LG-7): "quando [condição] durar [T s], então gravar
@@ -56,7 +57,8 @@ class RulesPage extends StatelessWidget {
         icon: const Icon(Icons.add_rounded),
         label: const Text('Nova regra'),
       ),
-      body: ListenableBuilder(
+      // No tablet, a coluna das regras não estica até a borda (TB-3, como Mais).
+      body: FormWidth(child: ListenableBuilder(
         listenable: engine ?? scope.controller,
         builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(Ind.page, 8, Ind.page, 110),
@@ -77,7 +79,7 @@ class RulesPage extends StatelessWidget {
             ],
           ],
         ),
-      ),
+      )),
     );
   }
 

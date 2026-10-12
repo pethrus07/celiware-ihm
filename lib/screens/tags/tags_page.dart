@@ -43,6 +43,7 @@ class TagsPage extends StatefulWidget {
 class _TagsPageState extends State<TagsPage> {
   final _listKey = GlobalKey();
   final _addKey = GlobalKey();
+  final _moreKey = GlobalKey();
   final _panes = GlobalKey<ListDetailState>();
 
   /// Item do painel para o cadastro novo (não colide com id de variável).
@@ -68,7 +69,7 @@ class _TagsPageState extends State<TagsPage> {
 
     return VisibleLiveTags(
       child: TourHost(
-        spec: Tours.variaveis(list: _listKey, add: _addKey),
+        spec: Tours.variaveis(list: _listKey, add: _addKey, more: _moreKey),
         // Só pelo "?" ou por Mais → Tutoriais (ver DevicesPage).
         autoStart: false,
         forceStart: widget.startTour,
@@ -83,20 +84,27 @@ class _TagsPageState extends State<TagsPage> {
           ),
           list: Scaffold(
             appBar: AppBar(title: const Text('Variáveis'), actions: [
-              // Variável que sai de uma conta com outras (§9.5): mora num
-              // cadastro próprio, sem endereço.
-              IconButton(
-                key: const ValueKey('nova-calculada'),
-                tooltip: 'Nova variável calculada',
-                icon: const Icon(Icons.functions_rounded),
-                onPressed: () => _panes.currentState?.open(_novaCalculada, (_) => const CalcTagFormPage()),
-              ),
-              IconButton(
-                key: const ValueKey('criar-varias'),
-                tooltip: 'Criar várias',
-                icon: const Icon(Icons.playlist_add_rounded),
-                // Faixa de memória é coisa de Modbus: sem equipamento Modbus, nada a criar.
-                onPressed: project.devices.any((d) => d.usesModbusMemory) ? () => _createMany(context) : null,
+              // Os dois jeitos de criar além do "Nova variável", juntos: o
+              // tutorial realça os dois num passo só.
+              KeyedSubtree(
+                key: _moreKey,
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  // Variável que sai de uma conta com outras (§9.5): mora num
+                  // cadastro próprio, sem endereço.
+                  IconButton(
+                    key: const ValueKey('nova-calculada'),
+                    tooltip: 'Nova variável calculada',
+                    icon: const Icon(Icons.functions_rounded),
+                    onPressed: () => _panes.currentState?.open(_novaCalculada, (_) => const CalcTagFormPage()),
+                  ),
+                  IconButton(
+                    key: const ValueKey('criar-varias'),
+                    tooltip: 'Criar várias',
+                    icon: const Icon(Icons.playlist_add_rounded),
+                    // Faixa de memória é coisa de Modbus: sem equipamento Modbus, nada a criar.
+                    onPressed: project.devices.any((d) => d.usesModbusMemory) ? () => _createMany(context) : null,
+                  ),
+                ]),
               ),
               const HelpButton(),
             ]),

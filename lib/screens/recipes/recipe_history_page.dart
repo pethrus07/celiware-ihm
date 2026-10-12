@@ -5,6 +5,7 @@ import '../../app/app_scope.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/recipes/recipe_applier.dart';
 import '../../services/recipes/recipe_history.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 
 /// Histórico de aplicações (RC-7): quem aplicou qual receita, onde, quando e
@@ -64,7 +65,8 @@ class _RecipeHistoryPageState extends State<RecipeHistoryPage> {
               padding: const EdgeInsets.fromLTRB(Ind.page, 20, Ind.page, 0),
               child: Text('Fica só neste aparelho; não vai junto com o projeto.', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
             ));
-            return ListView(padding: const EdgeInsets.only(bottom: 32), children: children);
+            // No tablet, a coluna não estica até a borda (TB-3).
+            return FormWidth(child: ListView(padding: const EdgeInsets.only(bottom: 32), children: children));
           },
         ),
       );

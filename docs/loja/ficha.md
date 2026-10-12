@@ -49,7 +49,7 @@ contra `docs/ARQUITETURA.md` em 12/10/2026):
 | Testar conexão com o que conferir | §6.5, §4.14 |
 | Notação de Inovance, INVT, WEG, Delta, MD500, GD20 | §6.6 "Memória do CLP"; **validação em bancada pendente** — por isso "confira com o manual do seu modelo" |
 | Criar várias por faixa ou CSV | §6.6, IF-1 a IF-5 |
-| RTU/ASCII por conversor, S7, MQTT, cru | §4.15–4.18; **nenhum testado em equipamento real** — por isso "novos nesta versão e ainda estão sendo conferidos" |
+| RTU/ASCII por conversor ou cabo USB-OTG, S7, MQTT, cru | §4.15–4.18 e §4.20; **nenhum testado em equipamento real** (o USB só com porta simulada) — por isso "novos nesta versão e ainda estão sendo conferidos" |
 | ISA-18.2, faixa, marca, vibração, reconhecer, histórico | §6.8 |
 | Voz no fone com fila e narração | §6.9 |
 | Registro, gráfico e CSV | §6.10 |
@@ -57,12 +57,12 @@ contra `docs/ARQUITETURA.md` em 12/10/2026):
 | Calculadas e regras que perguntam antes | §6.12 |
 | Tutoriais, claro e escuro, tablet | §7, §8, §6.13 |
 | Só com o app aberto; não é função de segurança (NR-12) | §6.8–6.12 "Limite desta versão"; §6.12 (PS-7) |
-| Serial só por conversor | USB-OTG ainda não existe (§4.15) |
+| Serial por conversor ou cabo USB-OTG | §4.15 e §4.20 (USB: `uses-feature` opcional, sem permissão nova; adaptador validado só com porta simulada) |
 
 Ficou de fora de propósito: a correção do Wi-Fi sem internet com dados móveis
 ligados (1.3.2) ainda não foi provada num celular de verdade; a descrição fala
-só do que o "Testar conexão" mostra. **Quando o USB-OTG ou as câmeras
-entrarem, a linha "Equipamento só serial precisa de um conversor" muda.**
+só do que o "Testar conexão" mostra. A linha do serial já cita o cabo USB-OTG (12/10). **Quando as câmeras
+entrarem, mudam a descrição, a política e o formulário de Segurança dos dados.**
 
 ### Palavras para busca
 

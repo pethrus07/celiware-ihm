@@ -25,7 +25,7 @@ class PrivacyPage extends StatelessWidget {
       'Nada disso é enviado para nós nem para ninguém. Com o backup do Android ligado, o próprio Android pode guardar uma cópia do projeto, dos históricos e das preferências na sua conta Google, como faz com os outros apps; os registros de dados ficam de fora. Para apagar tudo, desinstale o app ou limpe os dados dele nos ajustes do Android.',
     ]),
     ('A rede local', [
-      'O app conversa com os equipamentos que você cadastrar (CLP, inversor, conversor, broker), no endereço que você informar. A conversa vai direto do celular para o equipamento, pela sua rede ou pela VPN que você configurar, sem passar por servidor nosso.',
+      'O app conversa com os equipamentos que você cadastrar (CLP, inversor, conversor, broker), no endereço que você informar ou pelo cabo USB ligado ao celular. A conversa vai direto do celular para o equipamento, pela sua rede, pela VPN que você configurar ou pelo cabo, sem passar por servidor nosso.',
       'O app também consulta em qual Wi-Fi o celular está, para usar a rede da máquina e avisar quando a faixa de IP é diferente. Isso não sai do aparelho.',
     ]),
     ('Arquivos', [

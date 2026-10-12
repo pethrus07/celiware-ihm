@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Modbus TCP é socket de rede: sem esta permissão NO MANIFESTO PRINCIPAL
          o app de loja (release) não conecta em nada. Nos apps anteriores
          (machine_monitor, InoRobot) ela só existia no manifesto de debug —
@@ -15,6 +16,10 @@
          só não aparece funcionando. A permissão de cada adaptador é pedida
          na hora de usar (PortaSerialUsb.kt), não aqui. -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
+    <!-- O ExoPlayer (câmeras, CameraRtsp.kt) declara WAKE_LOCK para o modo que
+         mantém o aparelho acordado tocando; a câmera não usa esse modo (fecha
+         o vídeo ao sair da tela), então a permissão não entra no app. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove"/>
 
     <!-- Backup: o histórico dos registros fica de fora (res/xml/*_rules.xml).
          O projeto entra: trocar de celular não pode perder as telas. -->

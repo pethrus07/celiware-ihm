@@ -56,7 +56,7 @@ upgrade de R$ [valor].
 | # | Item | Da lista dele / da reunião | Estado (11/10, noite) |
 |---|---|---|---|
 | 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | **Feito (1.3.2).** Falta a prova em celular real com Wi-Fi sem internet + 4G. |
-| 1 | Publicação na Play Store | reunião | Falta. Roteiro em `PUBLICACAO.md`; decidir o `applicationId` antes do 1º envio. |
+| 1 | Publicação na Play Store | reunião | **Lado técnico pronto (12/10):** `.aab` de loja com portões (sem chave de upload não sai), alvo 36, 16 KB, privacidade no app, ficha pt-BR, gráfico de recursos, 8 capturas de celular e 5 de tablet, formulários (`docs/loja/`). Falta o que é do dono, na ordem de `PUBLICACAO.md`: decisões (identificador, grátis é definitivo), site no ar, D-U-N-S, conta de organização, chave de upload. |
 | 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100), com o link "Quero aprender automação" para o Instituto (item 184) e os protocolos novos marcados como ainda sem teste em equipamento real (12/10). Falta publicar: links da loja, e-mail e domínio (marcadores no `site/README.md`). |
 | 3 | ~~Versão para Windows do próprio app~~ — **adiada em 11/10/2026** (decisão do Pedro) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
 | 4 | Grade maior e mais variáveis por tela | reunião | **Feito:** grade fina 6 ↔ 12 colunas, mover e redimensionar sem arrastar, Tabela de valores (até 30 variáveis), ≥ 40 variáveis numa tela de celular (GR-1 a GR-10). |
@@ -158,12 +158,13 @@ Pequenos, nenhum atrapalha a apresentação.
 
 ## Publicação — etapa 3 (Play Store)
 
-Roteiro completo em `PUBLICACAO.md`.
+Roteiro completo em `PUBLICACAO.md`; ficha, imagens e formulários prontos em `docs/loja/`.
 
 - Conta de desenvolvedor **de organização** em nome da Celiware (pede D-U-N-S).
 - Chave de upload (credencial permanente — criar e guardar no cofre).
-- Ficha da loja: textos, capturas, ícone, política de privacidade.
-- Teste fechado com o cliente antes de abrir ao público.
+- Teste interno com o cliente antes de abrir ao público. Quem tem o APK do
+  WhatsApp precisa exportar o projeto, desinstalar e instalar pela loja (a
+  assinatura muda).
 
 ## Campo e fabricantes
 

@@ -1,0 +1,44 @@
+O Ware IoT transforma o celular na IHM da sua máquina. Você cadastra o equipamento pelo IP, dá nome às memórias que interessam e monta a tela de operação com botões, lâmpadas, mostradores e gráficos. Tudo fica salvo no aparelho e pode ser enviado para outro celular pelo WhatsApp, e-mail ou Drive.
+
+Abra e veja funcionando: o app já vem com uma máquina de demonstração, uma cortadora de rótulos simulada no próprio celular, com telas, alarmes e receitas prontos. Não precisa de equipamento para conhecer.
+
+Para quem
+• Integrador e programador de CLP (PLC): deixa o mapa de memória pronto no CLP, monta as telas no celular e entrega o arquivo do projeto ao cliente.
+• Dono e líder de produção: acompanha as máquinas numa tela só de acompanhamento, com os números que importam.
+• Operador: liga, desliga e ajusta parâmetros pela tela montada.
+
+Montar a tela
+• 12 elementos: botão, lâmpada, mostrador, ajuste de valor, indicador de estado, barra, medidor, gráfico de tendência, gráfico de barras, tabela de valores, texto e imagem.
+• Grade que encaixa: tocar, mover e redimensionar, sem sobrepor. Na grade fina cabem 40 valores ou mais numa tela de celular.
+• O valor aparece ao vivo enquanto você configura a variável, então dá para conferir o endereço na hora.
+• Escala (o equipamento manda 752, a tela mostra 75,2 °C), texto ASCII, botão com retorno da máquina, troca de tela e imagem por etapa, inclusive de um PDF.
+• Segurança ao gravar: confirmação antes de enviar, tela só de acompanhamento, limites no ajuste e botão de pulso que nunca fica preso.
+
+Conectar
+• Modbus TCP com CLP, inversor, IHM ou conversor que fale o protocolo.
+• O Testar conexão diz o que conferir quando não conecta: o Wi-Fi, a faixa de IP, a porta e o Modbus ligado no equipamento.
+• Notação do fabricante: com Inovance H3U e H5U, INVT IVC1 e IVC3, WEG TPW04, Delta DVP e os inversores MD500 e GD20, você digita D200 e o app acha o endereço Modbus. Os mapas seguem os manuais; confira com o do seu modelo.
+• Criar várias variáveis de uma vez, por faixa (D0 a D99) ou por planilha CSV.
+• Também fala Modbus RTU e ASCII através de conversor RS-485 para rede, Siemens S7 (S7-300, 400, 1200 e 1500, com PUT/GET), MQTT 3.1.1 e mensagem própria por TCP ou UDP (Arduino, ESP). Esses protocolos são novos nesta versão e ainda estão sendo conferidos em equipamento real: teste com o seu antes de usar na produção.
+
+Alarmes
+• Três prioridades com cor, forma e número, como pede a ISA-18.2: faixa no topo de todas as telas, marca no próprio elemento, vibração, reconhecimento e histórico.
+• Aviso por voz no fone de ouvido, com fila por prioridade, e narração de eventos ("a cortadora parou").
+
+Dados da produção
+• Registro periódico das variáveis no celular, com histórico em gráfico e planilha CSV para o Excel.
+• Receitas: guarde os ajustes de cada produto, compare com o que está na máquina e aplique com uma confirmação, vendo o que vai mudar.
+• Variáveis calculadas, com contas entre variáveis de várias máquinas, e regras "quando… então…" que perguntam antes de gravar.
+
+Também
+• Tutoriais dentro do app, tema claro e escuro, e telas próprias para tablet, com a lista e o cadastro lado a lado.
+
+Bom saber
+• Alarmes, voz, registro e regras funcionam com o app aberto. Com o app fechado, a leitura para.
+• O Ware IoT não é função de segurança: não substitui intertravamentos, botão de emergência nem as proteções da NR-12. A segurança da máquina continua no CLP.
+• O celular fala com o equipamento pela rede (Wi-Fi, cabo ou VPN). Equipamento só serial precisa de um conversor RS-485 para rede.
+
+Privacidade
+Sem conta, sem anúncio e sem rastreamento. O projeto fica no celular, e o app conversa só com os equipamentos que você cadastrar.
+
+Powered by Celiware.

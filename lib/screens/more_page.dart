@@ -19,6 +19,7 @@ import '../widgets/tour/tour.dart';
 import 'devices/devices_page.dart';
 import 'editor/screen_editor_page.dart';
 import 'logs/logs_page.dart';
+import 'privacy_page.dart';
 import 'recipes/recipes_page.dart';
 import 'rules/rules_page.dart';
 import 'screen_run_page.dart';
@@ -160,6 +161,14 @@ class MorePage extends StatelessWidget {
             title: const Text('${AppInfo.name} · versão ${AppInfo.version}'),
             subtitle: const Text('Powered by ${AppInfo.company}'),
             onTap: () => showLicensePage(context: context, applicationName: AppInfo.name, applicationVersion: AppInfo.version),
+          ),
+          // A Play pede a política também dentro do app (PS-5).
+          ListTile(
+            key: const ValueKey('privacidade'),
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacidade'),
+            subtitle: const Text('Sem conta, sem anúncio, sem rastreamento'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPage())),
           ),
         ],
       )),

@@ -1,0 +1,15 @@
+# Modelo da assinatura de release do Ware IoT (Play Store).
+#
+# Copie para android/key.properties (mesmo lugar, sem o ".exemplo") e preencha.
+# O key.properties e a chave (.jks) NUNCA vão para o git (.gitignore): ficam
+# na máquina de quem gera o pacote e, as duas coisas, no cofre de credenciais.
+# Criar a chave e onde guardar: docs/PUBLICACAO.md, passo 4.
+#
+# Sem o key.properties:
+#   - flutter build appbundle  → para com o aviso (a loja recusa a chave de debug);
+#   - flutter build apk        → sai assinado com a chave de debug, só para teste.
+
+storeFile=C:/Users/SEU_USUARIO/chaves/ware-iot-upload.jks
+storePassword=SENHA_DA_CHAVE
+keyAlias=upload
+keyPassword=SENHA_DA_CHAVE

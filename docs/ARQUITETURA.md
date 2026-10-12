@@ -184,6 +184,7 @@ lib/
 │   ├── recipes/                      Receitas: lista, receita, tipo e máquina, aplicar, histórico.
 │   ├── rules/                        Regras: lista com o estado de cada uma e cadastro.
 │   ├── more_page.dart                Projeto, registros, receitas, regras, tutoriais, sobre.
+│   ├── privacy_page.dart             Política de privacidade em texto (Mais → Sobre), a mesma do site.
 │   └── tours.dart                    Textos de todas as trilhas de tutorial.
 └── widgets/
     ├── hmi/
@@ -200,8 +201,9 @@ lib/
 
 sim/            Simulador Modbus TCP externo (Python) — ver SIMULACAO.md.
 test/           Testes: protocolo, TCP real, codec, planejador, runtime, fluxos de tela.
-tool/           Gerador de ícone e da documentação em Word; bench/ mede a rolagem em modo profile (§8).
-store/          Material da Play Store (ícone 512).
+tool/           Gerador de ícone e da documentação em Word; bench/ mede a rolagem em modo profile (§8); loja/ gera e confere as imagens e os textos da Play.
+store/          Ícone 512 da Play Store.
+docs/loja/      Ficha da Play (textos, imagens, formulários); roteiro em docs/PUBLICACAO.md.
 ```
 
 ## 4. Comunicação Modbus
@@ -608,7 +610,7 @@ Na escolha de variável do editor, a lista é **agrupada por equipamento** (os q
 
 ### 6.7. Mais
 
-Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Dados: **Registros** (§6.10) , **Receitas** (§6.11) e **Regras** (§6.12). Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças.
+Projeto: renomear, **enviar** (folha de compartilhar do Android: WhatsApp, e-mail, Drive — o caso comum, projeto indo para outro celular), salvar em arquivo, importar, restaurar a demonstração, começar do zero. Dados: **Registros** (§6.10) , **Receitas** (§6.11) e **Regras** (§6.12). Tutoriais: cada trilha com o botão de reproduzir, e "Rever todos". Vídeos: aparecem quando houver link (vídeo não mora dentro do app). Sobre e licenças; **Privacidade**, a política em texto (a Play pede a política também dentro do app, e na rede da máquina um link não abriria).
 
 ### 6.8. Alarmes
 
@@ -934,7 +936,7 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | Singleton por equipamento (InoRobot). | Uma sessão por equipamento, criada sob demanda. |
 | Permissão INTERNET só no manifesto de debug — o app de loja não conectaria. | Permissão no manifesto principal. |
 | `applicationId` `com.example.*` (recusado pela Play Store). | `com.celiware.ihm`. |
-| Release assinado com chave de debug. | Assinatura por `key.properties` fora do git; debug só como alternativa local. |
+| Release assinado com chave de debug. | Assinatura por `key.properties` fora do git; o `.aab` da loja não sai sem ela; debug só no APK de teste. |
 | Mapas de memória fixos no código (monitor, TEX). | Variáveis e telas configuradas pelo usuário, salvas em arquivo. |
 
 ## 13. Testes
@@ -986,13 +988,14 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/runtime/rule_engine_test.dart` | Regras com relógio simulado (`fake_async`) sobre o caminho de produção: propõe só depois do tempo, confirmar grava, uma vez por passagem, ignorar não grava, condição que passa retira a pergunta; destino sem permissão recusado e em alarme, marcado volta a valer, permissão tirada retira a pergunta; automático só para parar; sem comunicação não roda e vira alarme; segundo plano retira a pergunta, nada grava e avisa na volta; a regra de exemplo da demonstração (desligada não vigia; ligada, propõe 65 m/min e grava com o toque). |
 | `test/widgets/rules_page_test.dart` | Regras pela interface: aviso de segurança, condição ao vivo, destino pede permissão, automático pede termo e recusa "Ligar", pergunta aparece em outra tela só depois do tempo e grava com o toque, histórico; regra parada na lista e chave de ligar; "Aceita escrita por regra" no cadastro de variável e marca preservada ao salvar outra coisa. |
 | `test/widgets/table_element_test.dart` | Tabela de valores (GR-7): tamanhos nas duas grades, arquivo ida e volta, `liveTagIds` sem as linhas, "usada em" aceitando texto; valores ao vivo com unidade, liga/desliga com o texto da tabela e texto lido, na ordem configurada; endereço recusado só na linha dele, alarme marcando a linha, queda com o último valor esmaecido e volta; tocar na linha gravável abre o teclado, confirma e grava (liga/desliga, só leitura e tela só acompanhamento não); tabela que rola lê só as linhas à vista e troca a inscrição ao rolar; pelo editor: paleta na grade fina, escolher várias, reordenar pela alça, tirar. GR-8: 390×844 dp com barras de Android e de recorte de câmera, contando as variáveis inteiras à vista (46 e 44). |
+| `test/widgets/privacy_page_test.dart` | Mais → Privacidade abre a política em texto; o texto do app e `site/privacidade.html` dizem as mesmas coisas (senha de broker, "Quem está aplicando", backup, voz, permissões) e têm as mesmas seções. |
 | `test/widgets/grid_performance_test.dart` | GR-9: tela fina de 48 elementos (a mesma de `tool/bench/gr9_rolagem.dart`) com varredura de 500 ms, contando reconstruções por leitura e camadas repintadas: nada muda → 0; três mudam → 3, e só esses repintam; rolar ~1 s → nenhum elemento repinta; tudo muda → 58 e 48 (contraprova de que o contador conta). |
 
 Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstração e animações avançam por passos, sem depender da velocidade da máquina. Toque que não acerta o alvo é falha, não aviso (`hitTestWarningShouldBeFatal`). Eles já pegaram seis defeitos reais antes do aparelho: quatro transbordos de layout (cartão de tela, legenda do gráfico, lâmpada estreita em dois tamanhos), leitura publicando depois do encerramento e toque sem retorno em tela só acompanhamento.
 
 ## 14. Próximos passos
 
-- **Etapa 3 — Play Store:** conta de desenvolvedor da Celiware, chave de upload, ficha da loja. Roteiro em `docs/PUBLICACAO.md`.
+- **Etapa 3 — Play Store:** o lado técnico e a ficha estão prontos (`docs/loja/`); falta o que é do dono — D-U-N-S, conta de organização, chave de upload. Roteiro em `docs/PUBLICACAO.md`.
 - **Perfis de fabricante:** validar em bancada (Inovance H3U/H5U primeiro, o manual da série H não foi aberto).
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
 - **Siemens S7:** conferir num S7-1200 de verdade (kit) — PUT/GET, DB não otimizado, família no "Testar conexão" e o tempo da varredura com PDU 240.

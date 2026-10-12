@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:clock/clock.dart';
 import 'package:logging/logging.dart';
 
+import '../comm/comm_error.dart';
 import '../link/byte_link.dart';
 import '../modbus/modbus_client_serial.dart' show isConnectionRefused;
 import 'message_parser.dart';
@@ -109,6 +110,8 @@ class RawClient {
     link.onClosed = _onClosed;
     try {
       await link.open();
+    } on CommError {
+      rethrow; // já tem nome (adaptador USB não encontrado, sem permissão)
     } catch (e) {
       throw RawConnectionError('Falha ao abrir $label: $e', refused: isConnectionRefused(e));
     }

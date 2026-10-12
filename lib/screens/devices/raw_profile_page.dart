@@ -6,7 +6,7 @@ import '../../core/rawlink/raw_link_error.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/device.dart';
 import '../../models/raw_config.dart';
-import '../../services/runtime/drivers/raw_driver.dart' show FrameProblemText;
+import '../../services/runtime/drivers/raw_driver.dart' show FrameProblemText, RawDriver;
 import '../../services/runtime/raw_preview.dart';
 import '../../widgets/common/common.dart';
 
@@ -289,7 +289,7 @@ class _RawProfilePageState extends State<RawProfilePage> {
           // Prévia presa no topo: é a resposta a cada opção mexida lá embaixo.
           Padding(
             padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 8),
-            child: _PreviewPanel(preview: _preview, where: '${d.host}:${d.port}'),
+            child: _PreviewPanel(preview: _preview, where: RawDriver.labelFor(d)),
           ),
           Expanded(
             child: ListView(

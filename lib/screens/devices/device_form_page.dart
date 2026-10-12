@@ -4,6 +4,7 @@ import '../../app/app_scope.dart';
 import '../../core/modbus/modbus_framing.dart';
 import '../../core/mqtt/mqtt_error.dart';
 import '../../core/mqtt/mqtt_topic.dart';
+import '../../core/serial/usb_serial.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
@@ -12,11 +13,13 @@ import '../../models/vendor_profiles.dart';
 import '../../models/mqtt_config.dart';
 import '../../models/raw_config.dart';
 import '../../models/s7_config.dart';
+import '../../models/serial_config.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import 'raw_device_fields.dart';
 import 's7_device_fields.dart';
+import 'usb_device_fields.dart';
 import 'vendor_profile_sheet.dart';
 
 /// Cadastro/edição de equipamento.
@@ -36,7 +39,22 @@ class DeviceFormPage extends StatefulWidget {
 class _DeviceFormPageState extends State<DeviceFormPage> {
   final _form = GlobalKey<FormState>();
   late final String _id = widget.device?.id ?? newId('d');
-  late bool _demo = widget.device?.isDemo ?? false;
+
+  /// Onde o equipamento está: na rede, no cabo USB ou simulado.
+  late _Where _where = switch (widget.device) {
+    Device(isDemo: true) => _Where.demo,
+    Device(isUsb: true) => _Where.usb,
+    _ => _Where.network,
+  };
+  bool get _demo => _where == _Where.demo;
+  bool get _net => _where == _Where.network;
+  bool get _usb => _where == _Where.usb;
+
+  /// Cabo USB: adaptador, protocolo, velocidade e paridade.
+  late final UsbDeviceFields _usbF = UsbDeviceFields(widget.device?.serial ?? const SerialConfig());
+
+  /// Arduino pelo cabo: o perfil da mensagem é o mesmo do cru pela rede.
+  bool get _usbRaw => _usb && _usbF.isRaw;
 
   /// Protocolo de rede: Modbus TCP, RTU/ASCII "cru" por um gateway serial,
   /// ou MQTT (o IP passa a ser o do broker).
@@ -62,14 +80,14 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   late final _offline = TextEditingController(text: _broker.offlinePayload);
   bool _showPass = false;
 
-  bool get _mqtt => !_demo && _protocol == _Protocol.mqtt;
+  bool get _mqtt => _net && _protocol == _Protocol.mqtt;
 
   /// Siemens S7: família do CLP (rack e slot) no lugar do ID do escravo.
   late final S7DeviceFields _s7 = S7DeviceFields(widget.device?.s7);
-  bool get _isS7 => !_demo && _protocol == _Protocol.s7;
+  bool get _isS7 => _net && _protocol == _Protocol.s7;
   /// Arduino/ESP com mensagem própria: TCP ou UDP e o perfil da mensagem.
   late final RawDeviceFields _rw = RawDeviceFields(widget.device?.raw ?? const RawConfig());
-  bool get _raw => !_demo && _protocol == _Protocol.raw;
+  bool get _raw => _net && _protocol == _Protocol.raw;
   late final _name = TextEditingController(text: widget.device?.name ?? '');
   late final _host = TextEditingController(text: widget.device?.host ?? '');
   late final _port = TextEditingController(text: '${widget.device?.port ?? 502}');
@@ -97,6 +115,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         name: _name.text.trim().isEmpty ? 'Equipamento' : _name.text.trim(),
         kind: _demo
             ? DeviceKind.demo
+            : _usb
+            ? DeviceKind.usbSerial
             : switch (_protocol) {
                 _Protocol.tcp => DeviceKind.modbusTcp,
                 _Protocol.mqtt => DeviceKind.mqtt,
@@ -105,13 +125,13 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 _ => DeviceKind.modbusRtuTcp,
               },
         framing: _protocol == _Protocol.ascii ? ModbusFraming.ascii : ModbusFraming.rtu,
-        host: _host.text.trim(),
+        host: _usb ? '' : _host.text.trim(),
         port: int.tryParse(_port.text) ?? 502,
         unitId: int.tryParse(_unit.text) ?? 1,
         timeoutMs: (int.tryParse(_timeout.text) ?? 1500).clamp(200, 10000),
         pollMs: (int.tryParse(_poll.text) ?? 500).clamp(100, 60000),
         // Perfil de fabricante é mapa de memória Modbus: no MQTT, no S7 e no cru não existe.
-        profile: _demo || _mqtt || _isS7 || _raw ? null : _profile,
+        profile: _demo || _mqtt || _isS7 || _raw || _usbRaw ? null : _profile,
         // Só MQTT guarda broker; nos outros fica o padrão (e o arquivo, igual).
         mqtt: _mqtt
             ? MqttBroker(
@@ -126,7 +146,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
             : const MqttBroker(),
         s7: _isS7 ? _s7.build() : const S7Config(),
         // Só o cru guarda o perfil da mensagem.
-        raw: _raw ? _rw.build() : const RawConfig(),
+        raw: _raw || _usbRaw ? _rw.build() : const RawConfig(),
+        serial: _usb ? _usbF.build() : const SerialConfig(),
       );
 
   /// Trocar de protocolo leva junto a porta padrão — quem escolhe MQTT quase
@@ -155,6 +176,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 
   /// Resumo de "Mais opções" fechado.
   String _moreSummary() {
+    if (_usb) return _usbF.summary(_unit.text, profileName: _profileName);
     if (_isS7) return '${_s7.build().label} · Porta ${_port.text}';
     if (_raw) return _rw.summary(_port.text);
     if (!_mqtt) return '${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}${_profileName == null ? '' : ' · $_profileName'}';
@@ -169,7 +191,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   Future<void> _test() async {
     // Testar só exige o IP — validar o formulário inteiro marcava erro no
     // nome, que não tem nada a ver com o teste.
-    if (!_demo && !(_ipField.currentState?.validate() ?? false)) return;
+    if (_net && !(_ipField.currentState?.validate() ?? false)) return;
+    // Cabo USB sem a permissão do Android: explica antes da pergunta dele.
+    if (_usb && !await _usbPermission()) return;
+    if (!mounted) return;
     setState(() {
       _probing = true;
       _probe = null;
@@ -186,6 +211,17 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
       final ctx = _probeKey.currentContext;
       if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300), alignment: 0.9);
     });
+  }
+
+  /// Devolve falso quando a pessoa não deixou (o cartão do teste já diz isso).
+  Future<bool> _usbPermission() async {
+    await _usbF.refresh();
+    final port = _usbF.plugged;
+    if (!mounted || port == null || port.hasPermission) return true;
+    final ok = await askUsbPermission(context, port);
+    if (!mounted) return false;
+    if (!ok) setState(() => _probe = const ProbeResult(ok: false, message: UsbHint.permission));
+    return ok;
   }
 
   final _probeKey = GlobalKey();
@@ -241,6 +277,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   @override
   Widget build(BuildContext context) {
     final tcp = !_demo;
+    final usbSubtitle = 'RS-485 · RS-232 · ${_usbF.protocol.short}';
     return Scaffold(
       appBar: AppBar(
         title: Text(_editing ? 'Equipamento' : 'Novo equipamento'),
@@ -262,14 +299,15 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 32),
           children: [
-            ChoiceCards<bool>(
+            ChoiceCards<_Where>(
               options: [
-                ChoiceOption(value: false, title: 'Na rede', subtitle: _protocol.subtitle, icon: Icons.router_outlined),
-                const ChoiceOption(value: true, title: 'Demonstração', subtitle: 'Simulada', icon: Icons.smart_toy_outlined),
+                ChoiceOption(value: _Where.network, title: 'Na rede', subtitle: _protocol.subtitle, icon: Icons.router_outlined),
+                ChoiceOption(value: _Where.usb, title: 'Cabo USB', subtitle: usbSubtitle, icon: Icons.usb_rounded),
+                const ChoiceOption(value: _Where.demo, title: 'Demonstração', subtitle: 'Simulada', icon: Icons.smart_toy_outlined),
               ],
-              selected: _demo,
+              selected: _where,
               onChanged: (k) => setState(() {
-                _demo = k;
+                _where = k;
                 _probe = null;
               }),
             ),
@@ -281,12 +319,17 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(labelText: 'Nome', hintText: 'Ex.: CLP da cortadora'),
             ),
-            if (tcp) ...[
+            // Cabo USB: o adaptador no lugar do IP.
+            if (_usb) ...[
+              const SizedBox(height: Ind.space),
+              UsbAdapterRow(fields: _usbF, onChanged: () => setState(() => _probe = null)),
+            ],
+            if (_net) ...[
               const SizedBox(height: Ind.space),
               TextFormField(
                 key: _ipField,
                 controller: _host,
-                validator: (v) => tcp ? Validators.host(v) : null,
+                validator: (v) => _net ? Validators.host(v) : null,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: Ind.number(20),
                 decoration: InputDecoration(labelText: _mqtt ? 'IP do broker' : _isS7 ? 'IP do CLP' : 'IP do equipamento', hintText: '192.168.0.10'),
@@ -295,7 +338,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
             ],
             // Cru: sem o perfil certo nada funciona — fica à vista, antes do
             // teste (que confere se o perfil entende a mensagem).
-            if (_raw) ...[
+            if (_raw || _usbRaw) ...[
               const SizedBox(height: Ind.space),
               RawProfileRow(fields: _rw, device: _build, onChanged: () => setState(() => _probe = null)),
             ],
@@ -308,7 +351,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   : const Icon(Icons.network_check_rounded),
               label: Text(_probing ? 'Testando…' : 'Testar conexão'),
             ),
-            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7, raw: _raw ? _rw : null))],
+            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7, raw: _raw ? _rw : null, usb: _usb ? _usbF : null))],
             if (tcp) ...[
               const SizedBox(height: Ind.spaceLarge),
               Theme(
@@ -325,7 +368,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                     // Marca e modelo: com ela, as variáveis aceitam a memória
                     // como no manual ("D200"). Genérico = endereço Modbus direto.
                     // No MQTT, no S7 e no cru não há mapa de memória Modbus.
-                    if (!_mqtt && !_isS7 && !_raw) ...[
+                    if (!_mqtt && !_isS7 && !_raw && !_usbRaw) ...[
                       ListTile(
                         key: const ValueKey('marca-modelo'),
                         contentPadding: EdgeInsets.zero,
@@ -339,23 +382,27 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                     // Gateway serial→Ethernet (RS-485 do outro lado) que repassa
                     // RTU/ASCII cru, ou um broker MQTT: escolhas raras, por isso
                     // ficam aqui.
-                    Text('Protocolo', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      for (final p in _Protocol.values)
-                        ChoiceChip(
-                          key: ValueKey('protocolo-${p.name}'),
-                          label: Text(p.chip),
-                          selected: _protocol == p,
-                          onSelected: (_) => setState(() => _setProtocol(p)),
-                        ),
-                    ]),
-                    if (_protocol == _Protocol.rtu || _protocol == _Protocol.ascii) ...[
+                    if (_net) ...[
+                      Text('Protocolo', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 8, runSpacing: 8, children: [
+                        for (final p in _Protocol.values)
+                          ChoiceChip(
+                            key: ValueKey('protocolo-${p.name}'),
+                            label: Text(p.chip),
+                            selected: _protocol == p,
+                            onSelected: (_) => setState(() => _setProtocol(p)),
+                          ),
+                      ]),
+                    ],
+                    if (_net && (_protocol == _Protocol.rtu || _protocol == _Protocol.ascii)) ...[
                       const SizedBox(height: 6),
                       Text('Para conversor RS-485 → Ethernet que repassa os bytes sem converter. Se o conversor faz a conversão para Modbus TCP, use Modbus TCP.',
                           style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
                     ],
-                    if (_raw)
+                    if (_usb)
+                      UsbMoreOptions(fields: _usbF, unit: _unit, timeout: _timeout, poll: _poll, onChanged: () => setState(() => _probe = null))
+                    else if (_raw)
                       RawDeviceMoreOptions(fields: _rw, port: _port, timeout: _timeout, onChanged: () => setState(() => _probe = null))
                     else if (_mqtt)
                       ..._mqttOptions()
@@ -457,7 +504,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 }
 
 class _ProbeCard extends StatelessWidget {
-  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false, this.s7 = false, this.raw});
+  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false, this.s7 = false, this.raw, this.usb});
   final ProbeResult result;
   final bool tcp;
   final bool mqtt;
@@ -465,6 +512,9 @@ class _ProbeCard extends StatelessWidget {
 
   /// Equipamento cru: o teste fala de mensagem e de perfil.
   final RawDeviceFields? raw;
+
+  /// Cabo USB: o teste fala do adaptador, da permissão e da linha.
+  final UsbDeviceFields? usb;
 
   @override
   Widget build(BuildContext context) {
@@ -486,7 +536,9 @@ class _ProbeCard extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                raw != null
+                usb != null
+                    ? usbProbeTitle(result, raw: usb!.isRaw)
+                    : raw != null
                     ? rawProbeTitle(result)
                     : ok
                         ? '${mqtt ? 'Broker' : s7 ? 'CLP' : 'Equipamento'} respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}'
@@ -510,12 +562,12 @@ class _ProbeCard extends StatelessWidget {
               Text(result.hint!, key: const ValueKey('teste-dica'), style: const TextStyle(fontWeight: FontWeight.w600, height: 1.35)),
               const SizedBox(height: 10),
             ],
-            Text(raw != null ? rawProbeHeader(result) : result.refused ? '${mqtt ? 'O broker' : s7 ? 'O CLP' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
+            Text(usb != null ? usbProbeHeader(result) : raw != null ? rawProbeHeader(result) : result.refused ? '${mqtt ? 'O broker' : s7 ? 'O CLP' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             // Recusou = achou o aparelho; o problema é porta ou Modbus
             // desligado. Nem vale mandar conferir Wi-Fi e IP.
-            for (final t in mqtt ? _mqttChecks() : s7 ? S7DeviceFields.checks(result) : raw != null ? rawProbeChecks(result, udp: raw!.isUdp) : result.refused
+            for (final t in usb != null ? usbProbeChecks(result, raw: usb!.isRaw) : mqtt ? _mqttChecks() : s7 ? S7DeviceFields.checks(result) : raw != null ? rawProbeChecks(result, udp: raw!.isUdp) : result.refused
                 ? const [
                     'A porta está certa? Modbus TCP usa 502 — confira em "Mais opções".',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
@@ -560,6 +612,9 @@ class _ProbeCard extends StatelessWidget {
     ];
   }
 }
+
+/// Onde o equipamento está.
+enum _Where { network, usb, demo }
 
 /// Protocolo de um equipamento na rede.
 enum _Protocol {

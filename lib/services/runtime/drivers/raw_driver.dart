@@ -6,11 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
 import '../../../core/comm/comm_error.dart';
+import '../../../core/link/byte_link.dart';
 import '../../../core/modbus/modbus_client.dart';
 import '../../../core/rawlink/message_parser.dart';
 import '../../../core/rawlink/raw_client.dart';
 import '../../../core/rawlink/raw_link_error.dart';
 import '../../../core/rawlink/raw_link_pool.dart';
+import '../../../core/serial/usb_serial_link.dart';
 import '../../../models/device.dart';
 import '../../../models/tag.dart';
 import '../../net/local_network.dart';
@@ -130,7 +132,28 @@ class RawDriver extends DeviceDriver {
   @override
   bool get reportsScanTime => false;
 
-  String get _label => '${device.host}:${device.port}';
+  String get _label => labelFor(device);
+
+  /// "192.168.0.50:5030" ou "cabo USB · CH340".
+  static String labelFor(Device d) => d.isUsb ? 'cabo USB · ${d.serial.port?.label ?? 'adaptador'}' : '${d.host}:${d.port}';
+
+  /// O cano compartilhado do equipamento: socket TCP/UDP ([RawLinkPool]) ou
+  /// a porta do adaptador USB ([UsbSerialPool]). Varredura, teste, prévia do
+  /// editor e "Ouvir o equipamento" pegam cada um o seu, pendurado no mesmo.
+  static ByteLink linkFor(Device d, {Duration? connectionTimeout}) {
+    if (d.isUsb) return UsbSerialPool.acquire(port: d.serial.port, params: d.serial.params, dtr: d.serial.dtr, label: labelFor(d));
+    final raw = d.raw;
+    return RawLinkPool.acquire(
+      udp: raw.isUdp,
+      host: d.host,
+      port: d.port,
+      localPort: raw.localPort,
+      connectionTimeout: connectionTimeout ?? Duration(milliseconds: max(1000, d.timeoutMs)),
+      // Wi-Fi da máquina sem internet + dados móveis: sem isto a conexão
+      // sairia pelo 4G (ver LocalNetwork).
+      beforeConnect: LocalNetwork.prepare,
+    );
+  }
 
   Duration get _timeout => Duration(milliseconds: max(1000, device.timeoutMs));
 
@@ -157,16 +180,7 @@ class RawDriver extends DeviceDriver {
         // Perfil que não fecha lança RawProfileError aqui — um CommError: o
         // selo mostra "perfil de mensagem inválido: …".
         c = _client = RawClient(
-          link: RawLinkPool.acquire(
-            udp: raw.isUdp,
-            host: device.host,
-            port: device.port,
-            localPort: raw.localPort,
-            connectionTimeout: _timeout,
-            // Wi-Fi da máquina sem internet + dados móveis: sem isto a conexão
-            // sairia pelo 4G (ver LocalNetwork).
-            beforeConnect: LocalNetwork.prepare,
-          ),
+          link: linkFor(device, connectionTimeout: _timeout),
           profile: raw.profile,
           label: _label,
           responseTimeout: _timeout,
@@ -174,7 +188,8 @@ class RawDriver extends DeviceDriver {
         _frames = c.frames.listen(_onFrame);
       }
       await c.connect();
-    } on RawLinkError {
+    } on CommError {
+      // RawLinkError e também o do cabo USB (adaptador não encontrado).
       _setState(ModbusLinkState.lost);
       rethrow;
     }
@@ -252,7 +267,7 @@ class RawDriver extends DeviceDriver {
     if (ok) return;
     if (problem != null) throw RawProbeError('$_label: ${problem!.name}', '${RawProbeError.notUnderstood}: ${problem!.label}');
     // UDP "conecta" sempre (só reserva a porta): o silêncio pode ser IP errado.
-    throw RawProbeError('$_label: silêncio', RawProbeError.silent(wait.inSeconds), refused: !device.raw.isUdp);
+    throw RawProbeError('$_label: silêncio', RawProbeError.silent(wait.inSeconds), refused: device.isUsb || !device.raw.isUdp);
   }
 
   // ── Varredura ────────────────────────────────────────────────────────────────

@@ -92,10 +92,16 @@ class ModbusConnectionError extends ModbusError {
 
 /// A resposta chegou, mas não bate com o pedido (tamanho, função, protocolo).
 class ModbusProtocolError extends ModbusError {
-  const ModbusProtocolError(super.message);
+  const ModbusProtocolError(super.message, {this.garbled = false});
+
+  /// Numa linha serial: chegaram bytes, mas nenhum formou uma resposta — o
+  /// sinal clássico de velocidade ou paridade diferente nos dois lados.
+  final bool garbled;
+
+  static const String garbledMessage = 'chegaram bytes que não formam uma resposta';
 
   @override
-  String get userMessage => 'resposta inválida do equipamento';
+  String get userMessage => garbled ? garbledMessage : 'resposta inválida do equipamento';
 }
 
 /// O pedido viola um limite do protocolo antes mesmo de ir para a rede

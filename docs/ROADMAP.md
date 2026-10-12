@@ -9,6 +9,11 @@ só a lista de trabalho.
 Tag `v1.3.2`. É a versão para apresentar e instalar
 (`celiware-ihm-1.3.2-arm64.apk`, celulares Android de 2017 para cá). A próxima já sai com o nome **Ware IoT**.
 
+**Prévia 1.4.0 (11/10, sem tag):** a etapa 4 construída até aqui, para teste
+interno (`ware-iot-1.4.0-previa-arm64.apk`). Não é entrega: a etapa 4 sai
+numa entrega só, quando fechar (ver "Forma" abaixo). Estado item a item na
+tabela da etapa 4.
+
 | Versão | O que trouxe |
 |---|---|
 | 1.0 | Modbus TCP próprio, variáveis intermediárias, 11 elementos, editor em grade, demonstração embutida, tutoriais, simulador Python. |
@@ -48,23 +53,23 @@ upgrade de R$ [valor].
 
 **Requisitos detalhados, horas e fontes:** `docs/REQUISITOS-ETAPA4.md`. **Conferência item a item da lista do cliente (205 itens):** `docs/RASTREABILIDADE-LISTA-CLIENTE.md` — 16 itens dentro do app ainda para decidir. (levantamento de 11/10/2026: [estimativa interna] no total, mais da metade em protocolos).
 
-| # | Item | Da lista dele / da reunião | Hoje (código em 11/10) |
+| # | Item | Da lista dele / da reunião | Estado (11/10, noite) |
 |---|---|---|---|
-| 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | o app não amarra a conexão ao Wi-Fi |
-| 1 | Publicação na Play Store | reunião | roteiro em `PUBLICACAO.md` |
-| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | não existe |
+| 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | **Feito (1.3.2).** Falta a prova em celular real com Wi-Fi sem internet + 4G. |
+| 1 | Publicação na Play Store | reunião | Falta. Roteiro em `PUBLICACAO.md`; decidir o `applicationId` antes do 1º envio. |
+| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100). Falta publicar: links da loja, e-mail e domínio (marcadores no `site/README.md`). |
 | 3 | ~~Versão para Windows do próprio app~~ — **adiada em 11/10/2026** (decisão do Pedro) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
-| 4 | Grade maior e mais variáveis por tela | reunião | grade atual do editor |
-| 5 | Correções no "editar memória" | 2, 11 · reunião | — |
-| 6 | Tela de tablet | reunião | item 3 de "Próximo" |
-| 7 | Importar memórias por faixa (M0–M1000, D0–D3000, X, Y) | reunião | importa o projeto inteiro |
-| 8 | Mapas de memória prontos das marcas parceiras (Inovance, INVT…) | reunião | perfil Inovance planejado (ARQUITETURA §10.2) |
-| 9 | Protocolos: Siemens S7, OPC UA, MQTT, Modbus RTU/ASCII (serial e USB-OTG), TCP/UDP/serial com interpretador de mensagens (Arduino) | 15, 16, 60, 64 · reunião | **11/10: base de drivers feita; Modbus RTU/ASCII sobre TCP (gateway) feito.** Falta: USB-OTG, MQTT, S7, cru, OPC UA |
-| 10 | Avisos por voz no fone e narração de eventos | 10, 12 · reunião | o alarme só vibra |
-| 11 | Lógica entre máquinas (intertravamento) e cálculos | 13, 14 · reunião | sem motor de lógica; script na escrita recusado na 1.1 — a lógica **nunca** é função de segurança da máquina |
-| 12 | Câmeras IP (RTSP) vinculadas à máquina, abertas por botão | 70, 71 | não existe |
-| 13 | Receitas: criar, salvar, comparar com a ativa, aplicar com confirmação | 96, 114–118 | não existe |
-| 14 | Registro periódico de variáveis, gráfico do registro e exportação CSV | 17, 63, 158, 159 | gráfico de 2 min só em memória |
+| 4 | Grade maior e mais variáveis por tela | reunião | **Feito:** grade fina 6 ↔ 12 colunas, mover e redimensionar sem arrastar, Tabela de valores (até 30 variáveis), ≥ 40 variáveis numa tela de celular (GR-1 a GR-10). |
+| 5 | Correções no "editar memória" | 2, 11 · reunião | **Feito:** nada se perde calado, sugestões de sinal e CDAB, hexadecimal, bit de registrador de entrada (EM-1 a EM-12). |
+| 6 | Tela de tablet | reunião | **Feito:** trilho a partir de 600 dp, lista + detalhe, formulários estreitos, painel do editor, estado ao girar, capturas em `docs/imagens/tablet/` (TB-1 a TB-7). |
+| 7 | Importar memórias por faixa (M0–M1000, D0–D3000, X, Y) | reunião | **Feito:** Criar várias por faixa na notação do fabricante ou CSV, com prévia, leituras por ciclo e conflitos (IF-1 a IF-5). |
+| 8 | Mapas de memória prontos das marcas parceiras (Inovance, INVT…) | reunião | **Feito:** Inovance H3U/H5U, INVT IVC1/IVC3, WEG TPW04, Delta DVP, inversores MD500/GD20; campo "Memória do CLP" (MP-1 a MP-6). Validar em bancada (H3U primeiro). |
+| 9 | Protocolos: Siemens S7, OPC UA, MQTT, Modbus RTU/ASCII (serial e USB-OTG), TCP/UDP/serial com interpretador de mensagens (Arduino) | 15, 16, 60, 64 · reunião | **Feitos:** base de drivers, Modbus RTU/ASCII por gateway, MQTT, Siemens S7, TCP/UDP cru com perfil e prévia (Arduino). Falta: USB-OTG (precisa do adaptador) e OPC UA (spike). Nenhum testado em equipamento real ainda. |
+| 10 | Avisos por voz no fone e narração de eventos | 10, 12 · reunião | **Feito:** alarmes falados no fone com fila por prioridade, silenciar ≠ reconhecer, narração por valor (VZ-1 a VZ-6). Conferir a voz no celular (timbre é julgamento humano). |
+| 11 | Lógica entre máquinas (intertravamento) e cálculos | 13, 14 · reunião | **Feito:** variáveis calculadas (contas com variáveis de qualquer equipamento, taxa de contador) e regras "quando… durar… gravar" no modo propor (LG-1 a LG-7). Nunca função de segurança. |
+| 12 | Câmeras IP (RTSP) vinculadas à máquina, abertas por botão | 70, 71 | Falta (CM-1 a CM-5): precisa de câmera para testar. |
+| 13 | Receitas: criar, salvar, comparar com a ativa, aplicar com confirmação | 96, 114–118 | **Feito:** tipos e receitas, ler da máquina, comparar, aplicar com confirmação e relatório de falha parcial, condição, transferir, versões, histórico (RC-1 a RC-7). |
+| 14 | Registro periódico de variáveis, gráfico do registro e exportação CSV | 17, 63, 158, 159 | **Feito:** grupos de registro em SQLite, histórico com zoom e lacunas, CSV para Excel pt-BR (RG-1 a RG-6). Só com o app aberto. |
 
 ### Já existe (1.3.1) — conta como entregue
 

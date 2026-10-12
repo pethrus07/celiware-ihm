@@ -2,6 +2,7 @@
 
 import '../core/modbus/modbus_framing.dart';
 import 'mqtt_config.dart';
+import 'opcua_config.dart';
 import 's7_config.dart';
 import 'raw_config.dart';
 
@@ -34,6 +35,11 @@ enum DeviceKind {
   /// Equipamento virtual das variáveis calculadas ([CalcDevice]): não fala com
   /// nada, faz as contas com o que as outras variáveis leram.
   calc,
+
+  /// Servidor OPC UA na rede (CLP com OPC UA, Kepware, gateway, Node-RED),
+  /// no modo de segurança None. Caminho do endpoint e usuário ficam em
+  /// [Device.opcua].
+  opcua,
 }
 
 extension DeviceKindMeta on DeviceKind {
@@ -53,6 +59,8 @@ extension DeviceKindMeta on DeviceKind {
         return 'Arduino, ESP ou balança (mensagem própria)';
       case DeviceKind.calc:
         return 'Variáveis calculadas';
+      case DeviceKind.opcua:
+        return 'Servidor OPC UA';
     }
   }
 
@@ -85,6 +93,7 @@ class Device {
     this.mqtt = const MqttBroker(),
     this.s7 = const S7Config(),
     this.raw = const RawConfig(),
+    this.opcua = const OpcUaConfig(),
   });
 
   final String id;
@@ -121,6 +130,9 @@ class Device {
   /// Em [DeviceKind.raw]: TCP ou UDP e o perfil da mensagem.
   final RawConfig raw;
 
+  /// Em [DeviceKind.opcua]: caminho do endpoint, usuário e senha.
+  final OpcUaConfig opcua;
+
   bool get isDemo => kind == DeviceKind.demo;
 
   /// Variável aponta para área + endereço Modbus (a demonstração também:
@@ -133,7 +145,7 @@ class Device {
   /// Fala com o equipamento pela rede (IP e porta), qualquer que seja o
   /// protocolo.
   bool get isNetwork =>
-      kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt || kind == DeviceKind.s7 || kind == DeviceKind.raw;
+      kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt || kind == DeviceKind.s7 || kind == DeviceKind.raw || kind == DeviceKind.opcua;
 
   /// Descrição curta para listas: "192.168.0.10:502 · ID 1".
   String get addressLabel => isDemo
@@ -146,6 +158,8 @@ class Device {
           ? '$host:$port · ${s7.label}'
           : kind == DeviceKind.raw
           ? '$host:$port · Arduino · ${raw.transport.label}'
+          : kind == DeviceKind.opcua
+          ? '$host:$port${opcua.path} · OPC UA${opcua.anonymous ? '' : ' · ${opcua.username}'}'
           : '$host:$port · ${kind == DeviceKind.modbusRtuTcp ? '${framing.label} · ' : ''}ID $unitId';
 
   Device copyWith({
@@ -160,6 +174,7 @@ class Device {
     MqttBroker? mqtt,
     S7Config? s7,
     RawConfig? raw,
+    OpcUaConfig? opcua,
   }) =>
       Device(
         id: id,
@@ -174,6 +189,7 @@ class Device {
         mqtt: mqtt ?? this.mqtt,
         s7: s7 ?? this.s7,
         raw: raw ?? this.raw,
+        opcua: opcua ?? this.opcua,
         profile: profile,
       );
 
@@ -192,6 +208,7 @@ class Device {
         mqtt: mqtt,
         s7: s7,
         raw: raw,
+        opcua: opcua,
         profile: profile,
       );
 
@@ -205,7 +222,8 @@ class Device {
       framing == other.framing &&
       mqtt == other.mqtt &&
       s7 == other.s7 &&
-      raw == other.raw;
+      raw == other.raw &&
+      opcua == other.opcua;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -223,6 +241,8 @@ class Device {
         // S7 de fábrica (1200/1500) não grava nada; família diferente, só ela.
         if (kind == DeviceKind.s7 && s7.toJson().isNotEmpty) 's7': s7.toJson(),
         if (kind == DeviceKind.raw) 'raw': raw.toJson(),
+        // OPC UA anônimo na raiz não grava nada além do tipo.
+        if (kind == DeviceKind.opcua && opcua.toJson().isNotEmpty) 'opcua': opcua.toJson(),
       };
 
   factory Device.fromJson(Map<String, dynamic> j) => Device(
@@ -239,5 +259,6 @@ class Device {
         mqtt: j['mqtt'] is Map ? MqttBroker.fromJson(Map<String, dynamic>.from(j['mqtt'] as Map)) : const MqttBroker(),
         s7: j['s7'] is Map ? S7Config.fromJson(Map<String, dynamic>.from(j['s7'] as Map)) : const S7Config(),
         raw: j['raw'] is Map ? RawConfig.fromJson(Map<String, dynamic>.from(j['raw'] as Map)) : const RawConfig(),
+        opcua: j['opcua'] is Map ? OpcUaConfig.fromJson(Map<String, dynamic>.from(j['opcua'] as Map)) : const OpcUaConfig(),
       );
 }

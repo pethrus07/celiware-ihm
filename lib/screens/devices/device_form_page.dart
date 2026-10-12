@@ -10,11 +10,13 @@ import '../../core/utils/validators.dart';
 import '../../models/device.dart';
 import '../../models/vendor_profiles.dart';
 import '../../models/mqtt_config.dart';
+import '../../models/opcua_config.dart';
 import '../../models/raw_config.dart';
 import '../../models/s7_config.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
+import 'opcua_device_fields.dart';
 import 'raw_device_fields.dart';
 import 's7_device_fields.dart';
 import 'vendor_profile_sheet.dart';
@@ -46,6 +48,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     Device(kind: DeviceKind.mqtt) => _Protocol.mqtt,
     Device(kind: DeviceKind.s7) => _Protocol.s7,
     Device(kind: DeviceKind.raw) => _Protocol.raw,
+    Device(kind: DeviceKind.opcua) => _Protocol.opcua,
     _ => _Protocol.tcp,
   };
 
@@ -70,6 +73,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   /// Arduino/ESP com mensagem própria: TCP ou UDP e o perfil da mensagem.
   late final RawDeviceFields _rw = RawDeviceFields(widget.device?.raw ?? const RawConfig());
   bool get _raw => !_demo && _protocol == _Protocol.raw;
+
+  /// OPC UA: caminho do endpoint, usuário e senha no lugar do ID do escravo.
+  late final OpcUaDeviceFields _ua = OpcUaDeviceFields(widget.device?.opcua);
+  bool get _isOpcUa => !_demo && _protocol == _Protocol.opcua;
   late final _name = TextEditingController(text: widget.device?.name ?? '');
   late final _host = TextEditingController(text: widget.device?.host ?? '');
   late final _port = TextEditingController(text: '${widget.device?.port ?? 502}');
@@ -89,6 +96,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     }
     _s7.dispose();
     _rw.dispose();
+    _ua.dispose();
     super.dispose();
   }
 
@@ -102,6 +110,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 _Protocol.mqtt => DeviceKind.mqtt,
                 _Protocol.s7 => DeviceKind.s7,
                 _Protocol.raw => DeviceKind.raw,
+                _Protocol.opcua => DeviceKind.opcua,
                 _ => DeviceKind.modbusRtuTcp,
               },
         framing: _protocol == _Protocol.ascii ? ModbusFraming.ascii : ModbusFraming.rtu,
@@ -111,7 +120,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         timeoutMs: (int.tryParse(_timeout.text) ?? 1500).clamp(200, 10000),
         pollMs: (int.tryParse(_poll.text) ?? 500).clamp(100, 60000),
         // Perfil de fabricante é mapa de memória Modbus: no MQTT, no S7 e no cru não existe.
-        profile: _demo || _mqtt || _isS7 || _raw ? null : _profile,
+        profile: _demo || _mqtt || _isS7 || _raw || _isOpcUa ? null : _profile,
         // Só MQTT guarda broker; nos outros fica o padrão (e o arquivo, igual).
         mqtt: _mqtt
             ? MqttBroker(
@@ -127,17 +136,19 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         s7: _isS7 ? _s7.build() : const S7Config(),
         // Só o cru guarda o perfil da mensagem.
         raw: _raw ? _rw.build() : const RawConfig(),
+        opcua: _isOpcUa ? _ua.build() : const OpcUaConfig(),
       );
 
   /// Trocar de protocolo leva junto a porta padrão — quem escolhe MQTT quase
   /// nunca quer a 502 que já estava no campo. Porta mexida à mão fica.
   void _setProtocol(_Protocol p) {
     final port = int.tryParse(_port.text);
-    if (port == null || const {502, MqttBroker.defaultPort, MqttBroker.tlsPort, S7Config.defaultPort, RawConfig.defaultPort}.contains(port)) {
+    if (port == null || const {502, MqttBroker.defaultPort, MqttBroker.tlsPort, S7Config.defaultPort, RawConfig.defaultPort, OpcUaConfig.defaultPort}.contains(port)) {
       _port.text = switch (p) {
         _Protocol.mqtt => '${_tls ? MqttBroker.tlsPort : MqttBroker.defaultPort}',
         _Protocol.s7 => '${S7Config.defaultPort}',
         _Protocol.raw => '${RawConfig.defaultPort}',
+        _Protocol.opcua => '${OpcUaConfig.defaultPort}',
         _ => '502',
       };
     }
@@ -157,6 +168,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   String _moreSummary() {
     if (_isS7) return '${_s7.build().label} · Porta ${_port.text}';
     if (_raw) return _rw.summary(_port.text);
+    if (_isOpcUa) return _ua.summary(_port.text);
     if (!_mqtt) return '${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}${_profileName == null ? '' : ' · $_profileName'}';
     return [
       'MQTT · Porta ${_port.text}',
@@ -287,10 +299,14 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 key: _ipField,
                 controller: _host,
                 validator: (v) => tcp ? Validators.host(v) : null,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                // OPC UA: o endereço opc.tcp://… inteiro também cabe aqui (colado).
+                keyboardType: _isOpcUa ? TextInputType.url : const TextInputType.numberWithOptions(decimal: true),
                 style: Ind.number(20),
-                decoration: InputDecoration(labelText: _mqtt ? 'IP do broker' : _isS7 ? 'IP do CLP' : 'IP do equipamento', hintText: '192.168.0.10'),
-                onChanged: (_) => setState(() => _probe = null),
+                decoration: InputDecoration(labelText: _mqtt ? 'IP do broker' : _isS7 ? 'IP do CLP' : _isOpcUa ? 'IP do servidor' : 'IP do equipamento', hintText: '192.168.0.10'),
+                onChanged: (_) => setState(() {
+                  _probe = null;
+                  if (_isOpcUa) _ua.takeEndpoint(_host, _port);
+                }),
               ),
             ],
             // Cru: sem o perfil certo nada funciona — fica à vista, antes do
@@ -308,7 +324,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                   : const Icon(Icons.network_check_rounded),
               label: Text(_probing ? 'Testando…' : 'Testar conexão'),
             ),
-            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7, raw: _raw ? _rw : null))],
+            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7, opcua: _isOpcUa, raw: _raw ? _rw : null))],
             if (tcp) ...[
               const SizedBox(height: Ind.spaceLarge),
               Theme(
@@ -325,7 +341,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                     // Marca e modelo: com ela, as variáveis aceitam a memória
                     // como no manual ("D200"). Genérico = endereço Modbus direto.
                     // No MQTT, no S7 e no cru não há mapa de memória Modbus.
-                    if (!_mqtt && !_isS7 && !_raw) ...[
+                    if (!_mqtt && !_isS7 && !_raw && !_isOpcUa) ...[
                       ListTile(
                         key: const ValueKey('marca-modelo'),
                         contentPadding: EdgeInsets.zero,
@@ -361,6 +377,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                       ..._mqttOptions()
                     else if (_isS7)
                       S7DeviceOptions(fields: _s7, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
+                    else if (_isOpcUa)
+                      OpcUaDeviceOptions(fields: _ua, host: _host, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
                     else ...[
                       const SizedBox(height: Ind.space),
                       StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
@@ -457,11 +475,12 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 }
 
 class _ProbeCard extends StatelessWidget {
-  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false, this.s7 = false, this.raw});
+  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false, this.s7 = false, this.opcua = false, this.raw});
   final ProbeResult result;
   final bool tcp;
   final bool mqtt;
   final bool s7;
+  final bool opcua;
 
   /// Equipamento cru: o teste fala de mensagem e de perfil.
   final RawDeviceFields? raw;
@@ -489,7 +508,7 @@ class _ProbeCard extends StatelessWidget {
                 raw != null
                     ? rawProbeTitle(result)
                     : ok
-                        ? '${mqtt ? 'Broker' : s7 ? 'CLP' : 'Equipamento'} respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}'
+                        ? '${mqtt ? 'Broker' : s7 ? 'CLP' : opcua ? 'Servidor' : 'Equipamento'} respondeu${result.elapsedMs != null ? ' em ${result.elapsedMs} ms' : ''}'
                         : 'Não conectou: ${result.message}',
                 style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 15),
               ),
@@ -510,12 +529,12 @@ class _ProbeCard extends StatelessWidget {
               Text(result.hint!, key: const ValueKey('teste-dica'), style: const TextStyle(fontWeight: FontWeight.w600, height: 1.35)),
               const SizedBox(height: 10),
             ],
-            Text(raw != null ? rawProbeHeader(result) : result.refused ? '${mqtt ? 'O broker' : s7 ? 'O CLP' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
+            Text(raw != null ? rawProbeHeader(result) : result.refused ? '${mqtt ? 'O broker' : s7 ? 'O CLP' : opcua ? 'O servidor' : 'O equipamento'} está na rede, mas não aceitou:' : 'Confira, nesta ordem:',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             // Recusou = achou o aparelho; o problema é porta ou Modbus
             // desligado. Nem vale mandar conferir Wi-Fi e IP.
-            for (final t in mqtt ? _mqttChecks() : s7 ? S7DeviceFields.checks(result) : raw != null ? rawProbeChecks(result, udp: raw!.isUdp) : result.refused
+            for (final t in mqtt ? _mqttChecks() : s7 ? S7DeviceFields.checks(result) : opcua ? OpcUaDeviceFields.checks(result) : raw != null ? rawProbeChecks(result, udp: raw!.isUdp) : result.refused
                 ? const [
                     'A porta está certa? Modbus TCP usa 502 — confira em "Mais opções".',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
@@ -568,7 +587,8 @@ enum _Protocol {
   ascii('ASCII (gateway)', 'Modbus ASCII · gateway', 'ASCII'),
   mqtt('MQTT', 'MQTT · broker', 'MQTT'),
   s7('Siemens S7', 'Siemens S7', 'S7'),
-  raw('Arduino / mensagem própria', 'Arduino · mensagem própria', 'Arduino');
+  raw('Arduino / mensagem própria', 'Arduino · mensagem própria', 'Arduino'),
+  opcua('OPC UA', 'OPC UA · servidor', 'OPC UA');
 
   const _Protocol(this.chip, this.subtitle, this.short);
   final String chip;

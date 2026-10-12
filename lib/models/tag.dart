@@ -11,6 +11,7 @@ import 'alarm.dart';
 import 'calc.dart';
 import 'narration.dart';
 import 'mqtt_config.dart';
+import 'opcua_config.dart';
 import 's7_config.dart';
 import 'raw_config.dart';
 
@@ -166,6 +167,7 @@ class Tag {
     this.raw,
     this.calc,
     this.ruleWritable = false,
+    this.opcua,
   });
 
   final String id;
@@ -236,6 +238,11 @@ class Tag {
   /// padrão e ninguém lê.
   final RawAddress? raw;
 
+  /// NodeId do nó num servidor OPC UA ("ns=2;s=Maquina.Temperatura"). Só em
+  /// variável de equipamento OPC UA; aí, como no S7, área e endereço Modbus
+  /// ficam no padrão.
+  final OpcUaTagAddress? opcua;
+
   /// A conta, quando a variável é calculada (§9.5, LG-1). Mora no equipamento
   /// virtual [CalcDevice]; é sempre só leitura.
   final CalcSpec? calc;
@@ -278,7 +285,7 @@ class Tag {
   /// MQTT, **e** há tópico onde publicar — curinga não serve).
   /// No cru, o comando vem da variável ou do perfil do equipamento.
   /// Calculada nunca grava.
-  bool get canWrite => writable && calc == null && (mqtt?.canPublish ?? s7?.canWrite ?? (raw != null || area.isWritable));
+  bool get canWrite => writable && calc == null && (mqtt?.canPublish ?? s7?.canWrite ?? (raw != null || opcua != null || area.isWritable));
 
   /// Quantas posições da área a variável ocupa (bits ou registradores).
   int get span => area.isBit ? length : dataType.registerCount * length;
@@ -298,6 +305,8 @@ class Tag {
     if (s != null) return isArray ? '${s.address} · $length valores' : s.address;
     final r = raw;
     if (r != null) return r.label;
+    final o = opcua;
+    if (o != null) return isArray ? '${o.nodeId} · $length valores' : o.nodeId;
     final base = '${area.shortLabel} $address';
     if (isBitOfRegister) return '$base.$bitIndex';
     if (span > 1) return '${area.shortLabel} $address..$lastAddress';
@@ -326,6 +335,7 @@ class Tag {
     RawAddress? raw,
     CalcSpec? calc,
     bool? ruleWritable,
+    OpcUaTagAddress? opcua,
   }) =>
       Tag(
         id: id,
@@ -351,6 +361,7 @@ class Tag {
         memory: memory,
         calc: calc ?? this.calc,
         ruleWritable: ruleWritable ?? this.ruleWritable,
+        opcua: opcua ?? this.opcua,
       );
 
   /// Troca o texto da memória — inclusive para nulo (endereço digitado à mão),
@@ -379,6 +390,7 @@ class Tag {
         raw: raw,
         calc: calc,
         ruleWritable: ruleWritable,
+        opcua: opcua,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -386,10 +398,10 @@ class Tag {
   /// escala zero (que apagaria o valor) volta a 1.
   Tag normalized() {
     var t = this;
-    // MQTT, S7, cru e calculada: os campos Modbus voltam ao padrão, para
+    // MQTT, S7, cru, OPC UA e calculada: os campos Modbus voltam ao padrão, para
     // nenhuma regra de área (bit força liga/desliga, entrada tira a escrita)
     // valer sem querer.
-    if ((t.mqtt != null || t.s7 != null || t.raw != null || t.calc != null) && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
+    if ((t.mqtt != null || t.s7 != null || t.raw != null || t.opcua != null || t.calc != null) && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
       t = t.copyWith(area: ModbusArea.holdingRegister, address: 0, bitIndex: 0, byteOrder: ByteOrder.abcd);
     }
     // Calculada: só leitura, um valor só, número com vírgula ou liga/desliga
@@ -458,6 +470,7 @@ class Tag {
         if (mqtt != null) 'mqtt': mqtt!.toJson(),
         if (s7 != null) 's7': s7!.toJson(),
         if (raw != null) 'raw': raw!.toJson(),
+        if (opcua != null) 'opcua': opcua!.toJson(),
         // Como o MQTT: só quando existe (projeto sem calculada fica igual).
         if (calc != null) 'calc': calc!.toJson(),
         if (ruleWritable) 'ruleWritable': true,
@@ -494,5 +507,6 @@ class Tag {
         raw: j['raw'] is Map ? RawAddress.fromJson(Map<String, dynamic>.from(j['raw'] as Map)) : null,
         calc: j['calc'] is Map ? CalcSpec.fromJson(Map<String, dynamic>.from(j['calc'] as Map)) : null,
         ruleWritable: (j['ruleWritable'] as bool?) ?? false,
+        opcua: j['opcua'] is Map ? OpcUaTagAddress.fromJson(Map<String, dynamic>.from(j['opcua'] as Map)) : null,
       ).normalized();
 }

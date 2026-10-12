@@ -28,6 +28,7 @@ import 'address_field.dart';
 import 'alarm_editor.dart';
 import 'device_pick.dart';
 import 'mqtt_tag_fields.dart';
+import 'opcua_tag_fields.dart';
 import 'raw_tag_fields.dart';
 import 'reading_hints.dart';
 import 's7_tag_fields.dart';
@@ -167,6 +168,9 @@ class _TagFormPageState extends State<TagFormPage> {
   /// Campo da mensagem e comando — o endereço quando o equipamento é cru.
   late final RawTagFields _rw = RawTagFields(widget.tag?.raw);
 
+  /// NodeId — o endereço quando o equipamento é um servidor OPC UA.
+  late final OpcUaTagFields _ua = OpcUaTagFields(widget.tag?.opcua);
+
   HmiRuntime? _runtime;
   Timer? _liveTimer;
   Object? _liveValue;
@@ -195,9 +199,11 @@ class _TagFormPageState extends State<TagFormPage> {
   bool get _isMqtt => _device?.kind == DeviceKind.mqtt;
   bool get _isS7 => _device?.kind == DeviceKind.s7;
   bool get _isRaw => _device?.kind == DeviceKind.raw;
+  bool get _isOpcUa => _device?.kind == DeviceKind.opcua;
 
-  /// MQTT e cru não têm área, endereço, ordem de bytes nem lista Modbus.
-  bool get _notModbus => _isMqtt || _isRaw;
+  /// MQTT, cru e OPC UA não têm área, endereço, ordem de bytes nem
+  /// registrador (no OPC UA o servidor diz o tipo).
+  bool get _notModbus => _isMqtt || _isRaw || _isOpcUa;
 
   /// Pode virar "Lê e grava": no MQTT e no cru qualquer variável (publica no
   /// tópico de comando, manda o comando do modelo); no S7, menos as entradas;
@@ -266,6 +272,7 @@ class _TagFormPageState extends State<TagFormPage> {
     _mq.dispose();
     _s7.dispose();
     _rw.dispose();
+    _ua.dispose();
     super.dispose();
   }
 
@@ -423,7 +430,8 @@ class _TagFormPageState extends State<TagFormPage> {
     final mqtt = _isMqtt ? _mq.build() : null;
     final s7 = _isS7 ? _s7.build() : null;
     final raw = _isRaw ? _rw.build() : null;
-    final other = mqtt != null || s7 != null || raw != null;
+    final opcua = _isOpcUa ? _ua.build() : null;
+    final other = mqtt != null || s7 != null || raw != null || opcua != null;
     return Tag(
       id: _id,
       name: _name.text.trim().isEmpty ? 'Variável' : _name.text.trim(),
@@ -431,14 +439,15 @@ class _TagFormPageState extends State<TagFormPage> {
       mqtt: mqtt,
       s7: s7,
       raw: raw,
+      opcua: opcua,
       area: other ? ModbusArea.holdingRegister : _area,
       address: other ? 0 : _addressReading.address ?? 0,
       dataType: _type,
       byteOrder: other ? ByteOrder.abcd : _order,
       bitIndex: other ? 0 : (int.tryParse(_bit.text) ?? 0).clamp(0, 15),
       // Texto S7: o tamanho vem da faixa (P#… BYTE 22), não de registradores;
-      // o cru não tem lista.
-      length: _type == TagDataType.bool || (s7 != null && _type == TagDataType.string) || raw != null ? 1 : (int.tryParse(_length.text) ?? 1).clamp(1, 120),
+      // no OPC UA o texto vem inteiro do servidor; o cru não tem lista.
+      length: _type == TagDataType.bool || ((s7 != null || opcua != null) && _type == TagDataType.string) || raw != null ? 1 : (int.tryParse(_length.text) ?? 1).clamp(1, 120),
       writable: _writable && !_memoryReadOnly,
       ruleWritable: _ruleWritable,
       unit: _unit.text.trim(),
@@ -459,13 +468,14 @@ class _TagFormPageState extends State<TagFormPage> {
     if (_isMqtt) return _mq.build() == null ? null : _draft();
     if (_isS7) return _s7Error() == null ? _draft() : null;
     if (_isRaw) return _rw.build() == null ? null : _draft();
+    if (_isOpcUa) return _ua.error() == null ? _draft() : null;
     return _addressReading.address == null ? null : _draft();
   }
 
   /// O que a leitura depende: mudou durante a ida ao equipamento, o valor
   /// que voltou é de outra configuração e não vale.
   static String _readKey(Tag t) =>
-      '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.byteOrder.name}|${t.bitIndex}|${t.length}|${t.scale}|${t.offset}|${t.mqtt == null ? '' : jsonEncode(t.mqtt!.toJson())}|${t.s7?.address ?? ''}|${t.raw == null ? '' : jsonEncode(t.raw!.toJson())}';
+      '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.byteOrder.name}|${t.bitIndex}|${t.length}|${t.scale}|${t.offset}|${t.mqtt == null ? '' : jsonEncode(t.mqtt!.toJson())}|${t.s7?.address ?? ''}|${t.raw == null ? '' : jsonEncode(t.raw!.toJson())}|${t.opcua?.nodeId ?? ''}';
 
   /// O mesmo, sem a ordem dos bytes: as ordens que falharam valem para ele.
   static String _decodeKey(Tag t) => '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.length}';
@@ -543,6 +553,7 @@ class _TagFormPageState extends State<TagFormPage> {
         _mq.build()?.toJson() ?? _mq.topic.text.trim(),
         _s7.address.text.trim(),
         _rw.build()?.toJson() ?? '',
+        _ua.nodeId.text.trim(),
       ]);
 
   bool get _dirty => (_initialDeviceId != null && _deviceId != _initialDeviceId) || _snapshot() != _initialSnapshot;
@@ -680,7 +691,7 @@ class _TagFormPageState extends State<TagFormPage> {
       ?hex,
     ];
     if (parts.isNotEmpty) return parts.join(' · ');
-    return mqtt ? 'Escala, unidade, decimais, validade' : s7 ? 'Escala, unidade, decimais, formato' : 'Escala, unidade, decimais, formato, hex';
+    return _isOpcUa ? 'Escala, unidade, decimais' : mqtt ? 'Escala, unidade, decimais, validade' : s7 ? 'Escala, unidade, decimais, formato' : 'Escala, unidade, decimais, formato, hex';
   }
 
   /// "÷ 10", "× 0,5 + 3"... ou nulo sem escala.
@@ -742,6 +753,18 @@ class _TagFormPageState extends State<TagFormPage> {
     }
   }
 
+  /// Escolheu uma variável navegando no servidor OPC UA: o NodeId, o tipo do
+  /// valor e um nome de partida. Nó que o servidor não deixa gravar desliga
+  /// o "Pode ser alterada pela tela".
+  void _onOpcUaPick(OpcUaPick p) {
+    _ua.nodeId.text = p.nodeId;
+    if (!p.writable) _writable = false;
+    // Lista do servidor (Int16[]…): já com quantos valores ler.
+    _length.text = '${p.count.clamp(1, 120)}';
+    if (_decimals == 0) _decimals = p.decimals;
+    _applyPick(p.suggestedName, p.type);
+  }
+
   /// Endereço S7 digitado: o tamanho dele sugere o tipo, se o de agora não
   /// cabe (DB1.DBX0.3 → liga/desliga, DB1.DBD8 → número com vírgula).
   void _onS7Changed() {
@@ -780,6 +803,8 @@ class _TagFormPageState extends State<TagFormPage> {
       if (_s7Error() != null) return (_addressAnchor, false);
     } else if (_isRaw) {
       if (_rw.build() == null) return (_addressAnchor, false);
+    } else if (_isOpcUa) {
+      if (_ua.error() != null) return (_addressAnchor, false);
     } else {
       if (_memoryError() != null) return (_memoryAnchor, false);
       if (_addressReading.error != null) return (_addressAnchor, _addressInMore);
@@ -897,6 +922,7 @@ class _TagFormPageState extends State<TagFormPage> {
     final mqtt = _isMqtt;
     final s7 = _isS7;
     final raw = _isRaw;
+    final opcua = _isOpcUa;
     final canWrite = _canWrite;
     final draft = _draft();
     final live = _current();
@@ -908,9 +934,10 @@ class _TagFormPageState extends State<TagFormPage> {
     // 10⁹, e o sinal é a explicação mais comum — se não resolver, a ordem
     // aparece em seguida.
     final readOk = live != null && _liveError == null && _liveValue != null;
-    final signed = readOk ? ReadingHints.signedInstead(live, _liveValue) : null;
+    // No OPC UA o servidor manda o número já com sinal e tipo: nada a sugerir.
+    final signed = readOk && !opcua ? ReadingHints.signedInstead(live, _liveValue) : null;
     // No S7 não há ordem de bytes para sugerir: é sempre big-endian.
-    final betterOrder = readOk && signed == null && !s7 && ReadingHints.looksAbsurd(live, _liveValue)
+    final betterOrder = readOk && signed == null && !s7 && !opcua && ReadingHints.looksAbsurd(live, _liveValue)
         ? ReadingHints.nextOrder(_order, _absurdKey == _decodeKey(live) ? _absurdOrders : const {})
         : null;
 
@@ -975,6 +1002,8 @@ class _TagFormPageState extends State<TagFormPage> {
                                 ? 'Complete o endereço do CLP'
                                 : raw
                                 ? 'Diga qual campo da mensagem'
+                                : opcua
+                                ? 'Complete o NodeId'
                                 : _addressReading.overMax
                                 ? 'Endereço acima de 65535'
                                 : _addressReading.error ?? 'Complete equipamento e endereço',
@@ -1072,6 +1101,12 @@ class _TagFormPageState extends State<TagFormPage> {
                             key: _addressAnchor,
                             child: RawAddressBlock(fields: _rw, device: _device, onChanged: _onFieldChanged, onPick: _onRawPick),
                           )
+                        // OPC UA: o NodeId, com "Navegar e escolher".
+                        else if (opcua)
+                          KeyedSubtree(
+                            key: _addressAnchor,
+                            child: OpcUaAddressBlock(fields: _ua, device: _device, onChanged: _onFieldChanged, onPick: _onOpcUaPick),
+                          )
                         else if (!_addressInMore)
                           ..._modbusAddress(),
                         // Lista é obrigatória para o gráfico de barras: aí fica à vista.
@@ -1084,7 +1119,7 @@ class _TagFormPageState extends State<TagFormPage> {
                         ],
                         // Texto: o tamanho é o essencial (quantos registradores ler).
                         // No MQTT o texto vem inteiro na mensagem.
-                        if (isText && !mqtt && !s7 && !raw) ...[
+                        if (isText && !mqtt && !s7 && !raw && !opcua) ...[
                           const SizedBox(height: Ind.space),
                           KeyedSubtree(
                             key: _lengthAnchor,
@@ -1147,7 +1182,7 @@ class _TagFormPageState extends State<TagFormPage> {
 
   /// Com perfil de fabricante (e fora do MQTT), o endereço Modbus fica em
   /// "Mais opções": à vista, só a "Memória do CLP".
-  bool get _addressInMore => _profile != null && !_isMqtt && !_isS7 && !_isRaw;
+  bool get _addressInMore => _profile != null && !_isMqtt && !_isS7 && !_isRaw && !_isOpcUa;
 
   /// Título do bloco de endereço, com o aviso de quando o tipo mudou "Onde
   /// fica" sozinho.

@@ -7,6 +7,7 @@ import '../tag_codec.dart';
 import '../tag_store.dart';
 import 'modbus_driver.dart';
 import 'mqtt_driver.dart';
+import 'opcua_driver.dart';
 import 's7_driver.dart';
 import 'raw_driver.dart';
 
@@ -71,6 +72,8 @@ abstract class DeviceDriver {
         return S7Driver(device);
       case DeviceKind.raw:
         return RawDriver(device);
+      case DeviceKind.opcua:
+        return OpcUaDriver(device);
       case DeviceKind.calc:
         // As contas leem o projeto e o TagStore: quem monta o CalcDriver é o
         // HmiRuntime, que tem os dois. Aqui só chega um "Testar conexão".

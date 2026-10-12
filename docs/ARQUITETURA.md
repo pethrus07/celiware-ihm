@@ -58,6 +58,7 @@ Script livre (JavaScript) na variável ficou de fora de propósito: a escala lin
 | Comunicação industrial | Modbus TCP/IP sobre socket TCP cru, sem biblioteca Modbus externa. |
 | MQTT | Cliente MQTT 3.1.1 do pacote `mqtt_client` (Dart puro, MIT) — seção 4.18. |
 | Siemens S7 | Cliente S7 clássico (ISO-on-TCP, PUT/GET) próprio, em Dart puro — seção 4.16. |
+| OPC UA | Cliente OPC UA (UA-TCP, OPC UA Binary, modo de segurança None) próprio, em Dart puro — seção 4.19. |
 | Arduino / ESP (cru) | Sockets TCP e UDP do `dart:io` e um interpretador próprio de perfil de mensagem, sem biblioteca — seção 4.17. |
 | Cabo USB-OTG (serial) | Canal Kotlin próprio (`celiware/usb`) sobre a usb-serial-for-android 3.11.0 (MIT, Java puro, via JitPack); Modbus RTU/ASCII e protocolo cru em Dart — seção 4.20. |
 | Persistência | JSON num arquivo na pasta privada do app (`path_provider`). Histórico dos registros em SQLite (`sqflite`, o do Android — §6.10). |
@@ -135,6 +136,14 @@ lib/
 │   │   ├── s7_error.dart             Erros tipados, inclusive por item.
 │   │   ├── s7_client.dart            Cliente ISO-on-TCP (um pedido por vez, PDU, reconexão).
 │   │   └── s7_test_server.dart       CLP S7 em Dart (testes de integração).
+│   ├── opcua/
+│   │   ├── opcua_types.dart          NodeId (texto da norma), Variant, DataValue, endpoint, referência.
+│   │   ├── opcua_binary.dart         OPC UA Binary: leitor e escritor (funções puras).
+│   │   ├── opcua_messages.dart       UA-TCP, pedaços e os serviços: canal, sessão, Read, Write, Browse.
+│   │   ├── opcua_status.dart         StatusCodes da norma.
+│   │   ├── opcua_error.dart          Erros tipados, inclusive por nó.
+│   │   ├── opcua_crypto.dart         Senha cifrada com o certificado do servidor (RSA-OAEP, SHA-1).
+│   │   └── opcua_client.dart         Cliente: canal None, sessão, um pedido por vez, reconexão.
 │   ├── mqtt/                         Regras de tópico (curingas) e erro de comunicação MQTT.
 │   ├── link/byte_link.dart           Cano de bytes: TCP e UDP (protocolos sem cabeçalho de tamanho).
 │   ├── serial/                       Cabo USB-OTG: parâmetros da linha, fronteira com o Android, porta dividida (§4.20).
@@ -149,6 +158,7 @@ lib/
 │   ├── vendor_profiles.dart          Perfis de fabricante: "D200" ⇄ área + endereço Modbus.
 │   ├── mqtt_config.dart              Broker do equipamento e tópico da variável (MQTT).
 │   ├── s7_config.dart                Família do CLP (rack/slot) e endereço S7 da variável.
+│   ├── opcua_config.dart             Servidor OPC UA (caminho, usuário) e NodeId da variável.
 │   ├── raw_config.dart               TCP/UDP e perfil do equipamento cru; campo da variável; modelos prontos.
 │   ├── serial_config.dart            Cabo USB: adaptador, velocidade, bits, paridade, parada, protocolo, eco.
 │   ├── log_group.dart                Grupo de registro de dados (§6.10).
@@ -163,9 +173,10 @@ lib/
 │   │   ├── tag_codec.dart            Registradores ⇄ valor; formatação pt-BR.
 │   │   ├── mqtt_codec.dart           Mensagem MQTT ⇄ valor (texto, número, JSON com caminho).
 │   │   ├── s7_tag_codec.dart         Variável ⇄ S7 (tipo pelo tamanho do endereço) e itens juntados.
+│   │   ├── opcua_tag_codec.dart      Variável ⇄ Variant do OPC UA (o tipo vem do servidor).
 │   │   ├── raw_codec.dart            Campo da mensagem crua ⇄ valor (escala, liga/desliga, texto).
 │   │   ├── raw_preview.dart          Prévia ao vivo do editor de perfil: guarda bytes, reinterpreta a cada mexida.
-│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver, s7_driver, raw_driver; calc_driver (contas).
+│   │   ├── drivers/                  Um driver por protocolo: modbus_driver, mqtt_driver, s7_driver, raw_driver, opcua_driver; calc_driver (contas).
 │   │   └── tag_store.dart            Última leitura por variável + histórico curto.
 │   ├── calc/                         Linguagem das contas, avaliador, quem cita quem (§6.12).
 │   ├── rules/rule_engine.dart        Motor das regras entre máquinas (§6.12).
@@ -453,6 +464,68 @@ Testes: `test/support/mqtt_test_broker.dart`, broker 3.1.1 mínimo em Dart (CONN
 
 Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; TLS só com certificado em que o Android confia (broker com certificado autoassinado não conecta); Sparkplug B e MQTT 5 ficam para a fase 2.
 
+### 4.19. OPC UA
+
+Cliente OPC UA próprio em Dart puro (`lib/core/opcua/`), no modo de segurança **None**, e o driver `OpcUaDriver`. Por que não uma biblioteca: spike em `docs/pesquisa-etapa4/7-spike-opcua.md` — o único pacote Dart que fala OPC UA, `open62541`, é FFI: compila C com CMake e rede no build e põe 8,3 MB por ABI no APK. O código próprio pesa ~0,2 MB e não muda o `pubspec`.
+
+**Núcleo**
+
+- **Codec** (`opcua_binary.dart`): OPC UA Binary, little-endian. NodeId nas seis formas (o cliente escreve a mais curta), Variant escalar e lista, DataValue, LocalizedText, ExtensionObject. Os bytes batem com vetores gerados pelo asyncua.
+- **NodeId em texto** (`opcua_types.dart`): `ns=2;s=Maquina.Temperatura`, `ns=3;i=1001`, `i=2258`, `g=`, `b=` e o do S7-1500, `ns=3;s="DB1"."Velocidade"`. O erro vem curto: "falta o tipo do identificador — i=, s=, g= ou b=". `nsu=` (namespace pelo endereço) ainda não.
+- **Mensagens** (`opcua_messages.dart`, funções puras): Hello/Ack, pedaços OPN/MSG/CLO, OpenSecureChannel, CreateSession, ActivateSession, Read, Write, Browse/BrowseNext, GetEndpoints e CloseSession. Resposta em vários pedaços é remontada. Pedido grande sai em pedaços do tamanho que o servidor aceita. O Write manda o DataValue só com o valor: StatusCode ou horário junto faz muito servidor recusar (BadWriteNotSupported, comum no S7-1500).
+- **Cliente** (`opcua_client.dart`): TCP 4840 → Hello → canal None → sessão → limite de nós por pedido do servidor (OperationLimits; sem ele, 500).
+  - Um pedido por vez, com a resposta casada pelo RequestId; resposta atrasada é descartada.
+  - O token do canal é renovado aos 75% da vida.
+  - Sessão que o servidor esqueceu (reiniciou, venceu) é reaberta e o pedido repetido uma vez. Queda de rede reconecta no próximo pedido.
+  - Desconectar avisa o servidor (CloseSession + CLO): servidor de CLP tem poucas sessões.
+  - `beforeConnect` = `LocalNetwork.prepare` (4.14).
+- **Usuário e senha.** O endpoint None diz como quer a senha: como está, ou cifrada com o certificado do servidor. A cifra é RSA-OAEP/SHA-1, da política Basic256Sha256 — o que servidor com endpoint seguro costuma pedir. `opcua_crypto.dart` lê a chave pública do X.509 e cifra a senha com o nonce da sessão, sem dependência nova. Outra cifra de senha é recusada com o nome da política.
+- **Erros** (`opcua_error.dart`, todos `CommError`; StatusCodes em `opcua_status.dart`):
+  - **conexão**: porta recusada; endpoint inexistente (ERR BadTcpEndpointUrlInvalid → "confira o caminho");
+  - **tempo esgotado**, **protocolo** e **serviço recusado** (sessões demais, licença);
+  - **segurança exigida** (`OpcUaSecurityRequired`), com o que o servidor oferece: "Basic256Sha256 · SignAndEncrypt";
+  - **usuário** (`OpcUaAuthError`): recusado, anônimo não aceito, usuário não aceito, cifra de senha que o app não faz;
+  - **por nó** (`OpcUaNodeError`): "nó inexistente: ns=2;s=Temperatura", sem acesso, não gravável, tipo recusado, sem comunicação com o equipamento.
+- **Limites.** Só o modo None (Sign/SignAndEncrypt: 40–60 h, no spike). Sem Subscription: a varredura lê. Sem `nsu=`. Estrutura do servidor (ExtensionObject) e DateTime não viram valor de variável.
+
+**No app**
+
+- **Equipamento** do tipo `opcua`, em **Na rede → Mais opções → Protocolo → OPC UA**: a porta vira 4840; somem ID do escravo e marca e modelo. Em "Mais opções":
+  - porta e **caminho do endpoint** (o que vem depois da porta, `/OPCUA/SimulationServer`; vazio na maioria dos CLPs);
+  - o endereço completo, para conferir com a tela do servidor ("Endereço: opc.tcp://192.168.0.10:4840");
+  - usuário (vazio = anônimo) e senha, que só aparece com usuário;
+  - a linha **Segurança**: "Sem criptografia (modo None). Esta versão ainda não faz Sign nem SignAndEncrypt: se o servidor exigir, habilite nele o modo None."
+
+  Colar o endereço inteiro (`opc.tcp://192.168.0.70:49320/Kepware`) no campo do IP separa IP, porta e caminho. A configuração mora em `Device.opcua` (`OpcUaConfig`, `lib/models/opcua_config.dart`) e só vai para o arquivo o que difere do padrão: servidor anônimo na raiz não grava nada além do `kind`. A senha vai no arquivo do projeto, como a do MQTT.
+- **Variável.** O endereço é o NodeId em `Tag.opcua` (`OpcUaTagAddress`), guardado arrumado (" NS=2; s=Temp" → "ns=2;s=Temp"); a lista mostra o NodeId. O bloco (`lib/screens/tags/opcua_tag_fields.dart`) fica no lugar de "Onde fica", com a prova embaixo ("namespace 2, nome Maquina.Temperatura") ou o erro curto.
+  - **Navegar e escolher** mostra a árvore do servidor, um nível por vez, a partir de Objects, com o valor de agora e o tipo de cada variável ("72,5 · Double"). Os objetos do próprio servidor (namespace 0: Server, Aliases, Locations) ficam de fora.
+  - Tocar numa variável preenche NodeId, nome de partida, tipo, casas decimais do valor e quantos valores (lista do servidor). Se o servidor não deixa o usuário gravar (UserAccessLevel), "Pode ser alterada pela tela" desliga.
+  - O servidor diz o tipo. O cadastro só oferece liga/desliga, número inteiro, número com vírgula e texto; somem ordem de bytes, hexadecimal e as sugestões de sinal e de palavras trocadas do "Lendo agora".
+- **Driver** (`OpcUaDriver`, modo varredura). Um Read com os nós em uso (o mesmo nó em duas variáveis vai uma vez), dividido pelo limite do servidor; o selo conta uma ida e volta.
+  - `OpcUaTagCodec` (`lib/services/runtime/opcua_tag_codec.dart`): qualquer número vira número, com a escala da variável; liga/desliga aceita Boolean ou número; texto aceita String e LocalizedText; lista do servidor vira lista.
+  - Tipo que não combina é erro de configuração, com a escolha certa: "o nó é texto: escolha Texto (em Mais opções)".
+  - **Gravar usa o tipo do nó no servidor**, aprendido na leitura (ou lido na primeira gravação): Double num nó UInt16 o servidor recusa. Faixa e passo são conferidos antes da rede, na unidade da tela ("aceita de 0 a 65535", "aceita passos de 0,1").
+- **Erros na tela.**
+  - Nó inexistente marca só a variável dele (endereço inexistente). Não há bloco para separar, como no Modbus: o servidor responde nó a nó.
+  - StatusCode de "sem comunicação" (BadNoCommunication e parentes, comum em Kepware e gateways com o CLP desligado) deixa só aquele nó sem comunicação, com o último valor. O selo fica verde: o servidor está de pé.
+  - Queda, tempo esgotado, segurança exigida e usuário recusado são `CommError`: tudo sem comunicação, com a espera crescente.
+- **Testar conexão** = canal, sessão e leitura do estado do servidor (`OpcUaClient.ping`). Quando falha, o cartão diz o que conferir (`OpcUaDeviceFields.checks`): segurança exigida (habilitar o modo None no servidor, com o caminho no TIA Portal para o S7-1500), usuário recusado, anônimo ou usuário não aceitos, caminho errado (colar o endereço da tela do servidor), licença, porta (4840; o Kepware usa 49320; no S7-1500 o servidor vem desligado) ou a rede. As recusas contam como "recusou": o servidor foi achado.
+- **Lendo agora** lê pela sessão do equipamento; fechar o cadastro solta a sessão, com CloseSession. "Navegar e escolher" usa uma sessão própria, que fecha com a folha.
+- Variável de outro protocolo num servidor OPC UA vira "variável sem NodeId do OPC UA"; NodeId num equipamento Modbus, "variável de OPC UA num equipamento Modbus".
+
+Testes: `test/support/opcua_test_server.dart` é um servidor OPC UA mínimo em Dart, com codificação própria (sem o codec do app; só o SHA-1, que tem vetores próprios). Tem anônimo, usuário e senha (inclusive cifrada, com a chave de teste de `opcua_test_keys.dart`), endpoint só seguro, caminho estrito, limite de nós, continuação na navegação, respostas em pedaços, vida curta do canal, sessões esquecidas, atraso e perda de resposta.
+
+Houve também uma conferência manual contra o **asyncua 2.1.0** (Python, num venv fora do repositório; scripts em `build/spike/`, fora do git), com quatro servidores: anônimo + usuário, só usuário, só SignAndEncrypt, e None + Basic256Sha256 com certificado.
+
+- **Bateu:** leitura de Double, UInt16, Boolean, Int32, String, Int16[] e Float num pedido só; nó inexistente só nele (BadNodeIdUnknown); gravação de UInt16, Boolean e Float; navegação da raiz, de uma pasta e de 259 filhos; leitura de 777 atributos com pedaços de 8 KB (resposta em vários pedaços); usuário e senha em texto e **cifrada** (RSA-OAEP) no endpoint None; senha errada → "o servidor recusou o usuário"; anônimo num servidor só com usuário → "não aceita conexão anônima"; servidor só SignAndEncrypt → segurança exigida, com "Basic256Sha256 · SignAndEncrypt"; o caminho de produção inteiro (teste de conexão em 14 ms, varredura num pedido, gravações, selo).
+- **Diferiu do servidor de teste:**
+  - o asyncua responde **BadUserAccessDenied** (não BadNotWritable) a quem grava num nó só leitura — as duas viram "o servidor não deixa gravar em …";
+  - a pasta Objects dele traz Locations e Aliases (namespace 0), que a navegação esconde;
+  - ele não publica OperationLimits: vale o teto do app, 500 nós por pedido;
+  - gravar Double num UInt16 dá BadTypeMismatch — daí gravar no tipo aprendido na leitura.
+
+Nada foi conferido num servidor industrial (S7-1500, Kepware, CODESYS, Prosys) nem num CLP com OPC UA.
+
 ### 4.20. Serial por USB-OTG (cabo USB)
 
 Adaptador USB ↔ RS-485/RS-232 (CH340, CP210x, FTDI, PL2303) ou o próprio USB de um Arduino, ligado no celular por um cabo OTG. Equipamento do tipo `usbSerial`, escolhido no cartão **Cabo USB** do cadastro, ao lado de "Na rede" e "Demonstração". Pelo cabo falam Modbus RTU, Modbus ASCII ou a mensagem própria do Arduino (§4.17). Requisitos RT-1 a RT-3 (REQUISITOS-ETAPA4 §8.2). **Nada disto passou por adaptador nem equipamento de verdade:** tudo foi validado contra uma porta simulada (fim da seção), e o lado Android só foi compilado.
@@ -576,13 +649,14 @@ O carimbo de cada pacote anda só com o fio, então as pausas medidas não depen
 
 | Campo | Significado |
 |---|---|
-| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker), `demo` (máquina simulada no aparelho), `s7` (CLP Siemens), `raw` (Arduino/ESP com mensagem própria), `calc` (o equipamento virtual "Cálculos", das variáveis calculadas — §6.12; fica fora de `Project.equipment`) ou `usbSerial` (cabo USB-OTG — §4.20). |
-| host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). Em S7, porta 102; o ID não é usado. No cru, a porta do sketch (5030 de partida). |
+| kind | `modbusTcp` (rede), `modbusRtuTcp` (gateway RS-485), `mqtt` (broker), `demo` (máquina simulada no aparelho), `s7` (CLP Siemens), `raw` (Arduino/ESP com mensagem própria), `calc` (o equipamento virtual "Cálculos", das variáveis calculadas — §6.12; fica fora de `Project.equipment`), `usbSerial` (cabo USB-OTG — §4.20) ou `opcua` (servidor OPC UA, §4.19). |
+| host, port, unitId | IP ou nome, porta (502), ID do escravo (1). Em MQTT, IP e porta do broker (1883). Em S7, porta 102; o ID não é usado. No cru, a porta do sketch (5030 de partida). Em OPC UA, 4840. |
 | timeoutMs | Tempo máximo por resposta (1500 ms). |
 | pollMs | Intervalo entre varreduras (500 ms). |
 | profile | Perfil de fabricante (`inovance-h3u`, `invt-ivc1`…); ausente = Modbus genérico. Só vai para o arquivo quando existe (4.6). |
 | mqtt | Só em equipamento MQTT, e só o que difere do padrão: tls, username, password, keepAliveSec (10), clientId (vazio = automático), statusTopic e offlinePayload do testamento. |
 | s7 | Só em equipamento S7, e só o que difere do padrão (1200/1500, rack 0, slot 1): family (`s7300`, `s7400`, `s71200`, `other`) e, em `other`, rack e slot. |
+| opcua | Só em equipamento OPC UA, e só o que difere do padrão (anônimo, na raiz): path (caminho do endpoint, "/OPCUA/SimulationServer"), username, password. Segurança: só None nesta versão, sem campo — quando Sign entrar, o padrão None mantém os arquivos de hoje. |
 | raw | Só em equipamento cru: transport (`tcp` · `udp`), localPort (UDP, quando não é 0) e profile — o perfil da mensagem inteiro (framing, checksum, fields, mode, poll, pollMs, staleAfterMs, commands, charset, decimalComma, maxFrameBytes; bytes na notação `\n`, `\xAA`). No cabo USB com Arduino, só profile. |
 | serial | Só em equipamento `usbSerial`, e só o que difere do padrão (Modbus RTU, 9600 8N1): usb (vendorId, productId, portIndex quando não é 0, serialNumber, chip e product para mostrar), baud, dataBits, parity (`even` · `odd`), stopBits, protocol (`ascii` · `raw`) e discardEcho. |
 
@@ -604,6 +678,7 @@ O carimbo de cada pacote anda só com o fio, então as pausas medidas não depen
 | memory | A memória como no manual ("D200", "X10", "F3-12"), com perfil de fabricante. Só texto para mostrar e recalcular: `area`/`address` continuam a verdade. Só vai para o arquivo quando existe. |
 | mqtt | Só em variável de equipamento MQTT: topic, jsonPath, commandTopic, qos, retain, validitySec, boolFormat, commandJson. Com ele, area/address voltam ao padrão e ninguém lê. |
 | s7 | Só em variável de CLP S7: address, o texto do TIA ("DB1.DBW4", "EW64", "P#DB1.DBX10.0 BYTE 22"). O tipo continua em dataType e precisa caber no tamanho do endereço. Com ele, area/address voltam ao padrão; entrada (I/E) perde a escrita. |
+| opcua | Só em variável de servidor OPC UA: nodeId, o NodeId em texto ("ns=2;s=Maquina.Temperatura"). O tipo do valor quem diz é o servidor; dataType só escolhe como mostrar. Com ele, area/address voltam ao padrão. |
 | raw | Só em variável de equipamento cru: field, validitySec, command (modelo de texto ou binário). Com ele, area/address voltam ao padrão, length = 1 e ninguém lê. |
 | calc | Só em variável calculada (§6.12): `expr`, a conta canônica com `{id}` no lugar de cada variável citada, e `names`, o nome de cada citada no dia em que foi salva. Com ele, `normalized()` deixa só leitura, um valor, sem escala, tipo liga/desliga ou número com vírgula. Só vai para o arquivo quando existe. |
 | ruleWritable | "Aceita escrita por regra" (LG-5): sem ela nenhuma regra grava aqui. Vale só com a variável gravável (`acceptsRuleWrite`). Só vai para o arquivo quando marcada. |
@@ -1002,7 +1077,7 @@ Corrigir uma tabela não muda sozinho o endereço das variáveis já criadas (el
 
 Desde a etapa 4 o motor é dividido em dois. A `DeviceSession` é dona do laço, da espera crescente depois de uma queda e da saúde da conexão — vale para todo protocolo. O que é de protocolo mora num **driver** (`lib/services/runtime/drivers/`), atrás do contrato `DeviceDriver`: `connect`, `scan` (lê as variáveis em uso e publica no `TagStore`), `readOnce`, `write`, `ping` e `tagsChanged`. Falha de comunicação sai como `CommError` (`lib/core/comm/`), que a sessão trata igual para todos: "sem comunicação" com o último valor esmaecido. Falha de uma variável só (endereço inexistente, pedido fora do limite) o driver resolve publicando a qualidade daquela variável.
 
-`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.18) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `S7Driver` (4.16) é o modelo para outro protocolo de varredura: planejador e codec ao lado do driver (`s7_tag_codec.dart`), o endereço da variável num objeto opcional da `Tag` (`Tag.s7`, como `Tag.mqtt`), a configuração num da `Device` (`Device.s7`), e os campos dos cadastros em arquivos próprios (`s7_device_fields.dart`, `s7_tag_fields.dart`) com ganchos pequenos nos formulários (`if (s7) … else if (mqtt) … else`). `RawDriver` (4.17) também é de assinatura: o `scan` só confere validades, e o socket é dividido pelo `RawLinkPool` com as ferramentas do cadastro. Variável de um protocolo num equipamento de outro (tópico MQTT, endereço S7 ou campo cru num Modbus; endereço Modbus num cru) vira erro de configuração daquela variável — nunca uma leitura do HR 0 no lugar dela. O cabo USB (§4.20) não é protocolo novo: é outro cano (`SerialLink`) para dois que já existiam, e o `forDevice` escolhe `ModbusDriver` ou `RawDriver` pelo `SerialConfig.protocol`; um meio novo (COM no Windows) seria outra `UsbSerialPlatform` ou outro `SerialLink`, sem mexer em driver. O `CalcDriver` (§6.12) é o driver sem rede: lê o `TagStore` e publica o resultado das contas, e o `HmiRuntime` o entrega à sessão do equipamento virtual pelo `driverFactory`. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
+`ModbusDriver` é o primeiro: agrupamento (`ScanPlanner`), isolamento do endereço errado, codec e escrita. Para Modbus sobre outro meio (RTU por serial ou gateway) basta outro transporte com a interface de `ModbusClient`. Protocolo diferente (OPC UA) é um driver novo, escolhido em `DeviceDriver.forDevice` pelo tipo do equipamento. `MqttDriver` (4.18) é o segundo e o modelo para os de assinatura: `scan` reconcilia assinaturas e os valores chegam sozinhos; `reportsScanTime` falso tira o tempo de varredura do selo. `S7Driver` (4.16) é o modelo para outro protocolo de varredura: planejador e codec ao lado do driver (`s7_tag_codec.dart`), o endereço da variável num objeto opcional da `Tag` (`Tag.s7`, como `Tag.mqtt`), a configuração num da `Device` (`Device.s7`), e os campos dos cadastros em arquivos próprios (`s7_device_fields.dart`, `s7_tag_fields.dart`) com ganchos pequenos nos formulários (`if (s7) … else if (mqtt) … else`). `OpcUaDriver` (4.19) é o terceiro de varredura e o mais simples: o servidor responde nó a nó, então não há planejador nem isolamento — um Read com os nós em uso —, e o tipo para gravar vem do servidor, não da variável. `RawDriver` (4.17) também é de assinatura: o `scan` só confere validades, e o socket é dividido pelo `RawLinkPool` com as ferramentas do cadastro. Variável de um protocolo num equipamento de outro (tópico MQTT, endereço S7 ou campo cru num Modbus; endereço Modbus num cru) vira erro de configuração daquela variável — nunca uma leitura do HR 0 no lugar dela. O cabo USB (§4.20) não é protocolo novo: é outro cano (`SerialLink`) para dois que já existiam, e o `forDevice` escolhe `ModbusDriver` ou `RawDriver` pelo `SerialConfig.protocol`; um meio novo (COM no Windows) seria outra `UsbSerialPlatform` ou outro `SerialLink`, sem mexer em driver. O `CalcDriver` (§6.12) é o driver sem rede: lê o `TagStore` e publica o resultado das contas, e o `HmiRuntime` o entrega à sessão do equipamento virtual pelo `driverFactory`. `test/runtime/device_driver_test.dart` mostra o contrato com um driver de mentira. Plano completo dos protocolos: `docs/REQUISITOS-ETAPA4.md` §8.
 
 ### 10.4. Mudar o formato do arquivo
 
@@ -1073,6 +1148,9 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/core/rawlink_test.dart` | Protocolo cru: os quatro tipos de delimitação, mensagem partida e grudada, lixo, buffer cheio, ressincronização do binário; checksum com vetores conhecidos (CRC16, NMEA), certo/errado, BCC depois do ETX; campos chave=valor, CSV, regex e binário nas quatro ordens; comandos de texto e binários; JSON do perfil ida e volta; cliente contra o Arduino falso por TCP e UDP (streaming, polling, comando, silêncio, queda, porta fechada). |
 | `test/runtime/s7_device_test.dart` | CLP S7 pelo caminho de produção contra o `S7TestServer`: testar conexão, ler na varredura num pedido só (DB juntado, M, I), gravar bit sem mexer nos vizinhos e palavra, entrada só leitura, faixa na unidade da tela; erro por item isolando só a errada (DB inexistente, fora do DB, acesso negado) e voltando ao corrigir; PUT/GET desligado no teste e na varredura, voltando sozinho; família errada, certa e "Outro"; porta recusada; queda e reconexão; "lendo agora" soltando a conexão; tipo que não cabe e variável de outro protocolo; tipo sugerido, mensagens com o endereço certo, lista, byte e escala, item juntado; arquivo ida e volta e projeto antigo idêntico. |
 | `test/widgets/s7_forms_test.dart` | Cadastro com S7: protocolo em Mais opções troca porta e campos, família do CLP e "Outro" com rack e slot, volta ao Modbus; testar conexão com PUT/GET desligado mostrando o passo a passo do TIA e depois respondendo; variável com o endereço do TIA no lugar do Modbus (sem hexadecimal e ordem de bytes), erro curto, tipo pelo tamanho, entrada só leitura, prova da leitura e "lendo agora" contra o CLP de teste; prova e sugestão de tipo como funções puras. |
+| `test/core/opcua_test.dart` | OPC UA. Codec contra vetores do asyncua 2.1.0 (Hello, NodeId nas seis formas, Variant, DataValue, Read/Write/Browse byte a byte, respostas lidas), pedaços de MSG, mensagem cortada; NodeId em texto e erros; SHA-1 (FIPS 180), chave do X.509, senha cifrada conferida contra a Python. Por socket real contra o `OpcUaTestServer`: anônimo lendo vários nós, gravando e navegando; usuário certo e errado; senha cifrada; só endpoint seguro; caminho errado; respostas em pedaços e continuação; limite de nós do servidor; renovação do canal; sessão esquecida reaberta; tempo esgotado e resposta atrasada; queda e reconexão; desconexão pedida; porta fechada. |
+| `test/runtime/opcua_device_test.dart` | Servidor OPC UA pelo caminho de produção: testar, ler num Read só (nó repetido vai uma vez), gravar no tipo do nó (UInt16, Boolean, Float), escala, faixa e passo; nó inexistente só nele e voltando; sem comunicação com o equipamento num nó só; anônimo não aceito, usuário errado, segurança exigida; caminho errado e porta fechada; queda e reconexão; "lendo agora" soltando a sessão; cadastro que não fecha e protocolo errado; navegação (raiz sem o namespace 0, valor, permissão, tipo, casas, lista); codec puro; arquivo ida e volta e projeto antigo igual. |
+| `test/widgets/opcua_forms_test.dart` | Cadastro com OPC UA: protocolo em Mais opções (4840, sem ID e marca), segurança dita na tela, endereço colado separado em IP, porta e caminho, usuário e senha, salvar e voltar ao Modbus; testar conexão com usuário errado (o que conferir) e certo; variável com NodeId no lugar do Modbus (sem hexadecimal, ordem e formatos de registrador), erro curto, prova, "nó inexistente" no "Lendo agora", Navegar e escolher preenchendo NodeId, nome, tipo e casas, sessão solta ao sair. |
 | `test/runtime/raw_device_test.dart` | Equipamento cru pelo caminho de produção contra o Arduino falso: TCP em streaming (testar, ler na hora, gravar pelo comando e a confirmação), polling, escala desfeita e comando próprio da variável, valor que não cabe e falta de comando, checksum errado descartado, teste "não entendeu" × "nada chegou", equipamento mudo e volta na hora, campo que parou de vir, queda e reconexão, UDP em streaming para a porta local e em polling com comando, um socket só para telas + teste + ouvir + prévia, prévia reinterpretando ao mexer no perfil e mandando a pergunta do polling, "Lendo agora" (campo que não veio, nada chegou, soltar ao sair), variável do protocolo errado, arquivo do projeto ida e volta, codec e modelos prontos. |
 | `test/widgets/raw_forms_test.dart` | Cadastro com Arduino: protocolo em Mais opções, TCP/UDP e porta deste celular, mensagem à vista; variável com campo e comando do equipamento como dica; editor do perfil com a prévia ao vivo contra o Arduino falso (problema, trocar o modelo e dar nomes reinterpreta sem mensagem nova, checksum errado), "Testar conexão" falhando e passando; "Ouvir o equipamento" preenche campo, tipo e nome. |
 | `test/runtime/rtu_device_test.dart` | Equipamento atrás de gateway RS-485 pelo caminho de produção (fábrica → driver → sessão): testar, ler na varredura e gravar em RTU e ASCII; envelope no arquivo do projeto. |
@@ -1122,6 +1200,7 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Etapa 3 — Play Store:** o lado técnico e a ficha estão prontos (`docs/loja/`); falta o que é do dono — D-U-N-S, conta de organização, chave de upload. Roteiro em `docs/PUBLICACAO.md`.
 - **Perfis de fabricante:** validar em bancada (Inovance H3U/H5U primeiro, o manual da série H não foi aberto).
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
+- **OPC UA:** conferir num servidor industrial (S7-1500 com a licença, Kepware, CODESYS) e num CLP; depois Sign/SignAndEncrypt (40–60 h) e Subscription (12–20 h) — `docs/pesquisa-etapa4/7-spike-opcua.md`.
 - **Siemens S7:** conferir num S7-1200 de verdade (kit) — PUT/GET, DB não otimizado, família no "Testar conexão" e o tempo da varredura com PDU 240.
 - **Cabo USB:** primeira bancada com adaptador CH340/FTDI e um CLP ou escravo serial — roteiro na §4.20.
 - **Ideias registradas:** script livre na variável (as calculadas da §6.12 cobrem as contas; JavaScript segue fora), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.

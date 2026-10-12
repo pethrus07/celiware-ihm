@@ -49,7 +49,7 @@ contra `docs/ARQUITETURA.md` em 12/10/2026):
 | Testar conexão com o que conferir | §6.5, §4.14 |
 | Notação de Inovance, INVT, WEG, Delta, MD500, GD20 | §6.6 "Memória do CLP"; **validação em bancada pendente** — por isso "confira com o manual do seu modelo" |
 | Criar várias por faixa ou CSV | §6.6, IF-1 a IF-5 |
-| RTU/ASCII por conversor ou cabo USB-OTG, S7, MQTT, cru | §4.15–4.18 e §4.20; **nenhum testado em equipamento real** (o USB só com porta simulada) — por isso "novos nesta versão e ainda estão sendo conferidos" |
+| RTU/ASCII por conversor ou cabo USB-OTG, S7, OPC UA, MQTT, cru | §4.15–4.20 (OPC UA só no modo None, conferido contra o asyncua); **nenhum testado em equipamento real** (o USB só com porta simulada) — por isso "novos nesta versão e ainda estão sendo conferidos" |
 | ISA-18.2, faixa, marca, vibração, reconhecer, histórico | §6.8 |
 | Voz no fone com fila e narração | §6.9 |
 | Registro, gráfico e CSV | §6.10 |
@@ -71,7 +71,7 @@ descrições. Os termos que o público digita já aparecem no texto, cada um uma
 ou duas vezes (repetir demais é motivo de recusa):
 
 IHM · CLP · PLC · Modbus TCP · inversor · Inovance · INVT · WEG · Delta ·
-Siemens S7 · MQTT · Arduino · ESP · RS-485 · alarmes · receitas · máquina ·
+Siemens S7 · OPC UA · MQTT · Arduino · ESP · RS-485 · alarmes · receitas · máquina ·
 operador · tablet.
 
 ## Configurações da loja

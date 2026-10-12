@@ -74,6 +74,7 @@ void main() {
     final app = PrivacyPage.sections.expand((s) => [s.$1, ...s.$2]).join('\n');
     for (final fato in [
       'broker MQTT',
+      'servidor OPC UA',
       'Quem está aplicando',
       'Mais → Registros',
       'backup do Android',

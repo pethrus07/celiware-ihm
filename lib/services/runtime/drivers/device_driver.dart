@@ -7,6 +7,7 @@ import '../tag_codec.dart';
 import '../tag_store.dart';
 import 'modbus_driver.dart';
 import 'mqtt_driver.dart';
+import 'opcua_driver.dart';
 import 's7_driver.dart';
 import 'raw_driver.dart';
 
@@ -74,6 +75,8 @@ abstract class DeviceDriver {
       case DeviceKind.usbSerial:
         // Pelo cabo fala Modbus (RTU/ASCII) ou a mensagem de um Arduino.
         return device.serial.isRaw ? RawDriver(device) : ModbusDriver(clientFactory(device));
+      case DeviceKind.opcua:
+        return OpcUaDriver(device);
       case DeviceKind.calc:
         // As contas leem o projeto e o TagStore: quem monta o CalcDriver é o
         // HmiRuntime, que tem os dois. Aqui só chega um "Testar conexão".

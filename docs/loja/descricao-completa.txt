@@ -19,7 +19,7 @@ Conectar
 • O Testar conexão diz o que conferir quando não conecta: o Wi-Fi, a faixa de IP, a porta e o Modbus ligado no equipamento.
 • Notação do fabricante: com Inovance H3U e H5U, INVT IVC1 e IVC3, WEG TPW04, Delta DVP e os inversores MD500 e GD20, você digita D200 e o app acha o endereço Modbus. Os mapas seguem os manuais; confira com o do seu modelo.
 • Criar várias variáveis de uma vez, por faixa (D0 a D99) ou por planilha CSV.
-• Também fala Modbus RTU e ASCII através de conversor RS-485 para rede ou de cabo USB-OTG (RS-485/RS-232) ligado no celular, Siemens S7 (S7-300, 400, 1200 e 1500, com PUT/GET), MQTT 3.1.1 e mensagem própria por TCP ou UDP (Arduino, ESP). Esses protocolos são novos nesta versão e ainda estão sendo conferidos em equipamento real: teste com o seu antes de usar na produção.
+• Também fala Modbus RTU e ASCII através de conversor RS-485 para rede ou de cabo USB-OTG (RS-485/RS-232) ligado no celular, Siemens S7 (S7-300, 400, 1200 e 1500, com PUT/GET), OPC UA (modo sem criptografia), MQTT 3.1.1 e mensagem própria por TCP ou UDP (Arduino, ESP). Esses protocolos são novos nesta versão e ainda estão sendo conferidos em equipamento real: teste com o seu antes de usar na produção.
 
 Alarmes
 • Três prioridades com cor, forma e número, como pede a ISA-18.2: faixa no topo de todas as telas, marca no próprio elemento, vibração, reconhecimento e histórico.

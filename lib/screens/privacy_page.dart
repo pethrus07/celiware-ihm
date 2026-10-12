@@ -18,7 +18,7 @@ class PrivacyPage extends StatelessWidget {
   static const sections = <(String, List<String>)>[
     ('O que fica no seu celular', [
       'O app guarda, só na área privada dele no aparelho:',
-      '• o projeto: equipamentos, variáveis, telas, alarmes, receitas e regras que você cadastrou, inclusive usuário e senha de equipamento (broker MQTT), quando houver;',
+      '• o projeto: equipamentos, variáveis, telas, alarmes, receitas e regras que você cadastrou, inclusive usuário e senha de equipamento (broker MQTT, servidor OPC UA), quando houver;',
       '• os históricos de alarmes, de regras e de receitas aplicadas, com o nome digitado em "Quem está aplicando";',
       '• os registros de dados que você criar (Mais → Registros);',
       '• preferências do aparelho: aparência, voz e tutoriais já vistos.',

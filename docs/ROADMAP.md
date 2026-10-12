@@ -9,9 +9,9 @@ só a lista de trabalho.
 Tag `v1.3.2`. É a versão para apresentar e instalar
 (`celiware-ihm-1.3.2-arm64.apk`, celulares Android de 2017 para cá). A próxima já sai com o nome **Ware IoT**.
 
-**Prévia 1.4.0 (11/10, sem tag; build 9 em 12/10):** a etapa 4 construída até
-aqui, para teste interno (`ware-iot-1.4.0-previa-2-arm64.apk`, com câmeras,
-cabo USB-OTG e OPC UA). Não é entrega: a etapa 4 sai
+**Prévia 1.4.0 (11/10, sem tag; build 10 em 12/10):** a etapa 4 construída até
+aqui, para teste interno (`ware-iot-1.4.0-previa-3-arm64.apk`, com câmeras,
+cabo USB-OTG, OPC UA e as 13 correções da rodada de QA visual). Não é entrega: a etapa 4 sai
 numa entrega só, quando fechar (ver "Forma" abaixo). Estado item a item na
 tabela da etapa 4.
 

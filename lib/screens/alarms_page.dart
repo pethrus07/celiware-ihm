@@ -7,12 +7,17 @@ import '../services/alarms/alarm_engine.dart';
 import '../services/runtime/tag_codec.dart';
 import '../widgets/alarms/alarm_widgets.dart';
 import '../widgets/alarms/silence_button.dart';
+import '../widgets/common/adaptive.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/hmi_frame.dart';
 
 /// Lista de alarmes (ISA-18.2 §11.6): **Ativos** — o mais grave em cima,
 /// reconhecer um a um — e **Histórico** — o que aconteceu, com hora.
-class AlarmsPage extends StatelessWidget {
+///
+/// No tablet deitado (TB-2) a lista fica à esquerda e o alarme tocado abre ao
+/// lado: o valor de agora em letra grande e o que já aconteceu com ele. Sem
+/// toque, o detalhe mostra o mais grave.
+class AlarmsPage extends StatefulWidget {
   const AlarmsPage({super.key});
 
   static const routeName = 'alarmes';
@@ -20,13 +25,47 @@ class AlarmsPage extends StatelessWidget {
   static Route<void> route() => MaterialPageRoute(settings: const RouteSettings(name: routeName), builder: (_) => const AlarmsPage());
 
   @override
+  State<AlarmsPage> createState() => _AlarmsPageState();
+}
+
+/// Alarme aberto no detalhe: pela chave quando veio da lista de ativos; só
+/// pelo texto quando veio do histórico (o evento não guarda a chave).
+typedef _Pick = ({String? key, String message});
+
+class _AlarmsPageState extends State<AlarmsPage> {
+  _Pick? _pick;
+
+  /// As abas mudam de lugar na árvore ao girar o tablet: a chave leva junto
+  /// a rolagem das listas.
+  final _tabsKey = GlobalKey();
+
+  @override
   Widget build(BuildContext context) {
     final engine = AppScope.of(context).alarms;
+    final two = WindowClass.twoPane(context);
     return ListenableBuilder(
       listenable: engine,
       builder: (context, _) {
         final entries = engine.entries;
         final unack = engine.unackCount;
+        final first = entries.firstOrNull;
+        final pick = _pick ?? (first == null ? null : (key: first.key, message: first.message));
+        void select(_Pick p) => setState(() => _pick = p);
+        final tabs = KeyedSubtree(
+          key: _tabsKey,
+          child: TabBarView(children: [
+            _ActiveList(
+              entries: entries,
+              selectedKey: two ? pick?.key : null,
+              onSelect: two ? (e) => select((key: e.key, message: e.message)) : null,
+            ),
+            _HistoryList(
+              events: engine.history,
+              selectedMessage: two && pick?.key == null ? pick?.message : null,
+              onSelect: two ? (ev) => select((key: null, message: ev.message)) : null,
+            ),
+          ]),
+        );
         return DefaultTabController(
           length: 2,
           child: Scaffold(
@@ -46,6 +85,9 @@ class AlarmsPage extends StatelessWidget {
                   ),
               ],
               bottom: TabBar(
+                // Com dois painéis, as abas ficam sobre a lista.
+                isScrollable: two,
+                tabAlignment: two ? TabAlignment.start : null,
                 indicatorColor: Ind.accent,
                 labelColor: Ind.text,
                 unselectedLabelColor: Ind.textMuted,
@@ -56,10 +98,13 @@ class AlarmsPage extends StatelessWidget {
                 ],
               ),
             ),
-            body: TabBarView(children: [
-              _ActiveList(entries: entries),
-              _HistoryList(events: engine.history),
-            ]),
+            body: two
+                ? Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    SizedBox(width: 360, child: tabs),
+                    // Tom de cartão: separa da lista pelo fundo, sem linha.
+                    Expanded(child: Material(color: Ind.surface, child: FormWidth(child: _AlarmDetail(pick: pick, entries: entries, history: engine.history)))),
+                  ])
+                : tabs,
           ),
         );
       },
@@ -83,8 +128,12 @@ class AlarmsPage extends StatelessWidget {
 }
 
 class _ActiveList extends StatelessWidget {
-  const _ActiveList({required this.entries});
+  const _ActiveList({required this.entries, this.selectedKey, this.onSelect});
   final List<AlarmEntry> entries;
+
+  /// Com dois painéis: o alarme aberto no detalhe e o toque que abre outro.
+  final String? selectedKey;
+  final ValueChanged<AlarmEntry>? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -100,15 +149,24 @@ class _ActiveList extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(Ind.page, Ind.space, Ind.page, 40),
         itemCount: entries.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) => _AlarmCard(entry: entries[i]),
+        itemBuilder: (context, i) => _AlarmCard(
+          entry: entries[i],
+          selected: entries[i].key == selectedKey,
+          onTap: onSelect == null ? null : () => onSelect!(entries[i]),
+        ),
       ),
     );
   }
 }
 
 class _AlarmCard extends StatelessWidget {
-  const _AlarmCard({required this.entry});
+  const _AlarmCard({required this.entry, this.selected = false, this.onTap});
   final AlarmEntry entry;
+
+  /// Aberto no detalhe ao lado (tablet): fundo na cor de seleção. A borda
+  /// continua sendo do estado do alarme.
+  final bool selected;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -118,9 +176,13 @@ class _AlarmCard extends StatelessWidget {
     final c = entry.priority.color;
     final returned = entry.phase == AlarmPhase.returnedUnack;
     final rule = entry.rule;
-    return Container(
+    final card = Container(
       key: ValueKey('alarme-${entry.key}'),
-      decoration: Ind.card(border: entry.phase.unacked ? c.withValues(alpha: returned ? 0.35 : 0.7) : null, width: 1.5),
+      decoration: Ind.card(
+        color: selected ? Color.alphaBlend(Ind.accent.withValues(alpha: 0.12), Ind.surface) : null,
+        border: entry.phase.unacked ? c.withValues(alpha: returned ? 0.35 : 0.7) : null,
+        width: 1.5,
+      ),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -170,6 +232,8 @@ class _AlarmCard extends StatelessWidget {
         ],
       ]),
     );
+    final tap = onTap;
+    return tap == null ? card : GestureDetector(behavior: HitTestBehavior.opaque, onTap: tap, child: card);
   }
 }
 
@@ -187,8 +251,12 @@ class _Pill extends StatelessWidget {
 }
 
 class _HistoryList extends StatelessWidget {
-  const _HistoryList({required this.events});
+  const _HistoryList({required this.events, this.selectedMessage, this.onSelect});
   final List<AlarmEvent> events;
+
+  /// Com dois painéis: o alarme aberto no detalhe e o toque que abre outro.
+  final String? selectedMessage;
+  final ValueChanged<AlarmEvent>? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +276,20 @@ class _HistoryList extends StatelessWidget {
         day = d;
         items.add(SectionHeader(d, padding: const EdgeInsets.fromLTRB(0, 20, 0, 8)));
       }
-      items.add(_HistoryRow(event: ev));
+      final tap = onSelect;
+      final row = _HistoryRow(event: ev);
+      items.add(tap == null
+          ? row
+          : Material(
+              // Linha do alarme aberto no detalhe: fundo na cor de seleção.
+              color: ev.message == selectedMessage ? Ind.accent.withValues(alpha: 0.12) : Colors.transparent,
+              borderRadius: BorderRadius.circular(Ind.radiusSmall),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(Ind.radiusSmall),
+                onTap: () => tap(ev),
+                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: row),
+              ),
+            ));
     }
     return ListView(padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 40), children: items);
   }
@@ -220,12 +301,6 @@ class _HistoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final typeColor = switch (event.type) {
-      AlarmEventType.activated => event.priority.textColor,
-      AlarmEventType.acknowledged => Ind.textDim,
-      AlarmEventType.returned => Ind.textFor(Ind.ok),
-      AlarmEventType.silenced => Ind.textMuted,
-    };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(children: [
@@ -239,11 +314,120 @@ class _HistoryRow extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(event.message, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, color: Ind.text)),
             const SizedBox(height: 2),
-            Text([event.type.label, if (event.valueText.isNotEmpty && event.type == AlarmEventType.activated) event.valueText].join(' · '),
-                style: TextStyle(color: typeColor, fontSize: 12.5, fontWeight: FontWeight.w600)),
+            _EventType(event: event),
           ]),
         ),
       ]),
+    );
+  }
+}
+
+/// "Ativou · 88,2 °C", "Reconhecido", "Normalizou" — na cor do que aconteceu.
+class _EventType extends StatelessWidget {
+  const _EventType({required this.event});
+  final AlarmEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (event.type) {
+      AlarmEventType.activated => event.priority.textColor,
+      AlarmEventType.acknowledged => Ind.textDim,
+      AlarmEventType.returned => Ind.textFor(Ind.ok),
+      AlarmEventType.silenced => Ind.textMuted,
+    };
+    return Text([event.type.label, if (event.valueText.isNotEmpty && event.type == AlarmEventType.activated) event.valueText].join(' · '),
+        style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w600));
+  }
+}
+
+/// Detalhe do alarme no tablet deitado: o que é, quanto marca agora (em letra
+/// grande, para ler de longe), o que fazer e o que já aconteceu com ele.
+/// Alarme que saiu da lista (reconhecido e normalizado) continua aberto, só
+/// com o histórico — o detalhe não pula sozinho para outro.
+class _AlarmDetail extends StatelessWidget {
+  const _AlarmDetail({required this.pick, required this.entries, required this.history});
+  final _Pick? pick;
+  final List<AlarmEntry> entries;
+  final List<AlarmEvent> history;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = pick;
+    if (p == null) {
+      return const EmptyState(
+        icon: Icons.notifications_none_rounded,
+        title: 'Nenhum alarme aberto',
+        body: 'Toque num alarme da lista para ver o valor de agora e o que já aconteceu com ele.',
+      );
+    }
+    final scope = AppScope.of(context);
+    final entry = entries.where((e) => p.key != null ? e.key == p.key : e.message == p.message).firstOrNull;
+    final message = entry?.message ?? p.message;
+    final events = history.where((ev) => ev.message == message).take(20).toList();
+    final priority = entry?.priority ?? events.firstOrNull?.priority ?? AlarmPriority.medium;
+    final tag = entry?.tagId == null ? null : scope.controller.project.tag(entry!.tagId!);
+    final rule = entry?.rule;
+
+    return ListView(
+      key: const ValueKey('detalhe-alarme'),
+      padding: const EdgeInsets.fromLTRB(Ind.spaceLarge, Ind.spaceLarge, Ind.spaceLarge, 40),
+      children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          AlarmShape(priority: priority, size: 40, blinking: entry?.phase.unacked ?? false),
+          const SizedBox(width: Ind.space),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(message, style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 24, color: Ind.text, height: 1.15)),
+              const SizedBox(height: 10),
+              entry == null
+                  ? Text('Normal agora', style: TextStyle(color: Ind.textFor(Ind.ok), fontWeight: FontWeight.w600))
+                  : Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                      _Pill(text: '${entry.priority.label} · ${entry.phase.label}', color: entry.phase.unacked ? entry.priority.color : Ind.textMuted),
+                      Text('desde ${_hhmm(entry.since)} · ${_ago(entry.since)}', style: TextStyle(color: Ind.textMuted, fontSize: 12.5)),
+                    ]),
+            ]),
+          ),
+        ]),
+        if (tag != null) ...[
+          const SectionHeader('Agora', padding: EdgeInsets.fromLTRB(0, 36, 0, 10)),
+          TagBuilder(
+            tagId: tag.id,
+            builder: (context, t, r) => Text(TagCodec.format(tag, r.value), key: const ValueKey('detalhe-alarme-valor'), style: Ind.number(56)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            [tag.name, if (rule != null && rule.kind.isAnalog) '${rule.kind.label.toLowerCase()} ${TagCodec.format(tag, rule.limit)}'].join(' · '),
+            style: TextStyle(color: Ind.textDim, height: 1.35),
+          ),
+        ],
+        if (entry != null && entry.phase.unacked) ...[
+          const SizedBox(height: Ind.spaceLarge),
+          Row(children: [
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: () => scope.alarms.acknowledge(entry.key),
+                icon: const Icon(Icons.done_rounded),
+                label: Text(entry.phase == AlarmPhase.returnedUnack ? 'Reconhecer (já normalizou)' : 'Reconhecer'),
+              ),
+            ),
+            SilenceButton(entry: entry),
+          ]),
+        ],
+        if (events.isNotEmpty) ...[
+          const SectionHeader('O que aconteceu', padding: EdgeInsets.fromLTRB(0, 36, 0, 4)),
+          for (final ev in events)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(children: [
+                SizedBox(
+                  width: 120,
+                  child: Text('${_dayLabel(ev.at)} ${_hhmmss(ev.at)}', style: TextStyle(fontFamily: Ind.mono, fontSize: 12.5, color: Ind.textMuted)),
+                ),
+                Expanded(child: _EventType(event: ev)),
+              ]),
+            ),
+        ],
+      ],
     );
   }
 }

@@ -174,7 +174,7 @@ lib/
 │   ├── import/tag_batch.dart         "Criar várias": faixa, modelos de inversor, CSV, conflitos.
 │   └── storage/project_repository.dart   Arquivo do projeto, gravação atômica, formato.
 ├── screens/
-│   ├── shell.dart                    Barra inferior (4 abas).
+│   ├── shell.dart                    Barra inferior (4 abas); trilho lateral no tablet.
 │   ├── screens_page.dart             Lista de telas com planta em miniatura.
 │   ├── screen_run_page.dart          Tela em operação.
 │   ├── editor/                       Editor, paleta, configuração de elemento (a da tabela em table_config.dart).
@@ -194,7 +194,9 @@ lib/
     │   ├── write_actions.dart        Regras de escrita + teclado numérico grande.
     │   └── elements/                 Renderizadores (controle, indicador, gráfico, estático, tabela).
     ├── tour/tour.dart                Motor de tutorial (realce, balão, "já vi").
-    └── common/common.dart            Estado vazio, selo de conexão, cartões de escolha...
+    └── common/
+        ├── common.dart               Estado vazio, selo de conexão, cartões de escolha...
+        └── adaptive.dart             Tablet: classes de janela, lista + detalhe, largura de formulário.
 
 sim/            Simulador Modbus TCP externo (Python) — ver SIMULACAO.md.
 test/           Testes: protocolo, TCP real, codec, planejador, runtime, fluxos de tela.
@@ -487,7 +489,7 @@ Em aberto: a senha do broker vai no arquivo do projeto, inclusive no exportado; 
 
 ### 5.3. Tela e elemento
 
-A tela é uma grade de **6 colunas de células quadradas**; a célula mede largura ÷ colunas, então a mesma tela fica proporcional em celular e tablet. Num aparelho de 390 dp a célula tem ~60 dp, acima do mínimo de toque de 48 dp. A célula tem **dois tetos**: 96 dp e 1/4,5 da altura útil. Sem eles, no tablet e no celular deitado a célula crescia com a largura e só cabiam dois elementos gigantes (achado do QA de 27/09); agora a grade fica centralizada, do tamanho de um celular em pé 1,5× maior, e o celular deitado mostra ~4,5 linhas. Cada elemento tem posição e tamanho em células e um mapa `props` com a configuração do tipo.
+A tela é uma grade de **6 colunas de células quadradas**; a célula mede largura ÷ colunas, então a mesma tela fica proporcional em celular e tablet. Num aparelho de 390 dp a célula tem ~60 dp, acima do mínimo de toque de 48 dp. A célula tem **dois tetos**: 96 dp e 1/4,5 da altura útil. Sem eles, no tablet e no celular deitado a célula crescia com a largura e só cabiam dois elementos gigantes (achado do QA de 27/09); agora a grade fica centralizada, do tamanho de um celular em pé 1,5× maior, e o celular deitado mostra ~4,5 linhas. Na grade fina (12 colunas) o teto é a largura útil, até 1.200 dp, e o teto pela altura só vale no celular deitado: no tablet deitado ela ocupa a tela de lado a lado (TB-5, §6.13). Cada elemento tem posição e tamanho em células e um mapa `props` com a configuração do tipo.
 
 **Grade fina e densidade** (REQUISITOS-ETAPA4 §5.1). Em **Regras da tela → Grade**, Normal (6 colunas) ou **Fina (12)**. Passar para a fina multiplica posição e tamanho por 2 e a tela não mexe; voltar só quando tudo é par (`HmiScreen.withColumns`; o arquivo guarda `columns` e o `schemaVersion` segue 1). Na fina o respiro é 20% da célula (4 a 12 dp), o teto passa a ser a largura (1.200 dp) e o mínimo dobra — menos para quem cabe numa linha (mostrador, lâmpada, indicador, texto: uma célula fina, rótulo ao lado do valor); quem grava nunca desce de 2×2 (~60 dp). **GR-8:** num celular de 390×844 dp, duas tabelas lado a lado (6 colunas finas × 22 linhas finas, 23 variáveis cada) mostram **46 variáveis sem rolar** com barras de Android de 32/24 dp, e 44 no pior recorte de câmera (47/34 dp) — o teste conta as linhas inteiras à vista e com valor.
 
@@ -575,7 +577,7 @@ Os elementos com valores ao vivo; faixa com o selo de cada equipamento (Online �
 
 ### 6.3. Editor
 
-Grade pontilhada; "+ Elemento" abre a paleta (ícone, nome e uma frase curta). O elemento entra no primeiro espaço livre — ou na célula vazia tocada antes — e a configuração abre sozinha. Tocar seleciona (borda âmbar); arrastar o selecionado move; a bolinha do canto redimensiona; tudo encaixa na grade e nada sobrepõe. Barra inferior: sem seleção, "+ Elemento" e as regras da tela (nome, só acompanhamento, confirmar antes de gravar, apagar); com seleção, Configurar, Duplicar, Tirar e +. O topo fica só com nome, ajuda e Concluir. Os valores aparecem ao vivo durante a edição, mas nada reage a toque.
+Grade pontilhada; "+ Elemento" abre a paleta (ícone, nome e uma frase curta). O elemento entra no primeiro espaço livre — ou na célula vazia tocada antes — e a configuração abre sozinha. Tocar seleciona (borda âmbar); arrastar o selecionado move; a bolinha do canto redimensiona; tudo encaixa na grade e nada sobrepõe. Barra inferior: sem seleção, "+ Elemento" e as regras da tela (nome, só acompanhamento, confirmar antes de gravar, apagar); com seleção, Configurar, Duplicar, Tirar e +. O topo fica só com nome, ajuda e Concluir. Os valores aparecem ao vivo durante a edição, mas nada reage a toque. No tablet deitado a configuração fica num painel fixo à direita (§6.13).
 
 ### 6.4. Configuração de elemento
 
@@ -629,7 +631,7 @@ Seguem a ANSI/ISA-18.2 (resumo em `docs/PESQUISA-UI-UX.md` §1.2). O alarme **mo
 
 **Contra alarme tagarela** (EEMUA 191): a condição precisa durar **1 s** para disparar, e a volta tem **banda morta de 1% do limite** (acima de 85 só normaliza abaixo de 84,15).
 
-**Onde aparece.** (1) **Faixa fixa no topo do app**, acima de todas as telas, com o alarme que pede ação (o não reconhecido mais grave), o estado e a hora — sem o valor do disparo, que congelado desmentia o elemento da tela; celular deitado, a faixa cabe numa linha; o número "+2" de outros; toque abre a lista; o celular vibra quando um novo entra (som não funciona no chão de fábrica — ISA-18.2 §11.3.4); com fone, a voz fala (§6.9). Tudo reconhecido, a faixa fica discreta, mas à vista enquanto a condição existir. (2) **No próprio elemento** da tela: borda na cor e a forma no canto — o alarme aparece onde o valor está. (3) Na **lista de variáveis**: sino (tem alarme) ou a forma (em alarme agora). (4) **Página Alarmes** (faixa ou sino da lista de telas): aba *Ativos* — o mais grave em cima; cada cartão com mensagem, valor de **agora** e limite, prioridade/estado, "desde 19:21 · há 3 min" e o botão **Reconhecer** (um a um; "Reconhecer todos" com confirmação quando há mais de um); aba *Histórico* — por dia, hora com segundos, Ativou / Reconhecido / Normalizou.
+**Onde aparece.** (1) **Faixa fixa no topo do app**, acima de todas as telas, com o alarme que pede ação (o não reconhecido mais grave), o estado e a hora — sem o valor do disparo, que congelado desmentia o elemento da tela; celular deitado, a faixa cabe numa linha; o número "+2" de outros; toque abre a lista; o celular vibra quando um novo entra (som não funciona no chão de fábrica — ISA-18.2 §11.3.4); com fone, a voz fala (§6.9). Tudo reconhecido, a faixa fica discreta, mas à vista enquanto a condição existir. (2) **No próprio elemento** da tela: borda na cor e a forma no canto — o alarme aparece onde o valor está. (3) Na **lista de variáveis**: sino (tem alarme) ou a forma (em alarme agora). (4) **Página Alarmes** (faixa ou sino da lista de telas): aba *Ativos* — o mais grave em cima; cada cartão com mensagem, valor de **agora** e limite, prioridade/estado, "desde 19:21 · há 3 min" e o botão **Reconhecer** (um a um; "Reconhecer todos" com confirmação quando há mais de um); aba *Histórico* — por dia, hora com segundos, Ativou / Reconhecido / Normalizou. No tablet deitado, o alarme tocado abre ao lado da lista (§6.13).
 
 **Demonstração.** A cortadora já vem com as três prioridades: motor acima de 75 °C (baixa) e de 85 °C (alta), porta aberta (alta), pouca tensão no papel (baixa) e **máquina parada por alarme** (média — é consequência; a causa sobe como alta). A 150 m/min o motor passa de 85 °C em ~40 s, a máquina desarma e o RESET (segurar) rearma. que tem alarmes vira alarme próprio (média): sem leitura, os outros alarmes não merecem confiança. Os alarmes da variável ficam como estão até a leitura voltar.
 
@@ -756,6 +758,40 @@ O `RuleEngine` (`lib/services/rules/`) segue o padrão do `AlarmEngine`: mantém
 
 **Limite desta versão:** calculadas e regras só rodam com o app aberto, como alarmes e registro (o serviço em primeiro plano é a entrega separada da §9.6 dos requisitos). JavaScript continua fora (§1.2).
 
+### 6.13. Tablet
+
+REQUISITOS-ETAPA4 §5.2, TB-1 a TB-6. As peças moram em `lib/widgets/common/adaptive.dart`. A regra: **o celular fica exatamente como era**. Tudo só age a partir de 600 dp de largura, e nunca com altura compacta (abaixo de 480 dp). O celular deitado passa de 600 dp, às vezes de 840, mas continua com a barra e as telas de celular.
+
+| Janela (`WindowClass`) | O que muda |
+|---|---|
+| < 600 dp, ou altura < 480 (celular, inclusive deitado) | Nada: barra embaixo, cadastro empilhado por cima. |
+| 600–839 dp (tablet em pé) | Trilho lateral. Cadastro de equipamento e de variável abre no lugar da lista, com o trilho à vista. Um painel por vez. |
+| ≥ 840 dp (tablet deitado) | Lista de 360 dp à esquerda e cadastro ao lado, em Equipamentos, Variáveis e Alarmes. Editor com painel fixo de configuração. |
+
+- **Trilho (TB-1).** `NavigationRail` com as mesmas quatro áreas, ícone e rótulo sempre à vista, na cor da barra (`navigationRailTheme`). A chave do tutorial (`navKey`) vai no que estiver à vista, então o passo "O caminho" acha o alvo nos dois casos. Alvo alto e estreito ganha o balão ao lado (`_TourLayer`).
+- **Lista + detalhe (TB-2).** `ListDetail` envolve a página da lista. O cadastro mora num `Navigator` próprio do painel, e por isso os formulários não precisam saber onde estão:
+  - Salvar e Apagar fazem `Navigator.pop` e fecham só o painel;
+  - o "voltar" do Android fecha o cadastro e não a página (um `PopScope` só age na aba à vista, via `ActiveTab`, e respeita o tutorial aberto);
+  - tocar noutro item fecha o atual pelo caminho normal, então o "Descartar alterações?" da variável continua valendo, e só depois abre o novo.
+  
+  O item aberto fica marcado na lista: fundo na cor de seleção, mais o contorno no cartão de equipamento. Com dois painéis, o detalhe ganha o tom de cartão (`Ind.surface`), sem linha divisória. Em Alarmes o detalhe mostra o valor de agora em letra grande, Reconhecer/Silenciar e o que já aconteceu com aquele alarme, pelo texto, porque o evento do histórico não guarda a chave. Sem toque, abre o mais grave.
+- **Formulários (TB-3).** `FormWidth` limita campos e Salvar a 640 dp, centralizados. Está em equipamento, variável, Criar várias e Mais. Abaixo disso não muda nada. As folhas de baixo já têm 640 dp de máximo no Material 3.
+- **Editor (TB-4).** A partir de 840 dp, a configuração fica num painel fixo à direita, com ~30% da largura (entre 320 e 440 dp). O layout é o `SupportingPaneScaffold` (painel de apoio, reaproveitável). O conteúdo é a mesma `ElementConfigSheet` com `panel: true`, parada no tamanho do painel. Tocar noutro elemento troca o painel sem fechar. Sem seleção, o painel mostra as regras da tela. A barra de baixo fica sob a grade, com no máximo 640 dp, só com acrescentar, duplicar e tirar.
+- **Grade fina (TB-5).** Ver §5.3: até 1.200 dp de largura útil fora do celular deitado.
+- **Estado (TB-6).** A Activity não é recriada ao girar nem na multijanela (`configChanges` no manifesto). Basta a árvore não descartar nada:
+  - as abas da casca, a lista, o `Navigator` do painel, as abas de Alarmes e a grade do editor vivem em `GlobalKey`s e mudam de lugar sem perder estado;
+  - `FormWidth` tem a mesma estrutura em qualquer largura;
+  - um cadastro aberto no painel que encolheu até o tamanho de celular continua aberto, no lugar da lista;
+  - um cadastro empilhado no celular continua por cima ao virar tablet;
+  - a rolagem da grade é refeita em linhas quando a célula muda (`_GridScroll`), então a mesma linha continua no topo.
+  
+  Fica de fora o processo morto pelo Android em segundo plano (restauração de estado), que é outro mecanismo.
+
+Capturas para a ficha da loja (TB-7) em `docs/imagens/tablet/`: Pixel Tablet emulado (2560 × 1600, 1280 × 800 dp), tema escuro, demonstração rodando. São cinco: operação em pé, Variáveis e Equipamentos com o cadastro ao lado, editor com o painel e Alarmes com o detalhe.
+
+![Variáveis com o cadastro ao lado](imagens/tablet/02-variaveis.png)
+![Editor com o painel lateral](imagens/tablet/04-editor.png)
+
 ## 7. Tutoriais dentro do app
 
 Método do onboarding da Retífica (`sinapse/07-FONTES/onboarding-dentro-do-sistema.md`), portado para Flutter em `lib/widgets/tour/tour.dart`, com os textos centralizados em `lib/screens/tours.dart`.
@@ -769,7 +805,7 @@ Método do onboarding da Retífica (`sinapse/07-FONTES/onboarding-dentro-do-sist
 | Ajuda sempre no topo | "?" no topo de toda página; a barra inferior tem só 4 abas. |
 | Testes dispensam o tour | Os testes de widget marcam as trilhas como vistas antes de montar o app. |
 
-Trilhas: primeiros passos, operar uma tela, montar uma tela, cadastrar equipamento, criar variável. As três do caminho principal (primeiros passos, operar, montar) aparecem sozinhas na primeira visita; equipamento e variável só pelo "?" ou por Mais → Tutoriais — no QA, com as cinco automáticas, o primeiro minuto do app era uma fila de tutoriais. O realce nunca passa da borda da tela (o "?" no canto tinha o contorno cortado). O balão se posiciona onde cabe (abaixo, acima ou sobre o rodapé) e nunca sob a barra de status; o passo de lista realça o primeiro item, não a lista inteira.
+Trilhas: primeiros passos, operar uma tela, montar uma tela, cadastrar equipamento, criar variável. As três do caminho principal (primeiros passos, operar, montar) aparecem sozinhas na primeira visita; equipamento e variável só pelo "?" ou por Mais → Tutoriais — no QA, com as cinco automáticas, o primeiro minuto do app era uma fila de tutoriais. O realce nunca passa da borda da tela (o "?" no canto tinha o contorno cortado). O balão se posiciona onde cabe (abaixo, acima, ao lado de um alvo alto e estreito como o trilho do tablet, ou sobre o rodapé) e nunca sob a barra de status; o passo de lista realça o primeiro item, não a lista inteira.
 
 ## 8. Identidade visual
 
@@ -936,6 +972,7 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/widgets/recipes_page_test.dart` | Mais → Receitas: criar lendo da máquina, comparar só a diferença, aplicar com uma confirmação "de → para", relatório e histórico (nome já preenchido na próxima; Cancelar não grava); condição que impede aplicar; tipo novo com faixa, tolerância e condição; atualizar pela máquina com confirmação e restaurar versão. |
 | `test/widgets/trend_axis_test.dart` | Eixo da direita do gráfico de tendência: cobre os dados, mesmo número de passos, passo redondo, sem eixo negativo para grandeza positiva (inclusive valor constante 0). |
 | `test/widgets/tour_test.dart` | Tutorial aparece na primeira visita, "já vi" com versão na chave, rearme por versão nova, "voltar" fecha o tutorial e não a página. |
+| `test/widgets/tablet_test.dart` | Tablet (TB-1 a TB-6) em 390, 600, 700, 840 e 1280 dp. Barra × trilho, inclusive o celular deitado com barra. Passo do tutorial no trilho, com o balão ao lado. Aba mantida ao girar. Lista + detalhe: equipamento ao lado sem rota nova e com o item marcado; Salvar fecha só o painel; um painel por vez em 600 e "voltar" fecha o cadastro; celular empilha como antes; trocar de variável com e sem alteração ("Descartar alterações?"); alarme aberto ao lado com o valor de agora. Formulários com até 640 dp e centralizados. Painel do editor com ~30%, trocando de elemento sem fechar. Grade fina com até 1.200 dp, e presa pela altura no celular deitado. Cadastro meio preenchido atravessando 1280 → 700 → 390 → 1280 (o mesmo estado). Editor mantendo seleção e linha do topo ao girar. |
 | `test/models/vendor_profiles_test.dart` | Uma linha por linha de tabela de cada perfil (extremos de cada trecho, ida e volta texto ⇄ endereço), octal com as vizinhas certas em toda família, prefixo mais longo, contador de 32 bits, bit de registrador, mensagens de memória inexistente, áreas sem sobreposição, notação de manual só sem perfil, parâmetros MD500/GD20 (com e sem EEPROM), modelos prontos, recalcular ao trocar de perfil. |
 | `test/models/profile_json_test.dart` | `Device.profile` e `Tag.memory` no JSON: ida e volta, ausentes no genérico, arquivo antigo, id de perfil desconhecido preservado, `schemaVersion` 1. |
 | `test/services/tag_batch_test.dart` | Criar várias: faixa (contagem, nomes, passo de 32 bits, octal, contador de 32 bits, buraco entre trechos, par de 32 bits), limites 256/1000, leituras por ciclo, conflitos pular/substituir, parâmetros e modelos de inversor; CSV (separadores, aspas, BOM, Latin-1, cabeçalho opcional, erro por linha, contato × valor); `saveTags` com um aviso e uma gravação. |
@@ -960,4 +997,4 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 - **Ideias registradas:** script livre na variável (as calculadas da §6.12 cobrem as contas; JavaScript segue fora), texto gravável pela tela, backup e comparação de parâmetros de inversor, conversores RS-485/CANopen, Siemens, licenciamento.
 - **Referência de recursos:** levantar no editor de IHM da Inovance (e no WinCC da Siemens) o que ainda falta de "básico de IHM", para não descobrir as faltas uma a uma.
 - **Alarme e registro com o app fechado:** serviço em primeiro plano + notificação do Android (hoje alarmes, voz e registros só valem com o app aberto). Também "adiar" (shelve) um alarme com motivo e prazo.
-- **Próximas fases do visual:** faixa de status no topo da operação, miniatura real das telas, tablet com barra lateral, comando em 3 fases visíveis.
+- **Próximas fases do visual:** faixa de status no topo da operação, miniatura real das telas, comando em 3 fases visíveis.

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -127,6 +128,12 @@ class TourHostState extends State<TourHost> {
   bool get isActive => _index >= 0;
   TourSpec? get spec => widget.spec;
 
+  /// O "voltar" em curso fechou o tutorial (vale até o fim do quadro): as
+  /// outras travas de "voltar" da página, que rodam depois desta, não agem
+  /// em cima dele — senão o mesmo toque fechava também o cadastro aberto.
+  bool get closingByBack => _closingByBack;
+  bool _closingByBack = false;
+
   @override
   void initState() {
     super.initState();
@@ -209,7 +216,11 @@ class TourHostState extends State<TourHost> {
     return PopScope(
       canPop: !isActive,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && isActive) _finish();
+        if (!didPop && isActive) {
+          _closingByBack = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _closingByBack = false);
+          _finish();
+        }
       },
       child: _buildStack(context),
     );
@@ -304,7 +315,8 @@ class _TourLayer extends StatelessWidget {
       ),
     );
 
-    // Onde o balão cabe: abaixo do alvo, senão acima, senão por cima do
+    // Onde o balão cabe: abaixo do alvo, senão acima, senão ao lado (alvo
+    // alto e estreito, como o trilho lateral do tablet), senão por cima do
     // rodapé (alvo alto, como uma lista inteira). Nunca sob a barra de status.
     const need = 230.0;
     final safeTop = MediaQuery.paddingOf(context).top + 8;
@@ -321,6 +333,9 @@ class _TourLayer extends StatelessWidget {
         placed = Positioned(left: left, width: width, top: h.bottom + 12, child: card);
       } else if (spaceAbove >= need) {
         placed = Positioned(left: left, width: width, bottom: area.height - h.top + 12, child: card);
+      } else if (area.width - h.right - 16 >= width + 12) {
+        final top = (h.center.dy - need / 2).clamp(safeTop, math.max(safeTop, area.height - safeBottom - need)).toDouble();
+        placed = Positioned(left: h.right + 12, width: width, top: top, child: card);
       } else {
         placed = Positioned(left: left, width: width, bottom: safeBottom + 12, child: card);
       }

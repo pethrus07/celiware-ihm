@@ -10,6 +10,7 @@ import '../../services/runtime/tag_store.dart';
 import '../../services/alarms/alarm_engine.dart';
 import '../../services/calc/calc_graph.dart';
 import '../../widgets/alarms/alarm_widgets.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/hmi_frame.dart';
 import '../../widgets/hmi/live_tags.dart';
@@ -28,6 +29,9 @@ import 'tag_form_page.dart';
 /// (`ListView.builder`) e só as linhas à vista ficam sendo lidas
 /// ([VisibleLiveTags]). Antes ela montava e inscrevia todas — com mil
 /// variáveis, abrir a aba varria o CLP inteiro.
+///
+/// No tablet deitado o cadastro abre ao lado da lista ([ListDetail], TB-2):
+/// dá para conferir o valor ao vivo na lista enquanto acerta o endereço.
 class TagsPage extends StatefulWidget {
   const TagsPage({super.key, this.startTour = false});
   final bool startTour;
@@ -39,6 +43,11 @@ class TagsPage extends StatefulWidget {
 class _TagsPageState extends State<TagsPage> {
   final _listKey = GlobalKey();
   final _addKey = GlobalKey();
+  final _panes = GlobalKey<ListDetailState>();
+
+  /// Item do painel para o cadastro novo (não colide com id de variável).
+  static const _nova = '+nova';
+  static const _novaCalculada = '+nova-calculada';
 
   Future<void> _createMany(BuildContext context) async {
     final message = await Navigator.push<String>(context, MaterialPageRoute(builder: (_) => const BulkTagsPage()));
@@ -63,55 +72,65 @@ class _TagsPageState extends State<TagsPage> {
         // Só pelo "?" ou por Mais → Tutoriais (ver DevicesPage).
         autoStart: false,
         forceStart: widget.startTour,
-        child: Scaffold(
-          appBar: AppBar(title: const Text('Variáveis'), actions: [
-            // Variável que sai de uma conta com outras (§9.5): mora num
-            // cadastro próprio, sem endereço.
-            IconButton(
-              key: const ValueKey('nova-calculada'),
-              tooltip: 'Nova variável calculada',
-              icon: const Icon(Icons.functions_rounded),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalcTagFormPage())),
+        child: ListDetail(
+          key: _panes,
+          placeholder: const Scaffold(
+            body: EmptyState(
+              icon: Icons.data_object_rounded,
+              title: 'Escolha uma variável',
+              body: 'Toque numa variável da lista para ver e editar, ou crie uma nova.',
             ),
-            IconButton(
-              key: const ValueKey('criar-varias'),
-              tooltip: 'Criar várias',
-              icon: const Icon(Icons.playlist_add_rounded),
-              // Faixa de memória é coisa de Modbus: sem equipamento Modbus, nada a criar.
-              onPressed: project.devices.any((d) => d.usesModbusMemory) ? () => _createMany(context) : null,
-            ),
-            const HelpButton(),
-          ]),
-          floatingActionButton: FloatingActionButton.extended(
-            key: _addKey,
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TagFormPage())),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Nova variável'),
           ),
-          body: project.tags.isEmpty
-              ? KeyedSubtree(
-                  key: _listKey,
-                  child: EmptyState(
-                    icon: Icons.data_object_rounded,
-                    title: 'Nenhuma variável',
-                    body: project.equipment.isEmpty
-                        ? 'Primeiro cadastre um equipamento (aba Equipamentos). Depois dê nome às memórias dele aqui.'
-                        : 'Dê nome a uma memória do equipamento: "Velocidade" = registrador 2.',
+          list: Scaffold(
+            appBar: AppBar(title: const Text('Variáveis'), actions: [
+              // Variável que sai de uma conta com outras (§9.5): mora num
+              // cadastro próprio, sem endereço.
+              IconButton(
+                key: const ValueKey('nova-calculada'),
+                tooltip: 'Nova variável calculada',
+                icon: const Icon(Icons.functions_rounded),
+                onPressed: () => _panes.currentState?.open(_novaCalculada, (_) => const CalcTagFormPage()),
+              ),
+              IconButton(
+                key: const ValueKey('criar-varias'),
+                tooltip: 'Criar várias',
+                icon: const Icon(Icons.playlist_add_rounded),
+                // Faixa de memória é coisa de Modbus: sem equipamento Modbus, nada a criar.
+                onPressed: project.devices.any((d) => d.usesModbusMemory) ? () => _createMany(context) : null,
+              ),
+              const HelpButton(),
+            ]),
+            floatingActionButton: FloatingActionButton.extended(
+              key: _addKey,
+              onPressed: () => _panes.currentState?.open(_nova, (_) => const TagFormPage()),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Nova variável'),
+            ),
+            body: project.tags.isEmpty
+                ? KeyedSubtree(
+                    key: _listKey,
+                    child: EmptyState(
+                      icon: Icons.data_object_rounded,
+                      title: 'Nenhuma variável',
+                      body: project.equipment.isEmpty
+                          ? 'Primeiro cadastre um equipamento (aba Equipamentos). Depois dê nome às memórias dele aqui.'
+                          : 'Dê nome a uma memória do equipamento: "Velocidade" = registrador 2.',
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 100),
+                    itemCount: rows.length,
+                    itemBuilder: (context, i) => switch (rows[i]) {
+                      // As calculadas não têm conexão: o selo diria "Ocioso" ou "Online" à toa.
+                      (final Device d, null) => SectionHeader(d.name, key: ValueKey('secao-${d.id}'), trailing: d.isCalc ? null : LinkChip(device: d)),
+                      (_, final Tag t) => KeyedSubtree(
+                          // O tutorial realça a primeira variável, não a lista inteira.
+                          key: t.id == firstId ? _listKey : ValueKey('linha-${t.id}'),
+                          child: LiveTagItem(tagId: t.id, child: _TagTile(tag: t)),
+                        ),
+                    },
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 100),
-                  itemCount: rows.length,
-                  itemBuilder: (context, i) => switch (rows[i]) {
-                    // As calculadas não têm conexão: o selo diria "Ocioso" ou "Online" à toa.
-                    (final Device d, null) => SectionHeader(d.name, key: ValueKey('secao-${d.id}'), trailing: d.isCalc ? null : LinkChip(device: d)),
-                    (_, final Tag t) => KeyedSubtree(
-                        // O tutorial realça a primeira variável, não a lista inteira.
-                        key: t.id == firstId ? _listKey : ValueKey('linha-${t.id}'),
-                        child: LiveTagItem(tagId: t.id, child: _TagTile(tag: t)),
-                      ),
-                  },
-                ),
+          ),
         ),
       ),
     );
@@ -144,6 +163,9 @@ class _TagTile extends StatelessWidget {
     final calc = tag.calc;
     return ListTile(
       key: ValueKey('var-${tag.id}'),
+      // Aberta no painel ao lado (tablet): a linha fica marcada.
+      selected: ListDetail.selectedOf(context) == tag.id,
+      selectedTileColor: Ind.accent.withValues(alpha: 0.12),
       leading: Icon(
         calc != null
             ? Icons.functions_rounded
@@ -201,7 +223,7 @@ class _TagTile extends StatelessWidget {
           );
         },
       ),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => calc != null ? CalcTagFormPage(tag: tag) : TagFormPage(tag: tag))),
+      onTap: () => ListDetail.of(context).open(tag.id, (_) => calc != null ? CalcTagFormPage(tag: tag) : TagFormPage(tag: tag)),
     );
   }
 

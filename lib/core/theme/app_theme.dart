@@ -403,6 +403,15 @@ class Ind {
             fontWeight: FontWeight.w600,
             color: s.contains(WidgetState.selected) ? p.accent : p.textDim)),
       ),
+      // Trilho lateral do tablet: a mesma barra de baixo, de pé.
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: p.surface,
+        indicatorColor: p.accent.withValues(alpha: p.dark ? 0.18 : 0.14),
+        selectedIconTheme: IconThemeData(color: p.accent),
+        unselectedIconTheme: IconThemeData(color: p.textDim),
+        selectedLabelTextStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.accent),
+        unselectedLabelTextStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.textDim),
+      ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: p.accent,
         foregroundColor: p.onAccent,

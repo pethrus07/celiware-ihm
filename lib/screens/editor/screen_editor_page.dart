@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../models/hmi_screen.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/element_catalog.dart';
 import '../../widgets/hmi/hmi_canvas.dart';
@@ -26,6 +29,11 @@ import 'palette_sheet.dart';
 /// Os valores aparecem ao vivo durante a edição (o elemento mostra o que vai
 /// mostrar em operação), mas nada reage a toque — ninguém liga uma máquina
 /// sem querer enquanto arruma a tela.
+///
+/// No tablet deitado (a partir de 840 dp) a configuração mora num painel fixo
+/// ao lado da grade, em vez da folha que sobe e cobre a tela (TB-4): tocar
+/// noutro elemento troca o painel sem fechar; sem seleção, ele mostra as
+/// regras da tela.
 class ScreenEditorPage extends StatefulWidget {
   const ScreenEditorPage({super.key, required this.screenId, this.startTour = false});
   final String screenId;
@@ -82,8 +90,9 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
       _selected = e.id;
       _lastEmptyCell = null;
     });
-    // Texto e imagem também começam pela configuração (o texto, a foto).
-    await ElementConfigSheet.show(context, screenId: screen.id, elementId: e.id);
+    // Texto e imagem também começam pela configuração (o texto, a foto). No
+    // tablet deitado o painel ao lado já mostra o elemento novo.
+    if (!WindowClass.twoPane(context)) await ElementConfigSheet.show(context, screenId: screen.id, elementId: e.id);
   }
 
   void _duplicate(HmiScreen screen, HmiElement e) {
@@ -119,13 +128,23 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
     }
     final selected = screen.elements.where((e) => e.id == _selected).firstOrNull;
     final firstId = screen.elements.firstOrNull?.id;
+    final panel = WindowClass.twoPane(context);
 
     return LiveTags(
       tagIds: screen.liveTagIds,
       child: TourHost(
         spec: Tours.editor(palette: _paletteKey, element: _firstElementKey, config: _configKey, settings: _settingsKey, done: _doneKey),
         forceStart: widget.startTour,
-        child: Scaffold(
+        child: SupportingPaneScaffold(
+          // Tablet deitado: configurar e regras ficam à vista no painel.
+          panel: !panel
+              ? null
+              : selected == null
+                  ? KeyedSubtree(key: _settingsKey, child: _ScreenSettingsSheet(screenId: screen.id, panel: true))
+                  : KeyedSubtree(
+                      key: _configKey,
+                      child: ElementConfigSheet(key: ValueKey('painel-${selected.id}'), screenId: screen.id, elementId: selected.id, panel: true),
+                    ),
           appBar: AppBar(
             // Topo com o mínimo: nome, ajuda, concluir. As regras da tela
             // descem para a barra de baixo, junto das outras ferramentas.
@@ -172,7 +191,8 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
           ]),
           bottomNavigationBar: SafeArea(
             child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              // Sob a grade, com o painel ao lado: no máximo 640 dp de botões.
+              padding: EdgeInsets.symmetric(horizontal: panel ? math.max(12.0, (MediaQuery.sizeOf(context).width - SupportingPaneScaffold.panelWidth(context) - FormWidth.maxWidth) / 2) : 12, vertical: 10),
               decoration: BoxDecoration(color: Ind.surface, border: Border(top: BorderSide(color: Ind.line))),
               child: selected == null
                   ? Row(children: [
@@ -184,28 +204,39 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
                           label: const Text('Elemento'),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      KeyedSubtree(
-                        key: _settingsKey,
-                        child: _ToolButton(icon: Icons.tune_rounded, tooltip: 'Regras da tela', onTap: () => _settings(screen)),
-                      ),
+                      if (!panel) ...[
+                        const SizedBox(width: 8),
+                        KeyedSubtree(
+                          key: _settingsKey,
+                          child: _ToolButton(icon: Icons.tune_rounded, tooltip: 'Regras da tela', onTap: () => _settings(screen)),
+                        ),
+                      ],
                     ])
                   : Row(children: [
-                      Expanded(
-                        flex: 3,
-                        child: FilledButton.icon(
-                          key: _configKey,
-                          onPressed: () => ElementConfigSheet.show(context, screenId: screen.id, elementId: selected.id),
-                          icon: const Icon(Icons.settings_outlined),
-                          label: const Text('Configurar'),
+                      // Com o painel ao lado não há o que abrir: o botão
+                      // principal volta a ser acrescentar.
+                      if (panel)
+                        Expanded(
+                          child: FilledButton.icon(key: _paletteKey, onPressed: () => _add(screen), icon: const Icon(Icons.add_rounded), label: const Text('Elemento')),
+                        )
+                      else
+                        Expanded(
+                          flex: 3,
+                          child: FilledButton.icon(
+                            key: _configKey,
+                            onPressed: () => ElementConfigSheet.show(context, screenId: screen.id, elementId: selected.id),
+                            icon: const Icon(Icons.settings_outlined),
+                            label: const Text('Configurar'),
+                          ),
                         ),
-                      ),
                       const SizedBox(width: 8),
                       _ToolButton(icon: Icons.copy_all_outlined, tooltip: 'Duplicar', onTap: () => _duplicate(screen, selected)),
                       const SizedBox(width: 8),
                       _ToolButton(icon: Icons.delete_outline_rounded, tooltip: 'Tirar da tela', color: Ind.alarm, onTap: () => _delete(screen, selected)),
-                      const SizedBox(width: 8),
-                      _ToolButton(icon: Icons.add_rounded, tooltip: 'Outro elemento', onTap: () => _add(screen)),
+                      if (!panel) ...[
+                        const SizedBox(width: 8),
+                        _ToolButton(icon: Icons.add_rounded, tooltip: 'Outro elemento', onTap: () => _add(screen)),
+                      ],
                     ]),
             ),
           ),
@@ -239,21 +270,22 @@ class _ToolButton extends StatelessWidget {
 
 /// Regras da tela: nome, só acompanhamento, confirmação de escrita, apagar.
 class _ScreenSettingsSheet extends StatelessWidget {
-  const _ScreenSettingsSheet({required this.screenId});
+  const _ScreenSettingsSheet({required this.screenId, this.panel = false});
   final String screenId;
+
+  /// No painel lateral do editor (tablet), quando nada está selecionado.
+  final bool panel;
 
   @override
   Widget build(BuildContext context) {
     final c = AppScope.watch(context).controller;
     final s = c.project.screen(screenId);
     if (s == null) return const SizedBox(height: 80);
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    final children = [
+            if (panel) ...[
+              Text('Toque num elemento para configurar.', style: TextStyle(color: Ind.textMuted, height: 1.4)),
+              const SizedBox(height: Ind.spaceLarge),
+            ],
             Text('Regras da tela', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             TextFormField(
@@ -311,12 +343,26 @@ class _ScreenSettingsSheet extends StatelessWidget {
               onPressed: () async {
                 if (!await confirmDelete(context, title: 'Apagar "${s.name}"?', body: 'A tela e seus ${s.elements.length} elementos somem. Equipamentos e variáveis continuam.')) return;
                 c.deleteScreen(s.id);
-                if (context.mounted) Navigator.of(context)..pop()..pop();
+                if (!context.mounted) return;
+                // Na folha: fecha a folha e o editor. No painel: só o editor.
+                if (panel) {
+                  Navigator.of(context).pop();
+                } else {
+                  Navigator.of(context)..pop()..pop();
+                }
               },
               icon: const Icon(Icons.delete_outline_rounded),
               label: const Text('Apagar a tela'),
             ),
-          ],
+          ];
+    if (panel) return ListView(primary: false, padding: const EdgeInsets.all(Ind.page), children: children);
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
         ),
       ),
     );

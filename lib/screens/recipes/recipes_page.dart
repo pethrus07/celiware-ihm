@@ -11,6 +11,8 @@ import '../../widgets/common/common.dart';
 import 'recipe_history_page.dart';
 import 'recipe_page.dart';
 import 'recipe_type_page.dart';
+import '../tours.dart';
+import '../../widgets/tour/tour.dart';
 
 /// Mais → Receitas: os ajustes de cada produto, por tipo de receita.
 ///
@@ -31,7 +33,11 @@ class RecipesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppScope.watch(context).controller.project;
     final types = p.recipeTypes;
-    return Scaffold(
+    // "?" explica a página (não abre sozinho).
+    return TourHost(
+      spec: Tours.receitas(),
+      autoStart: false,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Receitas'),
         actions: [
@@ -41,6 +47,7 @@ class RecipesPage extends StatelessWidget {
             icon: const Icon(Icons.history_rounded),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipeHistoryPage())),
           ),
+          const HelpButton(),
         ],
       ),
       floatingActionButton: types.isEmpty
@@ -99,7 +106,7 @@ class RecipesPage extends StatelessWidget {
                 ),
               ],
             )),
-    );
+    ));
   }
 
   /// "Nova receita": escolhe o tipo (se houver mais de um), pede o nome e

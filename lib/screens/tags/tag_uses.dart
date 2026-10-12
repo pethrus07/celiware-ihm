@@ -89,14 +89,25 @@ class TagUse {
       if (!inCondition && !isTarget) continue;
       rules.add('${r.name} (${inCondition && isTarget ? 'na condição e onde grava' : inCondition ? 'na condição' : 'onde grava'})');
     }
+    // Receita: parâmetro, condição ("só com a máquina parada") ou bit de
+    // receita carregada de alguma máquina do tipo.
+    final recipes = [
+      for (final t in project.recipeTypes)
+        if (t.machines.any((m) => m.tags.containsValue(tagId) || m.conditionTagId == tagId || m.loadedTagId == tagId)) t.name,
+    ];
+    final logs = [for (final g in project.logGroups) if (g.tagIds.contains(tagId)) g.name];
     final one = rules.length == 1;
     return [
-      if (screens.isEmpty && calcs.isEmpty && rules.isEmpty) 'A variável sai do projeto.',
+      if (screens.isEmpty && calcs.isEmpty && rules.isEmpty && recipes.isEmpty && logs.isEmpty) 'A variável sai do projeto.',
       if (screens.isNotEmpty) 'Ela é usada em: ${screens.map((s) => s.name).join(', ')}. Esses elementos vão ficar pedindo "Escolha a variável".',
       if (calcs.isNotEmpty)
         'Ela entra na conta de: ${calcs.join(', ')}. ${calcs.length == 1 ? 'Essa conta vai dar erro até ser corrigida.' : 'Essas contas vão dar erro até serem corrigidas.'}',
       if (rules.isNotEmpty)
         'Ela está ${one ? 'na regra' : 'nas regras'}: ${rules.join(', ')}. ${one ? 'Essa regra fica parada' : 'Essas regras ficam paradas'} até ${one ? 'ser corrigida' : 'serem corrigidas'}.',
+      if (recipes.isNotEmpty)
+        'Ela está ${recipes.length == 1 ? 'no tipo de receita' : 'nos tipos de receita'}: ${recipes.join(', ')}. Sem ela, ${recipes.length == 1 ? 'as receitas desse tipo não aplicam' : 'as receitas desses tipos não aplicam'} até outra variável ser escolhida no lugar.',
+      if (logs.isNotEmpty)
+        'Ela é gravada ${logs.length == 1 ? 'no registro' : 'nos registros'}: ${logs.join(', ')}. O que já foi gravado continua no histórico.',
     ].join('\n\n');
   }
 }

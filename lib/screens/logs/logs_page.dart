@@ -8,6 +8,8 @@ import '../../models/tag.dart';
 import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import 'log_history_page.dart';
+import '../tours.dart';
+import '../../widgets/tour/tour.dart';
 
 /// Mais → Registros: os grupos de variáveis gravadas no aparelho.
 ///
@@ -21,10 +23,14 @@ class LogsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = AppScope.watch(context);
     final groups = scope.controller.project.logGroups;
-    return ListenableBuilder(
+    // "?" explica a página (não abre sozinho).
+    return TourHost(
+      spec: Tours.registros(),
+      autoStart: false,
+      child: ListenableBuilder(
       listenable: scope.logger,
       builder: (context, _) => Scaffold(
-        appBar: AppBar(title: const Text('Registros')),
+        appBar: AppBar(title: const Text('Registros'), actions: const [HelpButton()]),
         floatingActionButton: groups.isEmpty
             ? null
             : FloatingActionButton.extended(
@@ -64,7 +70,7 @@ class LogsPage extends StatelessWidget {
                 ],
               )),
       ),
-    );
+    ));
   }
 }
 

@@ -79,6 +79,30 @@ void main() {
     await live(tester, 600);
   }
 
+  testWidgets('Registros, Receitas e Regras têm o "?" com a explicação da página', (tester) async {
+    final c = await boot(tester);
+    await tester.tap(find.text('Mais'));
+    await live(tester, 600);
+    for (final (key, text) in [
+      ('registros', 'Grava variáveis no celular'),
+      ('receitas', 'Os ajustes de cada produto'),
+      ('regras', 'uma máquina avisa a outra'),
+    ]) {
+      await tester.ensureVisible(find.byKey(ValueKey(key)));
+      await live(tester, 300);
+      await tester.tap(find.byKey(ValueKey(key)));
+      await live(tester, 800);
+      await tester.tap(find.byKey(const ValueKey('ajuda')).last);
+      await live(tester, 800);
+      expect(find.textContaining(text), findsOneWidget, reason: key);
+      await tester.tap(find.text('Pular'));
+      await live(tester, 600);
+      await tester.pageBack();
+      await live(tester, 800);
+    }
+    await shutdown(tester, c);
+  });
+
   testWidgets('Mais → Registros: criar, gravar sem tela aberta, histórico com toque e pinça, desligar', (tester) async {
     final c = await boot(tester);
     await openLogs(tester);

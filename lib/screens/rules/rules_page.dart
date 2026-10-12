@@ -9,6 +9,8 @@ import '../../services/rules/rule_engine.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../widgets/common/adaptive.dart';
 import 'rule_editor_page.dart';
+import '../tours.dart';
+import '../../widgets/tour/tour.dart';
 
 /// Mais → Regras (LG-4 a LG-7): "quando [condição] durar [T s], então gravar
 /// [valor] em [variável]". Cada regra numa linha com o que ela vigia, o que
@@ -42,7 +44,11 @@ class RulesPage extends StatelessWidget {
     final scope = AppScope.watch(context);
     final engine = scope.rules;
     final project = scope.controller.project;
-    return Scaffold(
+    // "?" explica a página (não abre sozinho).
+    return TourHost(
+      spec: Tours.regras(),
+      autoStart: false,
+      child: Scaffold(
       appBar: AppBar(title: const Text('Regras'), actions: [
         IconButton(
           key: const ValueKey('historico-regras'),
@@ -50,6 +56,7 @@ class RulesPage extends StatelessWidget {
           icon: const Icon(Icons.history_rounded),
           onPressed: engine == null ? null : () => _showHistory(context, engine),
         ),
+        const HelpButton(),
       ]),
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('nova-regra'),
@@ -80,7 +87,7 @@ class RulesPage extends StatelessWidget {
           ],
         ),
       )),
-    );
+    ));
   }
 
   static void _showHistory(BuildContext context, RuleEngine engine) => showModalBottomSheet<void>(

@@ -74,6 +74,26 @@ class Tours {
 
   /// v2: o passo dos ícones do topo (ƒ e Criar várias), que chegaram na
   /// etapa 4 sem explicação.
+  // Recursos de Mais: só texto, no "?" de cada página (não abrem sozinhos).
+
+  static TourSpec registros() => const TourSpec(id: 'registros', version: 1, title: 'Registros', steps: [
+        TourStep(essential: true, title: 'Registros', body: 'Grava variáveis no celular para ver o histórico em gráfico e mandar a planilha.'),
+        TourStep(essential: true, title: 'Com o app aberto', body: 'Grava em qualquer tela, mas só com o app aberto. Com ele fechado, o gráfico mostra o intervalo vazio.'),
+        TourStep(essential: true, title: 'Planilha', body: 'No histórico, o botão de enviar gera o arquivo que abre no Excel.'),
+      ]);
+
+  static TourSpec receitas() => const TourSpec(id: 'receitas', version: 1, title: 'Receitas', steps: [
+        TourStep(essential: true, title: 'Receitas', body: 'Os ajustes de cada produto: velocidade, comprimento, temperatura.'),
+        TourStep(essential: true, title: 'Ler e comparar', body: '"Ler da máquina" guarda os valores de agora. "Comparar" mostra só o que está diferente.'),
+        TourStep(essential: true, title: 'Aplicar', body: 'Mostra o "de → para" e só grava depois da sua confirmação. Não substitui a segurança da máquina.'),
+      ]);
+
+  static TourSpec regras() => const TourSpec(id: 'regras', version: 1, title: 'Regras', steps: [
+        TourStep(essential: true, title: 'Regras', body: '"Quando a condição durar um tempo, gravar um valor": uma máquina avisa a outra.'),
+        TourStep(essential: true, title: 'Pergunta antes', body: 'O padrão é perguntar antes de gravar. Gravar sozinha só serve para parar.'),
+        TourStep(essential: true, title: 'Não é segurança', body: 'Celular não é intertravamento: emergência e proteções continuam na máquina.'),
+      ]);
+
   static TourSpec variaveis({GlobalKey? list, GlobalKey? add, GlobalKey? more}) =>
       TourSpec(id: 'variaveis', version: 2, title: 'Criar uma variável', steps: [
         TourStep(target: list, essential: true, title: 'Variáveis', body: 'Um nome para uma memória: "Velocidade" em vez de "registrador 2".'),

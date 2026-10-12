@@ -9,6 +9,7 @@ import 'package:ihm/core/modbus/modbus_memory.dart';
 import 'package:ihm/main.dart';
 import 'package:ihm/models/calc.dart';
 import 'package:ihm/models/device.dart';
+import 'package:ihm/models/log_group.dart';
 import 'package:ihm/models/logic_rule.dart';
 import 'package:ihm/models/tag.dart';
 import 'package:ihm/models/vendor_profiles.dart';
@@ -76,6 +77,17 @@ void main() {
       expect(ReadingHints.nextOrder(ByteOrder.abcd, ByteOrder.values.toSet()), isNull);
     });
 
+    test('apagar: o aviso cita o tipo de receita e o registro que usam a variável', () {
+      final p = DemoProject.build().copyWith(logGroups: const [LogGroup(id: 'g', name: 'Turno', tagIds: ['demo_sp'])]);
+      final text = TagUse.deleteNotice(p, 'demo_sp');
+      expect(text, contains('no tipo de receita: Rótulo'));
+      expect(text, contains('no registro: Turno'));
+      expect(text, contains('O que já foi gravado continua no histórico.'));
+      // A condição "só com a máquina parada" também conta.
+      expect(TagUse.deleteNotice(p, 'demo_bit_ciclo'), contains('Rótulo'));
+      expect(TagUse.deleteNotice(p, 'demo_nome'), isNot(contains('receita')));
+    });
+
     test('usos da variável: cada elemento pede o tipo do lugar onde ela está', () {
       final p = DemoProject.build();
       final temp = TagUse.of(p, 'demo_temp');
@@ -113,7 +125,8 @@ void main() {
       expect(
           TagUse.deleteNotice(deep, 'demo_comp'),
           'Ela entra na conta de: Rótulos por minuto, Rótulos por hora. Essas contas vão dar erro até serem corrigidas.\n\n'
-          'Ela está na regra: Avisar (na condição e onde grava). Essa regra fica parada até ser corrigida.');
+          'Ela está na regra: Avisar (na condição e onde grava). Essa regra fica parada até ser corrigida.\n\n'
+          'Ela está no tipo de receita: Rótulo. Sem ela, as receitas desse tipo não aplicam até outra variável ser escolhida no lugar.');
     });
   });
 

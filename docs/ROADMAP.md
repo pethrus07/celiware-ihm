@@ -9,8 +9,9 @@ só a lista de trabalho.
 Tag `v1.3.2`. É a versão para apresentar e instalar
 (`celiware-ihm-1.3.2-arm64.apk`, celulares Android de 2017 para cá). A próxima já sai com o nome **Ware IoT**.
 
-**Prévia 1.4.0 (11/10, sem tag):** a etapa 4 construída até aqui, para teste
-interno (`ware-iot-1.4.0-previa-arm64.apk`). Não é entrega: a etapa 4 sai
+**Prévia 1.4.0 (11/10, sem tag; build 9 em 12/10):** a etapa 4 construída até
+aqui, para teste interno (`ware-iot-1.4.0-previa-2-arm64.apk`, com câmeras,
+cabo USB-OTG e OPC UA). Não é entrega: a etapa 4 sai
 numa entrega só, quando fechar (ver "Forma" abaixo). Estado item a item na
 tabela da etapa 4.
 
@@ -64,10 +65,10 @@ upgrade de R$ [valor].
 | 6 | Tela de tablet | reunião | **Feito:** trilho a partir de 600 dp, lista + detalhe, formulários estreitos, painel do editor, estado ao girar, capturas em `docs/imagens/tablet/` (TB-1 a TB-7). |
 | 7 | Importar memórias por faixa (M0–M1000, D0–D3000, X, Y) | reunião | **Feito:** Criar várias por faixa na notação do fabricante ou CSV, com prévia, leituras por ciclo e conflitos (IF-1 a IF-5). |
 | 8 | Mapas de memória prontos das marcas parceiras (Inovance, INVT…) | reunião | **Feito:** Inovance H3U/H5U, INVT IVC1/IVC3, WEG TPW04, Delta DVP, inversores MD500/GD20; campo "Memória do CLP" (MP-1 a MP-6). Validar em bancada (H3U primeiro). |
-| 9 | Protocolos: Siemens S7, OPC UA, MQTT, Modbus RTU/ASCII (serial e USB-OTG), TCP/UDP/serial com interpretador de mensagens (Arduino) | 15, 16, 60, 64 · reunião | **Feitos:** base de drivers, Modbus RTU/ASCII por gateway, MQTT, Siemens S7, TCP/UDP cru com perfil e prévia (Arduino). Falta: USB-OTG (precisa do adaptador) e OPC UA (spike). Nenhum testado em equipamento real ainda. |
+| 9 | Protocolos: Siemens S7, OPC UA, MQTT, Modbus RTU/ASCII (serial e USB-OTG), TCP/UDP/serial com interpretador de mensagens (Arduino) | 15, 16, 60, 64 · reunião | **Feitos:** base de drivers, Modbus RTU/ASCII por gateway e por **cabo USB-OTG**, MQTT, Siemens S7, **OPC UA** (cliente próprio, modo None: usuário e senha, ler, gravar, navegar), TCP/UDP cru com perfil e prévia (Arduino, também pelo cabo). Fora: OPC UA Sign/SignAndEncrypt e Subscription. **Nenhum testado em equipamento real** (USB só com porta simulada; OPC UA contra o asyncua). |
 | 10 | Avisos por voz no fone e narração de eventos | 10, 12 · reunião | **Feito:** alarmes falados no fone com fila por prioridade, silenciar ≠ reconhecer, narração por valor (VZ-1 a VZ-6). Conferir a voz no celular (timbre é julgamento humano). |
 | 11 | Lógica entre máquinas (intertravamento) e cálculos | 13, 14 · reunião | **Feito:** variáveis calculadas (contas com variáveis de qualquer equipamento, taxa de contador) e regras "quando… durar… gravar" no modo propor (LG-1 a LG-7). Nunca função de segurança. |
-| 12 | Câmeras IP (RTSP) vinculadas à máquina, abertas por botão | 70, 71 | Falta (CM-1 a CM-5): precisa de câmera para testar. |
+| 12 | Câmeras IP (RTSP) vinculadas à máquina, abertas por botão | 70, 71 | **Feito (12/10):** câmera ligada à máquina, aberta por um Botão no modo "Abrir câmera", estado e atraso à vista, reconexão, foto pela URL HTTP, senha no cofre do Android (CM-1 a CM-5; ONVIF de fora). Testado no emulador com câmera falsa (~0,9 s); falta câmera de verdade. |
 | 13 | Receitas: criar, salvar, comparar com a ativa, aplicar com confirmação | 96, 114–118 | **Feito:** tipos e receitas, ler da máquina, comparar, aplicar com confirmação e relatório de falha parcial, condição, transferir, versões, histórico (RC-1 a RC-7). |
 | 14 | Registro periódico de variáveis, gráfico do registro e exportação CSV | 17, 63, 158, 159 | **Feito:** grupos de registro em SQLite, histórico com zoom e lacunas, CSV para Excel pt-BR (RG-1 a RG-6). Só com o app aberto. |
 

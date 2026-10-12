@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../models/project.dart';
 import '../../models/recipe.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import 'recipe_history_page.dart';
 import 'recipe_page.dart';
@@ -62,7 +63,8 @@ class RecipesPage extends StatelessWidget {
                 label: const Text('Começar'),
               ),
             )
-          : ListView(
+          // No tablet, a coluna das receitas não estica até a borda (TB-3).
+          : FormWidth(child: ListView(
               padding: const EdgeInsets.only(bottom: 100),
               children: [
                 for (final t in types) ...[
@@ -96,7 +98,7 @@ class RecipesPage extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
+            )),
     );
   }
 

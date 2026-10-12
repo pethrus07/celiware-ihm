@@ -23,7 +23,9 @@ p["devices"] = [d for d in p["devices"] if d["id"] != REDE] + [{
     "host": "10.0.2.2", "port": 5020, "unitId": 1, "timeoutMs": 1500, "pollMs": 300,
 }]
 
-demo_tags = [t for t in p["tags"] if t["deviceId"] != REDE]
+# Só as da cortadora: a calculada da demonstração (equipamento virtual
+# "calculos") não tem endereço para copiar para a rede.
+demo_tags = [t for t in p["tags"] if t["deviceId"] not in (REDE, "calculos")]
 novas = {t["id"]: "rede_" + t["id"] for t in demo_tags}
 p["tags"] = demo_tags + [dict(t, id=novas[t["id"]], deviceId=REDE) for t in demo_tags]
 

@@ -1,7 +1,9 @@
 import '../../core/modbus/modbus_memory.dart';
 import '../../models/alarm.dart';
+import '../../models/calc.dart';
 import '../../models/device.dart';
 import '../../models/hmi_screen.dart';
+import '../../models/logic_rule.dart';
 import '../../models/narration.dart';
 import '../../models/project.dart';
 import '../../models/recipe.dart';
@@ -14,9 +16,13 @@ import 'demo_process.dart';
 /// Uma cortadora de rótulos simulada ([DemoProcess]) e duas telas: a de
 /// **operação**, que usa todos os tipos de elemento, e o **resumo do líder**,
 /// compacto. Serve de vitrine (Play Store, vídeo, feira) e de exemplo vivo:
-/// quem abre o editor vê como cada elemento foi configurado.
+/// quem abre o editor vê como cada elemento foi configurado. Traz também um
+/// exemplo de cada recurso da etapa 4 que mora no projeto: receitas, uma
+/// variável calculada e uma regra (desligada).
 ///
-/// IDs fixos de propósito: o tutorial aponta para esses elementos.
+/// IDs fixos de propósito: o tutorial aponta para esses elementos. Tela nova
+/// não entra aqui: o vídeo (`tool/video/apresentacao.py`) toca as telas pela
+/// posição na lista.
 class DemoProject {
   DemoProject._();
 
@@ -24,6 +30,8 @@ class DemoProject {
   static const operationScreenId = 'demo_tela_operacao';
   static const leaderScreenId = 'demo_tela_lider';
   static const recipeTypeId = 'demo_receitas_rotulo';
+  static const calcTagId = 'demo_rotulos_min';
+  static const ruleId = 'demo_regra_motor';
 
   static Project build() {
     const dev = Device(id: deviceId, name: 'Cortadora de rótulos', kind: DeviceKind.demo, pollMs: 300);
@@ -79,7 +87,9 @@ class DemoProject {
         EventNarration(id: 'nr_parada', value: 0, text: 'A cortadora parou'),
         EventNarration(id: 'nr_ciclo', value: 1, text: 'A cortadora está em ciclo'),
       ]),
-      t('demo_sp', 'Velocidade desejada', hr, DemoMap.hrSpeedSetpoint, writable: true, unit: 'm/min'),
+      // Destino da regra de exemplo: precisa da marca "Aceita escrita por
+      // regra" (LG-5).
+      t('demo_sp', 'Velocidade desejada', hr, DemoMap.hrSpeedSetpoint, writable: true, unit: 'm/min').copyWith(ruleWritable: true),
       t('demo_vel', 'Velocidade', hr, DemoMap.hrSpeed, unit: 'm/min'),
       t('demo_prod', 'Rótulos cortados', hr, DemoMap.hrProduction, type: TagDataType.uint32, unit: 'un'),
       t('demo_comp', 'Comprimento do rótulo', hr, DemoMap.hrLabelLength, writable: true, unit: 'mm'),
@@ -102,6 +112,21 @@ class DemoProject {
           description: 'Exemplo de escala: o equipamento manda 352, a tela mostra 35,2 °C'),
       t('demo_nome', 'Nome da máquina', hr, DemoMap.hrName, type: TagDataType.string, length: DemoMap.nameRegisters,
           description: 'Exemplo de texto: 8 registradores, 2 letras em cada'),
+      // Variável calculada (LG-1): m/min × 1000 ÷ mm = rótulos por minuto. Com
+      // a velocidade de verdade (não a desejada): máquina parada dá 0. Mora no
+      // equipamento virtual "Cálculos", que entra em `devices` logo abaixo.
+      const Tag(
+        id: calcTagId,
+        name: 'Rótulos por minuto',
+        deviceId: CalcDevice.id,
+        dataType: TagDataType.float32,
+        unit: 'un/min',
+        description: 'Exemplo de variável calculada: velocidade × 1000 ÷ comprimento do rótulo',
+        calc: CalcSpec(
+          expression: '{demo_vel} × 1000 ÷ {demo_comp}',
+          names: {'demo_vel': 'Velocidade', 'demo_comp': 'Comprimento do rótulo'},
+        ),
+      ),
     ];
 
     const statusStates = [
@@ -176,6 +201,28 @@ class DemoProject {
       Recipe(id: 'demo_receita_60', typeId: recipeTypeId, name: 'Rótulo 60 mm', values: {'vel': 65.0, 'comp': 60.0}, note: Recipe.noteCreated),
     ];
 
-    return Project(name: 'Demonstração', devices: const [dev], tags: tags, screens: [operation, leader], recipeTypes: const [rotulo], recipes: recipes);
+    // Regra entre máquinas (LG-4 a LG-7), DESLIGADA e no modo propor: quem
+    // ligar vê a pergunta depois de uns 3 min com a cortadora a 80 m/min (o
+    // motor vai para ~81,6 °C). 65 m/min fica abaixo do alarme baixo de 75 °C,
+    // e a regra age antes de a máquina desarmar sozinha a 85 °C.
+    const rule = LogicRule(
+      id: ruleId,
+      name: 'Diminuir a velocidade',
+      condition: CalcSpec(expression: '{demo_temp} > 80', names: {'demo_temp': 'Temperatura do motor'}),
+      holdSec: 10,
+      targetTagId: 'demo_sp',
+      value: 65,
+      enabled: false,
+    );
+
+    return Project(
+      name: 'Demonstração',
+      devices: const [dev, CalcDevice.device],
+      tags: tags,
+      screens: [operation, leader],
+      recipeTypes: const [rotulo],
+      recipes: recipes,
+      rules: const [rule],
+    );
   }
 }

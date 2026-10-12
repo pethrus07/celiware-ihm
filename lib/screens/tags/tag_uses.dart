@@ -1,6 +1,7 @@
 import '../../models/hmi_screen.dart';
 import '../../models/project.dart';
 import '../../models/tag.dart';
+import '../../services/calc/calc_graph.dart';
 import '../../widgets/hmi/element_catalog.dart';
 import '../../widgets/hmi/elements/control_elements.dart';
 
@@ -68,5 +69,34 @@ class TagUse {
       if (!list.contains(u.elementName)) list.add(u.elementName);
     }
     return [for (final e in byScreen.entries) '${e.key.name} (${e.value.join(', ')})'].join('; ');
+  }
+
+  /// O texto do "Apagar": onde a variável [tagId] entra e o que deixa de
+  /// funcionar sem ela — elementos de tela, contas de calculadas e regras
+  /// entre máquinas (na condição ou como destino). Conta e condição valem em
+  /// qualquer profundidade: se ela entra numa calculada que entra em outra,
+  /// as duas param. Um parágrafo por tipo; sem uso nenhum, só que ela sai.
+  static String deleteNotice(Project project, String tagId) {
+    bool uses(Set<String> inputs) => inputs.isNotEmpty && CalcGraph.expand(project, inputs).contains(tagId);
+    final screens = project.screensUsingTag(tagId);
+    final calcs = [
+      for (final t in project.tags)
+        if (t.id != tagId && t.calc != null && uses(t.calc!.inputIds)) t.name,
+    ];
+    final rules = <String>[];
+    for (final r in project.rules) {
+      final inCondition = uses(r.condition.inputIds), isTarget = r.targetTagId == tagId;
+      if (!inCondition && !isTarget) continue;
+      rules.add('${r.name} (${inCondition && isTarget ? 'na condição e onde grava' : inCondition ? 'na condição' : 'onde grava'})');
+    }
+    final one = rules.length == 1;
+    return [
+      if (screens.isEmpty && calcs.isEmpty && rules.isEmpty) 'A variável sai do projeto.',
+      if (screens.isNotEmpty) 'Ela é usada em: ${screens.map((s) => s.name).join(', ')}. Esses elementos vão ficar pedindo "Escolha a variável".',
+      if (calcs.isNotEmpty)
+        'Ela entra na conta de: ${calcs.join(', ')}. ${calcs.length == 1 ? 'Essa conta vai dar erro até ser corrigida.' : 'Essas contas vão dar erro até serem corrigidas.'}',
+      if (rules.isNotEmpty)
+        'Ela está ${one ? 'na regra' : 'nas regras'}: ${rules.join(', ')}. ${one ? 'Essa regra fica parada' : 'Essas regras ficam paradas'} até ${one ? 'ser corrigida' : 'serem corrigidas'}.',
+    ].join('\n\n');
   }
 }

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ihm/app/project_controller.dart';
 import 'package:ihm/core/modbus/modbus_client_simulated.dart';
+import 'package:ihm/core/modbus/modbus_memory.dart';
 import 'package:ihm/models/alarm.dart';
 import 'package:ihm/models/calc.dart';
 import 'package:ihm/models/project.dart';
@@ -36,9 +37,11 @@ void main() {
     AlarmRule(id: 'al_f', kind: AlarmKind.above, limit: 80, priority: AlarmPriority.high, message: 'Motor quente'),
   ]);
 
+  /// A demonstração com as calculadas do teste no lugar da dela (que também
+  /// se chama "Rótulos por minuto").
   Project withCalcs(List<Tag> calcs) {
     final demo = DemoProject.build();
-    return demo.copyWith(devices: [...demo.devices, CalcDevice.device], tags: [...demo.tags, ...calcs]);
+    return demo.copyWith(devices: [...demo.equipment, CalcDevice.device], tags: [...demo.tags.where((t) => !t.isCalc), ...calcs]);
   }
 
   setUp(() async {
@@ -98,6 +101,19 @@ void main() {
 
     await runtime.write('demo_sp', 120);
     expect((await until('c_min', (r) => r.value == 1000.0)).value, 1000.0);
+  });
+
+  test('a calculada da demonstração: rótulos por minuto com a velocidade de verdade', () async {
+    await controller.replace(DemoProject.build());
+    final id = DemoProject.calcTagId;
+    runtime.subscribe([id]);
+    // Parada: velocidade 0, nenhum rótulo.
+    expect((await until(id, (r) => r.isGood)).value, 0.0);
+    // Liga: a velocidade sobe em rampa até os 80 m/min do ajuste (rótulo de 120 mm).
+    DemoRegistry.forDevice(DemoProject.deviceId).memory.pokeBit(ModbusArea.coil, DemoMap.coilRun, true);
+    final r = await until(id, (r) => r.isGood && (r.value as double) > 666, seconds: 10);
+    expect(r.value as double, closeTo(80 * 1000 / 120, 1e-9));
+    expect(TagCodec.format(controller.project.tag(id)!, r.value), '667 un/min');
   });
 
   test('calculada que cita calculada: as duas calculam, na ordem certa', () async {

@@ -7,7 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ihm/app/project_controller.dart';
 import 'package:ihm/core/modbus/modbus_memory.dart';
 import 'package:ihm/main.dart';
+import 'package:ihm/models/calc.dart';
 import 'package:ihm/models/device.dart';
+import 'package:ihm/models/logic_rule.dart';
 import 'package:ihm/models/tag.dart';
 import 'package:ihm/models/vendor_profiles.dart';
 import 'package:ihm/screens/tags/address_field.dart';
@@ -86,6 +88,32 @@ void main() {
       expect(TagUse.brokenBy(temp, before, before.copyWith(dataType: TagDataType.int16)), isEmpty);
       expect(TagUse.describe(TagUse.brokenBy(temp, before, before.copyWith(dataType: TagDataType.bool))),
           'Cortadora — operação (Medidor, Gráfico de tendência)');
+    });
+
+    test('apagar: o aviso diz o que deixa de funcionar — telas, contas e regras, em qualquer profundidade', () {
+      final p = DemoProject.build();
+      // "Velocidade" está nas duas telas e na conta da calculada de exemplo.
+      expect(
+          TagUse.deleteNotice(p, 'demo_vel'),
+          'Ela é usada em: Cortadora — operação, Resumo do líder. Esses elementos vão ficar pedindo "Escolha a variável".\n\n'
+          'Ela entra na conta de: Rótulos por minuto. Essa conta vai dar erro até ser corrigida.');
+      // A regra de exemplo vigia "Temperatura do motor" e grava em "Velocidade desejada".
+      expect(TagUse.deleteNotice(p, 'demo_temp'), endsWith('Ela está na regra: Diminuir a velocidade (na condição). Essa regra fica parada até ser corrigida.'));
+      expect(TagUse.deleteNotice(p, 'demo_sp'), contains('Diminuir a velocidade (onde grava)'));
+      expect(TagUse.deleteNotice(p, 'demo_codalarme'), 'A variável sai do projeto.');
+
+      // Calculada que cita calculada, e regra que vigia a de cima e grava na própria entrada.
+      final deep = p.copyWith(
+        tags: [
+          ...p.tags,
+          const Tag(id: 'c2', name: 'Rótulos por hora', deviceId: CalcDevice.id, dataType: TagDataType.float32, calc: CalcSpec(expression: '{${DemoProject.calcTagId}} * 60')),
+        ],
+        rules: [...p.rules, const LogicRule(id: 'r2', name: 'Avisar', condition: CalcSpec(expression: '{c2} < 100'), targetTagId: 'demo_comp')],
+      );
+      expect(
+          TagUse.deleteNotice(deep, 'demo_comp'),
+          'Ela entra na conta de: Rótulos por minuto, Rótulos por hora. Essas contas vão dar erro até serem corrigidas.\n\n'
+          'Ela está na regra: Avisar (na condição e onde grava). Essa regra fica parada até ser corrigida.');
     });
   });
 
@@ -230,6 +258,21 @@ void main() {
     expect(find.byKey(const ValueKey('aviso-tipo')), findsNothing);
     await tapKey(tester, 'salvar-variavel', wait: 600);
     expect(c.project.tag('demo_temp')!.alarms, hasLength(2));
+    await shutdown(tester, c);
+  });
+
+  testWidgets('apagar avisa o que deixa de funcionar: os elementos de tela e a regra que vigia a variável', (tester) async {
+    final c = await boot(tester);
+    await open(tester, tag: c.project.tag('demo_temp'));
+    await tester.tap(find.byTooltip('Apagar'));
+    await live(tester, 500);
+    expect(find.text('Apagar "Temperatura do motor"?'), findsOneWidget);
+    expect(find.textContaining('Ela é usada em: Cortadora — operação.'), findsOneWidget);
+    expect(find.textContaining('Ela está na regra: Diminuir a velocidade (na condição). Essa regra fica parada até ser corrigida.'), findsOneWidget);
+    await tester.tap(find.text('Cancelar'));
+    await live(tester, 400);
+    expect(c.project.tag('demo_temp'), isNotNull, reason: 'Cancelar não apaga');
+    expect(find.byType(TagFormPage), findsOneWidget);
     await shutdown(tester, c);
   });
 

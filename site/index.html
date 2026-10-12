@@ -57,7 +57,7 @@
     { "@type": "Question", "name": "Precisa de internet?",
       "acceptedAnswer": { "@type": "Answer", "text": "Não. O celular só precisa estar na mesma rede Wi-Fi da máquina. Internet só para baixar o app ou para ver a máquina de longe, pelo roteador 4G." } },
     { "@type": "Question", "name": "Quais CLPs e protocolos funcionam?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede. MQTT e Siemens S7: em breve." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede. O app também fala Siemens S7, MQTT e a mensagem própria de um Arduino ou ESP. Esses três são novos: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real." } },
     { "@type": "Question", "name": "Funciona com RS-485?",
       "acceptedAnswer": { "@type": "Answer", "text": "Sim, com um conversor RS-485 → Wi-Fi. O conversor fica ligado no fio da máquina e o celular conversa com ele pela rede." } },
     { "@type": "Question", "name": "Meus dados vão para a nuvem?",
@@ -67,7 +67,7 @@
     { "@type": "Question", "name": "Tem para iPhone?",
       "acceptedAnswer": { "@type": "Answer", "text": "Não. O Ware IoT é só para Android, versão 7 ou mais nova." } },
     { "@type": "Question", "name": "Tem para Windows?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Em breve." } }
+      "acceptedAnswer": { "@type": "Answer", "text": "Ainda não. Por enquanto o Ware IoT é só para Android." } }
   ]
 }
 </script>
@@ -236,7 +236,7 @@
         </details>
         <details>
           <summary>Quais CLPs e protocolos funcionam?</summary>
-          <div class="resposta"><p>Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede. MQTT e Siemens S7: em breve.</p></div>
+          <div class="resposta"><p>Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede.</p><p>O app também fala Siemens S7, MQTT e a mensagem própria de um Arduino ou ESP. Esses três são novos: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real.</p></div>
         </details>
         <details>
           <summary>Funciona com RS-485?</summary>
@@ -256,9 +256,11 @@
         </details>
         <details>
           <summary>Tem para Windows?</summary>
-          <div class="resposta"><p>Em breve.</p></div>
+          <div class="resposta"><p>Ainda não. Por enquanto o Ware IoT é só para Android.</p></div>
         </details>
       </div>
+      <!-- Instituto Automação (item 184 da lista do cliente): discreto, com o mesmo rastreio dos links da loja. -->
+      <p class="nota centro">Começando agora? <a class="externo" href="https://institutoautomacao.com.br/?utm_source=site&amp;utm_medium=home&amp;utm_campaign=ware-iot&amp;utm_content=perguntas">Quero aprender automação</a></p>
     </div>
   </section>
 </main>

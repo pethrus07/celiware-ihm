@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ihm/app/project_controller.dart';
@@ -9,6 +11,7 @@ import 'package:ihm/models/logic_rule.dart';
 import 'package:ihm/models/project.dart';
 import 'package:ihm/models/tag.dart';
 import 'package:ihm/services/alarms/alarm_engine.dart';
+import 'package:ihm/services/demo/demo_project.dart';
 import 'package:ihm/services/rules/rule_engine.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/storage/project_repository.dart';
@@ -145,6 +148,36 @@ void main() {
       fa.elapse(const Duration(seconds: 5));
       expect(r.memory.bit(ModbusArea.coil, 0), isFalse, reason: 'nunca dá partida sozinha');
       expect(r.rules.proposals.single.action, 'Ligar');
+      r.dispose(fa);
+    });
+  });
+
+  test('a regra de exemplo da demonstração: desligada não faz nada; ligada, propõe 65 m/min com o motor acima de 80 °C', () {
+    fakeAsync((fa) {
+      // A cortadora da demonstração sobre a memória do teste, sem o processo
+      // simulado: os valores são os que o teste põe.
+      final demo = DemoProject.build();
+      const cortadora = Device(id: DemoProject.deviceId, name: 'Cortadora de rótulos', host: 'x', pollMs: 200);
+      final r = _Rig(fa, demo.copyWith(devices: [cortadora, ...demo.devices.where((d) => d.isCalc)]));
+      final example = r.controller.project.rule(DemoProject.ruleId)!;
+      expect((example.enabled, example.mode, example.holdSec), (false, RuleMode.propose, 10));
+
+      final motor = ByteData(4)..setFloat32(0, 82); // "Temperatura do motor": FLOAT32 em HR 6–7
+      r.memory.pokeRegisters(ModbusArea.holdingRegister, 6, [motor.getUint16(0), motor.getUint16(2)]);
+      r.memory.pokeRegister(ModbusArea.holdingRegister, 1, 80); // "Velocidade desejada"
+      fa.elapse(const Duration(seconds: 15));
+      expect(r.rules.status(DemoProject.ruleId).state, RuleState.off);
+      expect(r.rules.proposals, isEmpty, reason: 'desligada não vigia nada');
+
+      r.controller.saveRule(example.copyWith(enabled: true));
+      fa.elapse(const Duration(seconds: 12));
+      final p = r.rules.proposals.single;
+      expect((p.question, p.action), ('Diminuir a velocidade?', 'Gravar'));
+      expect(p.detail, 'Grava 65 m/min em "Velocidade desejada" (Cortadora de rótulos)');
+      expect(r.memory.register(ModbusArea.holdingRegister, 1), 80, reason: 'propor não grava nada');
+      r.rules.confirm(DemoProject.ruleId);
+      fa.elapse(const Duration(milliseconds: 500));
+      expect(r.memory.register(ModbusArea.holdingRegister, 1), 65);
       r.dispose(fa);
     });
   });

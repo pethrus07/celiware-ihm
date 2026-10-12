@@ -12,7 +12,11 @@ import 'package:ihm/screens/alarms_page.dart';
 import 'package:ihm/screens/devices/device_form_page.dart';
 import 'package:ihm/screens/editor/element_config_sheet.dart';
 import 'package:ihm/screens/editor/screen_editor_page.dart';
+import 'package:ihm/screens/recipes/recipe_page.dart';
+import 'package:ihm/screens/rules/rule_editor_page.dart';
+import 'package:ihm/screens/rules/rules_page.dart';
 import 'package:ihm/screens/shell.dart';
+import 'package:ihm/screens/tags/calc_tag_form_page.dart';
 import 'package:ihm/screens/tags/tag_form_page.dart';
 import 'package:ihm/screens/tours.dart';
 import 'package:ihm/services/demo/demo_process.dart';
@@ -275,6 +279,28 @@ void main() {
         await shutdown(tester, c);
       });
     }
+
+    testWidgets('1280: calculada, regra, lista de regras e receita também ficam estreitas e centralizadas', (tester) async {
+      final c = await boot(tester, tablet);
+      // [limit]: campo de texto (dentro da margem da página) = 640; linha de
+      // lista (de borda a borda da coluna) = 640 + as duas margens.
+      Future<void> check(Widget page, String key, {double limit = FormWidth.maxWidth, String? save}) async {
+        unawaited(root(tester).push(MaterialPageRoute<void>(builder: (_) => page)));
+        await live(tester, 700);
+        final r = tester.getRect(find.byKey(ValueKey(key)));
+        expect(r.width, lessThanOrEqualTo(limit), reason: key);
+        expect(r.center.dx, closeTo(tablet.width / 2, 0.5), reason: '$key centralizado');
+        if (save != null) expect(tester.getRect(find.byKey(ValueKey(save))).width, lessThanOrEqualTo(FormWidth.maxWidth + 2 * Ind.page), reason: save);
+        root(tester).pop();
+        await live(tester, 400);
+      }
+
+      await check(const CalcTagFormPage(), 'campo-nome-calculada', save: 'salvar-calculada');
+      await check(const RuleEditorPage(), 'campo-nome-regra', save: 'salvar-regra');
+      await check(const RulesPage(), 'regra-${DemoProject.ruleId}', limit: FormWidth.maxWidth + 2 * Ind.page);
+      await check(const RecipePage(recipeId: 'demo_receita_120'), 'valor-vel', limit: FormWidth.maxWidth + 2 * Ind.page, save: 'aplicar');
+      await shutdown(tester, c);
+    });
   });
 
   group('TB-4 · editor com painel lateral', () {

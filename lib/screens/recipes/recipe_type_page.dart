@@ -6,6 +6,7 @@ import '../../core/utils/ids.dart';
 import '../../models/recipe.dart';
 import '../../models/tag.dart';
 import '../../services/recipes/recipe_logic.dart';
+import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/write_actions.dart';
 import '../screens_page.dart' show askText;
@@ -174,7 +175,8 @@ class RecipeTypePage extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
+      // No tablet, a coluna não estica até a borda (TB-3).
+      body: FormWidth(child: ListView(
         padding: const EdgeInsets.only(bottom: 40),
         children: [
           const SectionHeader('Parâmetros'),
@@ -220,7 +222,7 @@ class RecipeTypePage extends StatelessWidget {
             },
           ),
         ],
-      ),
+      )),
     );
   }
 

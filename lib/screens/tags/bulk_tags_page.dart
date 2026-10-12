@@ -518,7 +518,10 @@ class _Preview extends StatelessWidget {
             onSelectionChanged: (s) => onPolicy(s.first),
           ),
           const SizedBox(height: 6),
-          Text(policy == ConflictPolicy.skip ? 'As que já existem ficam como estão.' : 'As que já existem ganham a definição nova; as telas e os alarmes continuam ligados a elas.',
+          Text(
+              policy == ConflictPolicy.skip
+                  ? 'As que já existem ficam como estão.'
+                  : 'As que já existem ganham a definição nova. Telas, contas, regras, alarmes e narrações continuam ligados a elas.',
               style: muted),
         ],
         if (errors.isNotEmpty) ...[

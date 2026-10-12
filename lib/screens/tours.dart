@@ -36,7 +36,7 @@ class Tours {
           target: nav,
           essential: true,
           title: 'O caminho',
-          body: 'Equipamento (o IP) → Variáveis (nomes das memórias) → Telas.',
+          body: 'Equipamento (o IP) → Variáveis (nomes das memórias) → Telas. Receitas, registros e regras ficam em Mais.',
         ),
         TourStep(target: help, essential: true, title: 'Dúvida?', body: 'O "?" explica a tela em que você está.'),
       ]);
@@ -59,7 +59,9 @@ class Tours {
         TourStep(target: palette, essential: true, title: 'Acrescentar', body: 'Escolha um elemento: botão, lâmpada, gráfico...'),
         TourStep(target: element, essential: true, title: 'Mover', body: 'Toque para selecionar, arraste para mover, puxe a bolinha para aumentar.'),
         TourStep(target: config, essential: true, title: 'Configurar', body: 'Escolha a variável, o texto e a cor.'),
-        TourStep(target: settings, title: 'Regras', body: 'Nome da tela e se ela pode gravar.'),
+        // "Regras da tela", como no botão: "Regras" sozinho agora é o de Mais
+        // (regras entre máquinas).
+        TourStep(target: settings, title: 'Regras da tela', body: 'Nome, grade fina e se a tela pode gravar.'),
         TourStep(target: done, title: 'Pronto', body: 'Já está salvo. Concluir volta para a operação.'),
       ]);
 
@@ -70,9 +72,12 @@ class Tours {
         const TourStep(essential: true, title: 'Mesma rede', body: 'O celular precisa estar no mesmo Wi-Fi do equipamento.'),
       ]);
 
-  static TourSpec variaveis({GlobalKey? list, GlobalKey? add}) =>
-      TourSpec(id: 'variaveis', version: 1, title: 'Criar uma variável', steps: [
+  /// v2: o passo dos ícones do topo (ƒ e Criar várias), que chegaram na
+  /// etapa 4 sem explicação.
+  static TourSpec variaveis({GlobalKey? list, GlobalKey? add, GlobalKey? more}) =>
+      TourSpec(id: 'variaveis', version: 2, title: 'Criar uma variável', steps: [
         TourStep(target: list, essential: true, title: 'Variáveis', body: 'Um nome para uma memória: "Velocidade" em vez de "registrador 2".'),
         TourStep(target: add, essential: true, title: 'Criar', body: 'Enquanto você digita o endereço, o app já mostra o valor lido.'),
+        TourStep(target: more, title: 'Outros jeitos', body: 'ƒ: variável que é uma conta com outras. Ao lado: várias de uma vez, por faixa (D0 a D99) ou planilha.'),
       ]);
 }

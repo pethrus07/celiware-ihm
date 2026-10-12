@@ -119,7 +119,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('salvar-calculada')));
     await live(tester, 900);
 
-    final saved = c.project.tags.firstWhere((t) => t.name == 'Rótulos por minuto');
+    // A demonstração já traz uma "Rótulos por minuto" (com a velocidade de
+    // verdade): a salva agora é a última.
+    final saved = c.project.tags.lastWhere((t) => t.name == 'Rótulos por minuto');
     expect(saved.calc!.expression, '{demo_sp} * 1000 / {demo_comp}');
     expect(saved.calc!.names, {'demo_sp': 'Velocidade desejada', 'demo_comp': 'Comprimento do rótulo'});
     expect((saved.deviceId, saved.dataType, saved.canWrite), (CalcDevice.id, TagDataType.float32, false));

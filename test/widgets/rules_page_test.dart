@@ -107,7 +107,8 @@ void main() {
     await live(tester, 400);
 
     await tapKey(tester, 'salvar-regra', wait: 700);
-    final rule = c.project.rules.single;
+    // A demonstração já traz uma regra de exemplo, desligada.
+    final rule = c.project.rules.singleWhere((r) => r.id != DemoProject.ruleId);
     expect((rule.name, rule.condition.expression, rule.holdSec, rule.targetTagId, rule.value, rule.mode),
         ('Parar a cortadora', '{demo_temp} > 20', 5, 'demo_liga', 0.0, RuleMode.propose));
     expect(find.byKey(ValueKey('regra-${rule.id}')), findsOneWidget);
@@ -150,7 +151,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('ligar-regra-r')));
     await live(tester, 1200);
     expect(c.project.rule('r')!.enabled, isFalse);
-    expect(find.text('Desligada'), findsOneWidget);
+    // Só o estado desta regra: a de exemplo da demonstração também está desligada.
+    expect(tester.widget<Text>(find.byKey(const ValueKey('estado-regra-r'))).data, 'Desligada');
 
     // Abrir e sair sem mexer não pergunta nada.
     await tester.tap(find.byKey(const ValueKey('regra-r')));

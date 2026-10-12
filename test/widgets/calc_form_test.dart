@@ -187,9 +187,10 @@ void main() {
     await live(tester, 300);
     await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.leaderScreenId}')));
     await live(tester, 1500);
-    // 32 °C da demonstração; a unidade só aparece com número de verdade.
+    // ~32 °C da demonstração (89,6 °F); a unidade só aparece com número de
+    // verdade. A temperatura simulada tem ruído: 89 ou 90.
     expect(find.text('°F'), findsOneWidget);
-    expect(find.text('90'), findsOneWidget);
+    expect(find.textContaining(RegExp(r'^(89|90)$')), findsOneWidget);
     expect(find.byWidgetPredicate((w) => w is LinkChip && w.device.isCalc), findsNothing, reason: 'o selo é o da cortadora, não o de "Cálculos"');
 
     // Cadastro com alteração pendente: voltar pergunta.

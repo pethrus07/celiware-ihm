@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/app_scope.dart';
@@ -138,6 +139,18 @@ class AlarmBannerHost extends StatefulWidget {
 class _AlarmBannerHostState extends State<AlarmBannerHost> {
   AlarmEngine? _engine;
 
+  /// A faixa ocupa espaço no layout (as telas começam abaixo dela)?
+  ///
+  /// Muda junto com a faixa, **menos** com um diálogo, folha ou menu aberto:
+  /// encolher ou esticar as telas nessa hora recentraliza o diálogo, e o
+  /// toque mirado no "Confirmar" caía no vazio (o "pulo da tela" do QA).
+  /// Com o diálogo aberto, a faixa que chega aparece por cima, sem empurrar
+  /// nada, e a que sai deixa o espaço vazio até ele fechar.
+  bool _reserved = false;
+
+  /// Altura da última faixa no layout: o espaço guardado depois que ela sai.
+  double _lastHeight = 0;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -152,7 +165,7 @@ class _AlarmBannerHostState extends State<AlarmBannerHost> {
   void dispose() {
     _engine?.newAlarm.removeListener(_buzz);
     // O Navigator some sem avisar o observador: zera para o próximo app/teste.
-    AlarmBannerHost.observer.onAlarmsPage.value = false;
+    AlarmBannerHost.observer.reset();
     super.dispose();
   }
 
@@ -176,34 +189,103 @@ class _AlarmBannerHostState extends State<AlarmBannerHost> {
   @override
   Widget build(BuildContext context) {
     final engine = AppScope.of(context).alarms;
+    final observer = AlarmBannerHost.observer;
     return ListenableBuilder(
-      listenable: Listenable.merge([engine, AlarmBannerHost.observer.onAlarmsPage]),
+      listenable: Listenable.merge([engine, observer.onAlarmsPage, observer.popupOnTop]),
       builder: (context, _) {
         final list = engine.entries;
         // Na própria página de alarmes a faixa só repetiria o que está na tela.
-        if (list.isEmpty || AlarmBannerHost.observer.onAlarmsPage.value) return widget.child;
-        // Na faixa vai o que PEDE AÇÃO: o não reconhecido mais grave; só
-        // depois o mais grave já reconhecido.
-        final top = list.firstWhere((e) => e.phase.unacked, orElse: () => list.first);
-        return Column(children: [
-          _Banner(top: top, count: list.length, unack: engine.unackCount, onTap: _open),
-          // A faixa já ocupou a área da barra de status: as telas abaixo não
-          // podem reservá-la de novo.
-          Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: widget.child)),
+        final show = list.isNotEmpty && !observer.onAlarmsPage.value;
+        Widget? banner;
+        if (show) {
+          // Na faixa vai o que PEDE AÇÃO: o não reconhecido mais grave; só
+          // depois o mais grave já reconhecido.
+          final top = list.firstWhere((e) => e.phase.unacked, orElse: () => list.first);
+          banner = _Banner(top: top, count: list.length, unack: engine.unackCount, onTap: _open);
+        }
+        final popup = observer.popupOnTop.value;
+        if (!popup) _reserved = show;
+        final Widget slot;
+        if (!_reserved) {
+          slot = const SizedBox.shrink();
+        } else if (!popup) {
+          slot = _Measured(onHeight: (h) => _lastHeight = h, child: banner!);
+        } else {
+          // Diálogo aberto: o espaço fica com a altura de antes dele. A faixa
+          // pode mudar (reconhecida, outro alarme) ou sair sem mexer em nada
+          // abaixo; o espaço vazio some quando o diálogo fecha.
+          slot = SizedBox(
+            height: _lastHeight,
+            child: banner == null
+                ? ColoredBox(color: Ind.bg)
+                : ClipRect(child: OverflowBox(alignment: Alignment.topCenter, minHeight: 0, maxHeight: double.infinity, child: banner)),
+          );
+        }
+        // Estrutura fixa (pilha → coluna → telas): a faixa entrar ou sair
+        // nunca recria as telas de baixo.
+        return Stack(fit: StackFit.expand, children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            slot,
+            // A faixa já ocupou a área da barra de status: as telas abaixo
+            // não podem reservá-la de novo.
+            Expanded(child: MediaQuery.removePadding(context: context, removeTop: _reserved, child: widget.child)),
+          ]),
+          if (!_reserved && banner != null) Positioned(top: 0, left: 0, right: 0, child: banner),
         ]);
       },
     );
   }
 }
 
-/// Observa a pilha de telas para saber se a página de alarmes está no topo.
+/// Anota a altura do filho a cada layout (sem reconstruir nada).
+class _Measured extends SingleChildRenderObjectWidget {
+  const _Measured({required this.onHeight, required super.child});
+  final ValueChanged<double> onHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderMeasured(onHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMeasured renderObject) => renderObject.onHeight = onHeight;
+}
+
+class _RenderMeasured extends RenderProxyBox {
+  _RenderMeasured(this.onHeight);
+  ValueChanged<double> onHeight;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    onHeight(size.height);
+  }
+}
+
+/// Observa a pilha de telas para saber se a página de alarmes está no topo
+/// e se há um diálogo, folha ou menu aberto (rota "popup") por cima.
 class AlarmsRouteObserver extends NavigatorObserver {
   final ValueNotifier<bool> onAlarmsPage = ValueNotifier(false);
+  final ValueNotifier<bool> popupOnTop = ValueNotifier(false);
+
+  bool _alarms = false;
+  bool _popup = false;
+
+  /// Sem Navigator (app desmontado): volta ao começo.
+  void reset() {
+    _alarms = _popup = false;
+    onAlarmsPage.value = false;
+    popupOnTop.value = false;
+  }
 
   void _top(Route<dynamic>? r) {
-    // Adiado: a troca de rota acontece no meio de um build.
-    final v = r?.settings.name == AlarmsPage.routeName;
-    if (v != onAlarmsPage.value) scheduleMicrotask(() => onAlarmsPage.value = v);
+    _alarms = r?.settings.name == AlarmsPage.routeName;
+    _popup = r is PopupRoute;
+    // Adiado: a troca de rota acontece no meio de um build. Vale sempre a
+    // última troca — folha que fecha e diálogo que abre em seguida (o
+    // teclado do Ajuste → "Confirmar") caem antes da primeira atualização.
+    scheduleMicrotask(() {
+      onAlarmsPage.value = _alarms;
+      popupOnTop.value = _popup;
+    });
   }
 
   @override

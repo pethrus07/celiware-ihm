@@ -114,7 +114,7 @@ void main() {
     expect(find.byKey(ValueKey('regra-${rule.id}')), findsOneWidget);
 
     // Vai para outra tela; a máquina liga; a pergunta aparece lá, depois de 5 s.
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
     await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Telas')));
     await live(tester, 400);
@@ -158,7 +158,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('regra-r')));
     await live(tester, 700);
     expect(find.byType(RuleEditorPage), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 1200);
     expect(find.byKey(const ValueKey('descartar-alteracoes')), findsNothing);
     expect(find.byType(RuleEditorPage), findsNothing);

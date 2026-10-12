@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ihm/app/app_scope.dart';
 import 'package:ihm/app/appearance.dart';
 import 'package:ihm/app/project_controller.dart';
 import 'package:ihm/core/theme/app_theme.dart';
@@ -297,6 +298,71 @@ void main() {
     expect(find.byKey(const ValueKey('faixa-alarme')), findsOneWidget);
     expect(find.textContaining('Voltou ao normal'), findsOneWidget);
     expect(c.runtime.store.read('demo_porta').value, isTrue);
+    await shutdown(tester, c);
+  });
+
+  // O "pulo da tela" do QA: a faixa chegava com a confirmação aberta, o
+  // diálogo descia ~38 dp e o toque mirado no Confirmar caía no vazio.
+  testWidgets('alarme que chega com a confirmação aberta não tira o Confirmar do lugar', (tester) async {
+    final c = await boot(tester);
+    final memory = DemoRegistry.forDevice(DemoProject.deviceId).memory;
+    await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.operationScreenId}')));
+    await live(tester, 900);
+    await tester.tap(find.text('LIGA'));
+    await live(tester, 400);
+    final confirm = find.byKey(const ValueKey('confirmar-escrita'));
+    final before = tester.getRect(confirm);
+
+    memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, false);
+    await live(tester, 2000);
+    expect(find.byKey(const ValueKey('faixa-alarme')), findsOneWidget, reason: 'a faixa aparece mesmo com o diálogo aberto');
+    expect(tester.getRect(confirm), before, reason: 'o diálogo não se mexe');
+
+    // Fechado o diálogo, a faixa volta a ter o espaço dela: nada da tela
+    // fica escondido debaixo.
+    await tester.tap(find.text('Cancelar'));
+    await live(tester, 600);
+    final banner = tester.getRect(find.byKey(const ValueKey('faixa-alarme')));
+    expect(tester.getRect(find.text('Cortadora — operação')).top, greaterThanOrEqualTo(banner.bottom));
+
+    // O contrário: faixa no topo, diálogo aberto, o alarme sai (reconhecido e
+    // normalizado) — o diálogo continua onde estava.
+    await tester.tap(find.text('LIGA'));
+    await live(tester, 400);
+    final withBanner = tester.getRect(confirm);
+    AppScope.of(tester.element(confirm)).alarms.acknowledgeAll();
+    memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, true);
+    await live(tester, 1500);
+    expect(find.byKey(const ValueKey('faixa-alarme')), findsNothing);
+    expect(tester.getRect(confirm), withBanner);
+    await tester.tap(find.text('Cancelar'));
+    await live(tester, 600);
+    expect(tester.getRect(find.text('Cortadora — operação')).top, lessThan(banner.bottom), reason: 'sem alarme, a tela sobe de volta');
+    await shutdown(tester, c);
+  });
+
+  // No aparelho, o caso do QA era o do Ajuste: o teclado (uma folha) fecha e
+  // a confirmação abre logo em seguida — as duas trocas de rota chegam
+  // juntas e a faixa precisa saber que há um diálogo aberto.
+  testWidgets('teclado do Ajuste → Confirmar: a faixa que chega não move o diálogo', (tester) async {
+    final c = await boot(tester);
+    final memory = DemoRegistry.forDevice(DemoProject.deviceId).memory;
+    await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.operationScreenId}')));
+    await live(tester, 900);
+    await tester.tap(find.byKey(const ValueKey('el-op_sp')));
+    await live(tester, 500);
+    for (final k in ['1', '2', '0']) {
+      await tester.tap(find.byKey(ValueKey('tecla-$k')));
+      await tester.pump();
+    }
+    await tester.tap(find.byKey(const ValueKey('numpad-ok')));
+    await live(tester, 500);
+    final confirm = find.byKey(const ValueKey('confirmar-escrita'));
+    final before = tester.getRect(confirm);
+    memory.pokeBit(ModbusArea.discreteInput, DemoMap.diDoorClosed, false);
+    await live(tester, 2000);
+    expect(find.byKey(const ValueKey('faixa-alarme')), findsOneWidget);
+    expect(tester.getRect(confirm), before);
     await shutdown(tester, c);
   });
 

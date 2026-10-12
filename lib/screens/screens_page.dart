@@ -202,19 +202,25 @@ class _ScreenThumb extends StatelessWidget {
     // Encolher a tela inteira deixava a planta minúscula num canto; usar a
     // largura cheia mostrava só o título.
     return LayoutBuilder(builder: (context, box) {
-      final cell = math.min(box.maxWidth / screen.columns, box.maxHeight / 5);
+      // Grade fina: a célula é a metade, então são 10 linhas finas — o mesmo
+      // pedaço da tela (com 5, a planta mostrava só metade do topo).
+      final rows = 5 * HmiScreen.scaleOf(screen.columns);
+      final cell = math.min(box.maxWidth / screen.columns, box.maxHeight / rows);
       final visibleRows = (box.maxHeight / cell).ceil();
       final left = (box.maxWidth - cell * screen.columns) / 2;
       return ClipRect(
         child: Stack(children: [
           for (final e in screen.elements.where((e) => e.y < visibleRows))
             Positioned(
+              key: ValueKey('miniatura-${e.id}'),
               left: left + e.x * cell + 1.5,
               top: e.y * cell + 1.5,
               width: e.w * cell - 3,
               height: e.h * cell - 3,
               child: Container(
-                decoration: BoxDecoration(color: Ind.surfaceHigh, borderRadius: BorderRadius.circular(3), border: Border.all(color: Ind.line)),
+                // Bloco na cor do cartão, com contorno firme: no escuro, bloco
+                // e fundo no mesmo tom com linha quase invisível sumiam.
+                decoration: BoxDecoration(color: Ind.surface, borderRadius: BorderRadius.circular(3), border: Border.all(color: Ind.lineStrong)),
                 child: cell * e.h > 14 && cell * e.w > 14
                     ? Icon(ElementCatalog.of(e.type).icon, size: (cell * 0.5).clamp(8.0, 18.0), color: e.type == ElementType.button ? Ind.accent : Ind.textMuted)
                     : null,
@@ -227,7 +233,7 @@ class _ScreenThumb extends StatelessWidget {
 }
 
 /// Pergunta um texto curto (nome de tela, de equipamento...).
-Future<String?> askText(BuildContext context, {required String title, required String label, String? hint, String initial = ''}) {
+Future<String?> askText(BuildContext context, {required String title, required String label, String? hint, String initial = '', TextInputType? keyboardType}) {
   final ctrl = TextEditingController(text: initial);
   return showDialog<String>(
     context: context,
@@ -243,7 +249,8 @@ Future<String?> askText(BuildContext context, {required String title, required S
           key: const ValueKey('campo-nome'),
           controller: ctrl,
           autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
+          keyboardType: keyboardType,
+          textCapitalization: keyboardType == null ? TextCapitalization.sentences : TextCapitalization.none,
           decoration: InputDecoration(labelText: label, hintText: hint),
           onSubmitted: (_) => done(),
         ),

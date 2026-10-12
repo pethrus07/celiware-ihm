@@ -201,8 +201,10 @@ class _AlarmCard extends StatelessWidget {
                   builder: (context, t, r) => Text(
                     [
                       tag.name,
-                      'agora ${TagCodec.format(tag, r.value)}',
-                      if (rule != null && rule.kind.isAnalog) '${rule.kind.label.toLowerCase()} ${TagCodec.format(tag, rule.limit)}',
+                      // Número e unidade grudados: na coluna estreita do
+                      // tablet a linha quebrava entre "81,8" e "°C".
+                      'agora ${_glued(TagCodec.format(tag, r.value))}',
+                      if (rule != null && rule.kind.isAnalog) '${rule.kind.label.toLowerCase()} ${_glued(TagCodec.format(tag, rule.limit))}',
                     ].join(' · '),
                     style: TextStyle(color: Ind.textDim, fontSize: 13.5, height: 1.35),
                   ),
@@ -435,6 +437,9 @@ class _AlarmDetail extends StatelessWidget {
 String _two(int n) => n.toString().padLeft(2, '0');
 String _hhmm(DateTime t) => '${_two(t.hour)}:${_two(t.minute)}';
 String _hhmmss(DateTime t) => '${_two(t.hour)}:${_two(t.minute)}:${_two(t.second)}';
+
+/// "81,8 °C" com espaço que não quebra: valor e unidade na mesma linha.
+String _glued(String value) => value.replaceAll(' ', '\u00A0');
 
 String _ago(DateTime t) {
   final d = DateTime.now().difference(t);

@@ -311,7 +311,7 @@ class UsbMoreOptions extends StatelessWidget {
           controller: unit,
           min: 1,
           max: 247,
-          helper: 'O endereço do equipamento na linha RS-485. Vários na mesma linha: um cadastro para cada ID, mesmo adaptador.',
+          helper: 'O endereço dele na linha RS-485. Vários na mesma linha: um cadastro por ID, mesmo adaptador.',
           onChanged: onChanged,
         ),
         SwitchListTile(

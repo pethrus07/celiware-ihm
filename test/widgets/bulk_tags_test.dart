@@ -189,7 +189,7 @@ void main() {
     expect(find.descendant(of: page, matching: find.text('CLP S7')), findsNothing);
     expect(find.descendant(of: page, matching: find.text('Broker')), findsNothing);
     expect(find.descendant(of: page, matching: find.byKey(const ValueKey('lote-perfil'))), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 600);
 
     // Sem nenhum equipamento Modbus, o botão nem acende.

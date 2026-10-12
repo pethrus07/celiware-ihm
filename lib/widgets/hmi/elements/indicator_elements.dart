@@ -394,22 +394,23 @@ class GaugeElement extends StatelessWidget {
           label: e.prop<String>('label', tag?.name ?? ''),
           tag: tag,
           reading: r,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(painter: _GaugePainter(min: min, max: max, value: v, warn: warn, alarm: alarm, zone: zone)),
-              ),
-              // Valor no miolo do anel (não em cima do fim do arco).
-              // Estreito o bastante para não encostar nas marcas da régua.
-              Align(
-                alignment: const Alignment(0, 0.36),
-                child: FractionallySizedBox(
-                  widthFactor: 0.42,
+          child: LayoutBuilder(
+            builder: (context, box) => Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(painter: _GaugePainter(min: min, max: max, value: v, warn: warn, alarm: alarm, zone: zone)),
+                ),
+                // Valor no miolo do anel, numa caixa medida pelo próprio anel
+                // (e não pela largura do elemento): cabe inteira dentro das
+                // marcas da régua — "31,7 °C" encostava nelas no celular.
+                Positioned.fromRect(
+                  key: const ValueKey('valor-medidor'),
+                  rect: _GaugePainter.valueBox(box.biggest),
                   child: FitText(tag == null ? '---' : TagCodec.format(tag, v),
                       style: Ind.number(28, color: zone == null ? Ind.text : Ind.textFor(zone))),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -431,12 +432,30 @@ class _GaugePainter extends CustomPainter {
 
   double _frac(double v) => max <= min ? 0 : ((v - min) / (max - min)).clamp(0.0, 1.0);
 
-  @override
-  void paint(Canvas canvas, Size size) {
+  /// Centro, raio e espessura do arco num quadro deste tamanho — o mesmo
+  /// cálculo para pintar e para posicionar o valor.
+  static (Offset, double, double) _geometry(Size size) {
     final side = math.min(size.width, size.height * 1.15);
     final stroke = (side * 0.085).clamp(5.0, 13.0);
-    final radius = side / 2 - stroke * 1.6;
-    final c = Offset(size.width / 2, size.height * 0.56);
+    return (Offset(size.width / 2, size.height * 0.56), side / 2 - stroke * 1.6, stroke);
+  }
+
+  /// Caixa do valor: logo abaixo do centro e inteira dentro do círculo livre
+  /// que as marcas da régua deixam (com 2 dp de folga).
+  static Rect valueBox(Size size) {
+    final (c, radius, stroke) = _geometry(size);
+    final free = math.max(0.0, radius - stroke * 1.2 - 3 - 2);
+    final halfH = free * 0.28;
+    final top = c.dy + free * 0.12 - halfH;
+    // Canto de baixo da caixa no limite do círculo livre.
+    final dy = top + 2 * halfH - c.dy;
+    final halfW = math.sqrt(math.max(0.0, free * free - dy * dy));
+    return Rect.fromLTRB(c.dx - halfW, top, c.dx + halfW, top + 2 * halfH);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final (c, radius, stroke) = _geometry(size);
     final rect = Rect.fromCircle(center: c, radius: radius);
     Paint arc(Color color, double w, {StrokeCap cap = StrokeCap.round}) => Paint()
       ..color = color

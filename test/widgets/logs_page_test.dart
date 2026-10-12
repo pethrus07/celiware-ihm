@@ -97,7 +97,7 @@ void main() {
       expect(find.textContaining(text), findsOneWidget, reason: key);
       await tester.tap(find.text('Pular'));
       await live(tester, 600);
-      await tester.pageBack();
+      await tester.tap(find.byTooltip('Voltar'));
       await live(tester, 800);
     }
     await shutdown(tester, c);
@@ -138,7 +138,7 @@ void main() {
     expect(find.text('A cada 1 s · 2 variáveis'), findsOneWidget);
 
     // De volta à lista de telas: nenhuma tela aberta e o registro segue gravando.
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
     await tester.tap(find.text('Telas'));
     await live(tester, 12000); // 12 s: 1 linha por segundo, lote aos 10 s
@@ -217,7 +217,7 @@ void main() {
     expect(find.text('Nada gravado neste período'), findsNothing);
 
     // Desligar pela chave da lista.
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
     await tester.tap(find.byKey(ValueKey('ligar-${g.id}')));
     await live(tester, 400);

@@ -487,6 +487,9 @@ class Ind {
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.onAccent : p.textDim),
         trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.accent : p.surfaceHigher),
+        // Desligada, a chave precisa de contorno que se veja: o trilho tem o
+        // tom do fundo e, só com a linha clara, sumia no tema claro (1,1:1).
+        trackOutlineColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.transparent : p.textMuted),
       ),
     );
   }

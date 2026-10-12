@@ -371,7 +371,9 @@ class _CalcTagFormPageState extends State<CalcTagFormPage> {
         controller: _more,
         tilePadding: EdgeInsets.zero,
         onExpansionChanged: (open) => revealAfterExpand(_moreKey, open),
-        childrenPadding: const EdgeInsets.only(bottom: 8),
+        // O primeiro filho é um campo: o rótulo dele flutua acima da caixa
+        // e era cortado pela borda da seção.
+        childrenPadding: const EdgeInsets.only(top: 10, bottom: 8),
         title: const Text('Mais opções'),
         subtitle: Text(summary.isEmpty ? 'Observação' : summary.join(' · '), style: TextStyle(color: Ind.textMuted, fontSize: 13)),
         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,

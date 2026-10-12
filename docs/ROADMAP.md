@@ -160,7 +160,7 @@ Pequenos, nenhum atrapalha a apresentação.
 - **Adiar (shelve)** um alarme com motivo e prazo, para manutenção planejada.
 - **Exportar o histórico** de alarmes (CSV) junto com o projeto.
 
-## Publicação — etapa 3 (Play Store)
+## Publicação na Play Store (etapa 4: lado técnico feito; falta o do dono)
 
 Roteiro completo em `PUBLICACAO.md`; ficha, imagens e formulários prontos em `docs/loja/`.
 

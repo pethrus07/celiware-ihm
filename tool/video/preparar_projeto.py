@@ -23,20 +23,25 @@ p["devices"] = [d for d in p["devices"] if d["id"] != REDE] + [{
     "host": "10.0.2.2", "port": 5020, "unitId": 1, "timeoutMs": 1500, "pollMs": 300,
 }]
 
-# Só as da cortadora: a calculada da demonstração (equipamento virtual
-# "calculos") não tem endereço para copiar para a rede.
-demo_tags = [t for t in p["tags"] if t["deviceId"] not in (REDE, "calculos")]
+# Só as da cortadora ganham cópia na rede: a calculada da demonstração
+# (equipamento virtual "calculos") não tem endereço — fica como está.
+originais = [t for t in p["tags"] if t["deviceId"] != REDE and not t["id"].startswith("rede_")]
+demo_tags = [t for t in originais if t["deviceId"] != "calculos"]
 novas = {t["id"]: "rede_" + t["id"] for t in demo_tags}
-p["tags"] = demo_tags + [dict(t, id=novas[t["id"]], deviceId=REDE) for t in demo_tags]
+p["tags"] = originais + [dict(t, id=novas[t["id"]], deviceId=REDE) for t in demo_tags]
 
 def remapear(e):
+    # Toda referência a variável, não só tagId/tagIds: o botão Liga tem também
+    # feedbackTagId (o retorno de "em ciclo"), que ficava lendo a demonstração
+    # interna — a tela da rede mostrava dois "Online" e o botão acendia pela
+    # máquina errada.
     e = json.loads(json.dumps(e))
     e["id"] = "rede_" + e["id"]
-    pr = e.get("props", {})
-    if "tagId" in pr:
-        pr["tagId"] = novas.get(pr["tagId"], pr["tagId"])
-    if "tagIds" in pr:
-        pr["tagIds"] = [novas.get(x, x) for x in pr["tagIds"]]
+    for k, v in e.get("props", {}).items():
+        if isinstance(v, str) and v in novas:
+            e["props"][k] = novas[v]
+        elif isinstance(v, list):
+            e["props"][k] = [novas.get(x, x) if isinstance(x, str) else x for x in v]
     return e
 
 op = next(s for s in p["screens"] if s["id"] == "demo_tela_operacao")

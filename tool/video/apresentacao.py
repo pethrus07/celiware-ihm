@@ -1,4 +1,4 @@
-"""Vídeo de apresentação do Celiware IHM — gravado do sistema rodando de verdade.
+"""Vídeo de apresentação do Ware IoT — gravado do sistema rodando de verdade.
 
 Método da Retífica (retifica-os/onboarding): nada é encenado, a narração manda
 no tempo (cada cena dura o que a voz precisar; se a ação acabar antes, a tela
@@ -12,9 +12,12 @@ Diferença daqui: em vez do navegador, grava
 Uso (de celiware-ihm/):
   python tool/video/apresentacao.py ensaio     # roda as ações e tira fotos (sem gravar)
   python tool/video/apresentacao.py            # grava, narra e monta
-Pré-requisitos: emulador ligado com o app instalado; `tool/video/preparar_projeto.py`
+  python tool/video/apresentacao.py remontar   # monta de novo das gravações (sem aparelho)
+Pré-requisitos: emulador ligado com o app instalado EM PROFILE
+(`flutter build apk --profile`: compilado como o release, mas depurável — o
+`run-as` que põe o projeto do vídeo no app só funciona assim); `tool/video/preparar_projeto.py`
 já tem o projeto (ele é empurrado para o aparelho no início).
-Saída: tool/video/saida/celiware-ihm-apresentacao.mp4 (+ capítulos).
+Saída: tool/video/saida/ware-iot-apresentacao.mp4 (+ capítulos).
 """
 from __future__ import annotations
 
@@ -23,6 +26,7 @@ import ctypes.wintypes as wt
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -44,14 +48,23 @@ ADB = str(ANDROID / "platform-tools" / "adb.exe")
 FFMPEG = next((Path.home() / "AppData/Local/Microsoft/WinGet/Packages").glob("Gyan.FFmpeg*/**/bin/ffmpeg.exe"))
 FFPROBE = FFMPEG.with_name("ffprobe.exe")
 PYTHON = sys.executable
-PAINEL_TITULO = "Simulador Modbus TCP — Celiware IHM"
+PAINEL_TITULO = "Simulador Modbus TCP — Ware IoT"  # igual a sim/painel.py
 PACOTE = "com.celiware.ihm"
-VOZ = "pt-BR-AntonioNeural"
+# Voz local (tool/video/falar_kokoro.py) no venv de voz; o edge-tts passou a
+# receber 403 do serviço em out/2026.
+PYTHON_VOZ = Path(os.environ.get("PYTHON_VOZ", Path.home() / ".venvs/tts/Scripts/python.exe"))
+VOZ = "pm_alex"
+# Grafia para a voz, cada uma conferida por transcrição reversa (faster-whisper
+# small e medium) — como saía antes: "Ware IoT" → "Ariut", "Siemens" → "se m",
+# "OPC UA" → "opua", "app" → "apa" (às vezes), "faca" → "feca".
+PRONUNCIA = {"Ware IoT": "Uéar ai ou tí", "Siemens": "Símens", "OPC UA": "O P C U A",
+             "app": "épi", "faca": "fácca", "Faca": "Fácca"}
 
 L, A = 1920, 1080  # palco
 BG = (18, 20, 24)
 SURFACE = (35, 40, 48)
-TEXTO, DIM, AMBAR = (233, 237, 241), (163, 173, 184), (255, 176, 32)
+# Destaque = o verde-água do app no tema escuro (Ind.accent, 0xFF2EC4D0).
+TEXTO, DIM, DESTAQUE = (233, 237, 241), (163, 173, 184), (46, 196, 208)
 
 
 # ── Celular ──────────────────────────────────────────────────────────────────
@@ -88,6 +101,9 @@ class Celular:
 
 
 ENSAIO = len(sys.argv) > 1 and sys.argv[1] == "ensaio"
+# remontar: monta de novo com as gravações de .trabalho/bruto, sem aparelho —
+# para quando só a montagem (filtro, arte, narração) mudou.
+REMONTAR = len(sys.argv) > 1 and sys.argv[1] == "remontar"
 PRE_ROLL = 0.9
 
 
@@ -112,12 +128,14 @@ class Cena:
     tipo: str = "celular"          # celular · dividido · cartao
     pontos: list[str] = field(default_factory=list)
     acao: Callable[[Celular], None] | None = None
+    # cartão: palavra da narração em que cada ponto aparece (sem isso, espaçados por igual)
+    gatilhos: list[str] = field(default_factory=list)
 
 
 # Coordenadas do Pixel 7 (1080×2400), medidas nas capturas do ensaio.
 LIGA, CONFIRMAR = (204, 948), (697, 1412)
 AJUSTE = (300, 1300)
-TECLA = {"1": (209, 1884), "2": (540, 1884), "0": (540, 2054)}
+TECLA = {"1": (209, 1884), "2": (540, 1884), "6": (871, 1715), "0": (540, 2054)}
 GRAVAR = (708, 2220)
 LAPIS, CONCLUIR = (890, 220), (925, 220)
 ELEMENTO, MAIS_ELEMENTO = (462, 2242), (980, 2242)
@@ -142,7 +160,10 @@ def c_operar(c: Celular):
 def c_ajuste(c: Celular):
     c.toque(*AJUSTE, espera=1.4)
     marco(c, "ajuste-teclado")
-    for k in "120":
+    # 60, não 120: a demonstração esquenta para 32 + 0,62 × velocidade; a 120
+    # ela passa de 85 °C no meio do editor, para sozinha e põe a faixa de
+    # alarme no topo — que empurra a tela e desvia os toques seguintes.
+    for k in "60":
         c.toque(*TECLA[k], espera=0.45)
     c.toque(*GRAVAR, espera=1.4)
     marco(c, "ajuste-confirmar")
@@ -162,27 +183,30 @@ def c_editor(c: Celular):
     c.toque(*PALETA_LAMPADA, espera=1.6)        # já abre a configuração
     marco(c, "editor-config-lampada")
     c.toque(*ESCOLHER_VARIAVEL, espera=1.3)
-    c.toque(540, 1498, espera=1.6)              # Faca acionada
+    c.toque(540, 1684, espera=1.6)              # Faca acionada
     c.tecla(4, espera=1.2)                      # fecha a configuração
     c.toque(*MAIS_ELEMENTO, espera=1.4)
     c.toque(*PALETA_BOTAO, espera=1.6)
     marco(c, "editor-config-botao")
     c.toque(*ESCOLHER_VARIAVEL_BOTAO, espera=1.3)
     marco(c, "editor-escolha-botao")
-    c.toque(540, 1104, espera=1.6)              # Liga máquina
+    c.toque(540, 1290, espera=1.6)              # Liga máquina
     c.tecla(4, espera=1.2)
     c.toque(*CONCLUIR, espera=3.0)
 
 
 ESCOLHER_VARIAVEL_BOTAO = (540, 1290)
+EQUIP_DEMO = (288, 770)                         # "Cortadora de rótulos" (o form abre na rede)
 ENDERECO = (378, 1928)
-SUGESTAO = (540, 2110)
+SUGESTAO = (540, 1732)                          # o form rola ao focar o endereço
+DESCARTAR = (794, 1380)                         # "Descartar alterações?" ao sair do form
 
 
 def c_variavel(c: Celular):
     c.tecla(4, espera=1.0)
     c.toque(*ABA_VARIAVEIS, espera=1.6)
     c.toque(*FAB, espera=2.0)                   # Nova variável
+    c.toque(*EQUIP_DEMO, espera=1.0)            # a demonstração está rodando: o valor lido não é zero
     marco(c, "variavel-form")
     c.toque(*ENDERECO, espera=0.8)
     c.tecla(67, espera=0.3)
@@ -194,6 +218,7 @@ def c_variavel(c: Celular):
 
 def c_rede(c: Celular):
     c.tecla(4, espera=1.0)
+    c.toque(*DESCARTAR, espera=1.2)
     c.toque(*ABA_TELAS, espera=1.4)
     c.toque(*TELA_REDE, espera=4.5)
     c.toque(*LIGA, espera=1.3)
@@ -208,16 +233,18 @@ def c_falhas(c: Celular):
 
 
 ROTEIRO = [
-    Cena("abertura", "Celiware IHM", tipo="cartao",
-         narracao="Este é o Celiware IHM: a IHM da máquina, montada e operada no celular, "
-                  "conversando em Modbus TCP direto com o CLP.",
-         pontos=["A IHM da máquina, no celular"]),
+    Cena("abertura", "Ware IoT", tipo="cartao",
+         narracao="Este é o Ware IoT: a IHM da máquina, montada e operada no celular, "
+                  "conversando direto com o CLP pela rede da fábrica.",
+         pontos=["A IHM da máquina, no celular"], gatilhos=["a IHM"]),
     Cena("inicio", "Pronto para usar", acao=c_inicio,
          narracao="O app já abre com uma demonstração pronta: uma cortadora de rótulos simulada, "
                   "com a tela de operação e o resumo do líder. Funciona sem nada na rede.",
          pontos=["Demonstração embutida", "Funciona sem CLP"]),
     Cena("operar", "Operar", acao=c_operar,
-         narracao="Cada elemento da tela está ligado a uma memória do CLP. Toco em Liga e confirmo. "
+         # "Toco em Liga e confirmo" saía "toque… confirme" (a voz fecha o -o final)
+         narracao="Cada elemento da tela está ligado a uma memória do CLP. Um toque em Liga, "
+                  "e o app pede confirmação. "
                   "O botão só acende quando o equipamento confirma que ligou. "
                   "A velocidade sobe em rampa, a produção conta, e o motor começa a esquentar.",
          pontos=["Estado real, lido do CLP", "Confirmação antes de gravar", "Cor só onde importa"]),
@@ -230,32 +257,50 @@ ROTEIRO = [
                   "oito memórias seguidas, lidas num pedido só.",
          pontos=["Tendência ao vivo", "Produção por hora"]),
     Cena("editor", "Montar a tela", acao=c_editor,
-         narracao="Montar uma tela é tão simples quanto usar. Crio uma tela nova, escolho o elemento na paleta "
-                  "e ligo numa variável: ele já aparece com o valor ao vivo. "
-                  "Uma lâmpada para a faca, um botão para ligar a máquina, e a tela está pronta. "
-                  "Não existe botão de salvar: tudo fica gravado na hora.",
+         # A narração acompanha a ação (~25 s): mais curta, sobravam 10 s de silêncio.
+         # Sem "crio", "escolho", "concluo": a voz fecha o -o final e a
+         # transcrição ouvia "cri", "escolha", "conclui".
+         narracao="Montar uma tela é tão simples quanto usar. Vou criar uma tela nova, o Painel. "
+                  "Toco em Elemento, toco na lâmpada e ligo na variável da faca: "
+                  "ela já aparece com o valor ao vivo. Depois, um botão ligado em Liga máquina. "
+                  "Toco em Concluir, e a tela está pronta. Não existe botão de salvar: tudo fica gravado na hora.",
          pontos=["Arrastar e soltar", "Valor ao vivo na edição", "Salva sozinho"]),
     Cena("variavel", "Variáveis", acao=c_variavel,
-         narracao="Cada variável é só um nome para uma memória. Se eu digitar o endereço como vem no manual, "
-                  "quarenta mil e três, o app avisa que ele não existe no equipamento e sugere o certo. "
-                  "Com um toque, já aparece o valor lido.",
+         narracao="Cada variável é só um nome para uma memória. Toco no equipamento e, no endereço, "
+                  "vai o número como vem no manual: quarenta mil e três. O app avisa que ele não existe "
+                  "no equipamento e sugere o certo. Com um toque, já aparece o valor lido: "
+                  "a velocidade da máquina, ao vivo.",
          pontos=["Lendo agora, enquanto digita", "Entende a notação do manual"]),
     Cena("rede", "Rede de verdade", tipo="dividido", acao=c_rede,
-         narracao="Agora, com rede de verdade. No computador, o simulador faz o papel do CLP. "
+         narracao="Agora, com rede de verdade: volto às telas e abro a Cortadora na rede. "
+                  "No computador, o simulador faz o papel do CLP. "
                   "O celular conecta pelo IP, e cada pedido aparece aqui do lado: "
                   "repare que as variáveis vizinhas saem num pedido só. "
-                  "Ligo a máquina pelo celular, e o simulador responde.",
+                  "Ligo a máquina pelo celular, confirmo, e o simulador responde na hora.",
          pontos=["Modbus TCP real", "Leituras agrupadas"]),
     Cena("falhas", "O chão de fábrica, no celular", tipo="dividido", acao=c_falhas,
-         narracao="E o que acontece na máquina aparece no celular. Abro a porta no simulador: "
-                  "a máquina para e acusa alarme na hora. E se a rede cai, o app não mostra um zero falso: "
-                  "mantém o último valor esmaecido, avisa, e reconecta sozinho quando a rede volta.",
+         narracao="E o que acontece na máquina aparece no celular. No simulador, eu abro a porta: "
+                  "a máquina para e o alarme dispara na hora, e o botão Liga avisa que ficou sem retorno. "
+                  "Fecho a porta. Agora derrubo a rede: o app não mostra um zero falso. "
+                  "Ele mantém o último valor esmaecido, avisa que perdeu a conexão, "
+                  "e reconecta sozinho quando a rede volta.",
          pontos=["Alarme na hora", "Queda de rede sem zero falso", "Reconecta sozinho"]),
-    Cena("fecho", "Próximos passos", tipo="cartao",
-         narracao="Por baixo disso tudo: cinquenta e um testes automáticos, simulador para testar sem hardware, "
+    # O fecho era um cartão só, de 26 s, com os "próximos passos" na tela
+    # enquanto a voz falava de outra coisa: virou dois.
+    Cena("base", "Por baixo disso tudo", tipo="cartao",
+         narracao="Por baixo disso tudo: quase oitocentos testes automáticos, simulador para testar sem hardware, "
                   "tutorial em cada tela e documentação técnica completa. "
-                  "Próximos passos: testar na cortadora, criar o perfil Inovance e publicar na Play Store.",
-         pontos=["Teste na cortadora de rótulos", "Perfil Inovance", "Publicação na Play Store"]),
+                  "O app já tem receitas, registro em planilha e alarme falado no fone, "
+                  "e fala também Siemens S7, OPC UA, MQTT e Arduino, que passam nos testes com simulador.",
+         pontos=["Quase 800 testes automáticos", "Simulador para testar sem hardware",
+                 "Tutorial em cada tela e documentação técnica", "Receitas, planilha e alarme falado no fone",
+                 "Siemens S7, OPC UA, MQTT e Arduino, testados no simulador"],
+         gatilhos=["quase", "simulador", "tutorial", "receitas", "Siemens"]),
+    Cena("fecho", "Próximos passos", tipo="cartao",
+         narracao="Próximos passos: conferir tudo na cortadora e nas máquinas das marcas parceiras, "
+                  "e publicar na Play Store.",
+         pontos=["Teste na cortadora de rótulos", "Conferência nas marcas parceiras", "Publicação na Play Store"],
+         gatilhos=["cortadora", "marcas", "publicar"]),
 ]
 
 
@@ -268,17 +313,46 @@ def duracao(arquivo: Path) -> float:
     return float(r.stdout.strip())
 
 
-def narrar(cena: Cena) -> tuple[Path, float]:
-    """Texto → mp3 (edge-tts), com cache por texto+voz."""
+def falado(texto: str) -> str:
+    """O texto como a voz precisa ler (a tela continua com a grafia certa)."""
+    for escrito, dito in PRONUNCIA.items():
+        texto = re.sub(rf"\b{re.escape(escrito)}\b", dito, texto)
+    return texto
+
+
+MOTOR_VOZ = "kokoro-frase-a-frase"   # entra na chave do cache: mudou o motor, refaz tudo
+
+
+def audio_da_cena(cena: Cena) -> Path:
+    chave = hashlib.sha1(f"{MOTOR_VOZ}|{VOZ}|{falado(cena.narracao)}".encode()).hexdigest()[:12]
+    return TRAB / "audio" / f"{cena.id}-{chave}.mp3"
+
+
+def narrar_tudo(cenas: list[Cena]):
+    """Texto → mp3 (Kokoro, local) das cenas sem áudio, numa chamada só; volume em −16 LUFS.
+
+    Cache por texto+voz: mudar uma frase só refaz aquela cena."""
     pasta = TRAB / "audio"; pasta.mkdir(parents=True, exist_ok=True)
-    chave = hashlib.sha1(f"{VOZ}|{cena.narracao}".encode()).hexdigest()[:12]
-    mp3 = pasta / f"{cena.id}-{chave}.mp3"
-    if not mp3.exists():
-        txt = pasta / f"{cena.id}.txt"
-        txt.write_text(cena.narracao, encoding="utf-8")   # por arquivo: acento quebra linha de comando
-        subprocess.run([PYTHON, "-m", "edge_tts", "--voice", VOZ, "--rate", "+4%",
-                        "--file", str(txt), "--write-media", str(mp3)], check=True)
-        txt.unlink()
+    faltam = [c for c in cenas if not audio_da_cena(c).exists() or audio_da_cena(c).stat().st_size == 0]
+    if not faltam:
+        return
+    pares = []
+    for c in faltam:
+        txt, wav = pasta / f"{c.id}.txt", pasta / f"{c.id}.wav"
+        txt.write_text(falado(c.narracao), encoding="utf-8")   # por arquivo: acento quebra linha de comando
+        pares += [str(txt), str(wav)]
+    print(f"Narrando {len(faltam)} cena(s) com o Kokoro ({VOZ})…", flush=True)
+    subprocess.run([str(PYTHON_VOZ), str(AQUI / "falar_kokoro.py"), VOZ, *pares],
+                   check=True, capture_output=True)
+    for c in faltam:
+        txt, wav = pasta / f"{c.id}.txt", pasta / f"{c.id}.wav"
+        ff("-i", str(wav), "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-ar", "48000",
+           "-c:a", "libmp3lame", "-b:a", "192k", str(audio_da_cena(c)))
+        txt.unlink(); wav.unlink()
+
+
+def narrar(cena: Cena) -> tuple[Path, float]:
+    mp3 = audio_da_cena(cena)
     return mp3, duracao(mp3)
 
 
@@ -371,29 +445,39 @@ def fundo(cena: Cena, idx: int, total: int) -> Path:
     marca_f = fonte("IBMPlexSansCondensed-SemiBold.ttf", 26)
 
     if cena.tipo == "cartao":
-        d.text((160, 330), "CELIWARE IHM", font=marca_f, fill=AMBAR)
+        # Os pontos e a barra de progresso NÃO entram aqui: cada ponto vira uma
+        # camada que aparece quando a narração chega nele, e a barra é desenhada
+        # depois do zoom (ver montar).
+        d.text((160, 330), "WARE IOT", font=marca_f, fill=DESTAQUE)
         d.text((160, 380), cena.titulo, font=fonte("IBMPlexSansCondensed-Bold.ttf", 120), fill=TEXTO)
-        d.rectangle([160, 540, 360, 548], fill=AMBAR)
-        y = 600
-        for p in cena.pontos:
-            d.text((160, y), p, font=fonte("IBMPlexSans-500.ttf", 44), fill=DIM); y += 66
+        d.rectangle([160, 540, 360, 548], fill=DESTAQUE)
         icone = RAIZ / "store" / "icone-512.png"
         if icone.exists():
             ic = Image.open(icone).convert("RGB").resize((380, 380))
             m = Image.new("L", ic.size, 0); ImageDraw.Draw(m).rounded_rectangle([0, 0, 379, 379], 84, fill=255)
             img.paste(ic, (1380, 350), m)
+        CAMADAS[cena.id] = []
+        for k, p in enumerate(cena.pontos):
+            camada = Image.new("RGBA", (L, A), (0, 0, 0, 0))
+            ImageDraw.Draw(camada).text((160, 600 + 66 * k), p, font=fonte("IBMPlexSans-500.ttf", 44), fill=DIM)
+            arq_p = TRAB / "arte" / f"{cena.id}-ponto{k}.png"; arq_p.parent.mkdir(parents=True, exist_ok=True)
+            camada.save(arq_p)
+            CAMADAS[cena.id].append(arq_p)
+        arq = TRAB / "arte" / f"{cena.id}.png"
+        img.save(arq)
+        return arq
     elif cena.tipo == "celular":
         d.rounded_rectangle([150, 30, 150 + 470, 30 + 1020], 46, fill=SURFACE)   # moldura do aparelho
         x = 760
-        d.text((x, 300), "CELIWARE IHM", font=marca_f, fill=AMBAR)
+        d.text((x, 300), "WARE IOT", font=marca_f, fill=DESTAQUE)
         d.text((x, 345), cena.titulo, font=titulo_f, fill=TEXTO)
         y = 480
         for p in cena.pontos:
-            d.ellipse([x, y + 16, x + 14, y + 30], fill=AMBAR)
+            d.ellipse([x, y + 16, x + 14, y + 30], fill=DESTAQUE)
             d.text((x + 34, y), p, font=ponto_f, fill=DIM); y += 64
     else:  # dividido: celular à esquerda, painel à direita
         d.rounded_rectangle([60, 30, 60 + 470, 30 + 1020], 46, fill=SURFACE)
-        d.text((620, 40), "CELIWARE IHM  ·  SIMULADOR NO PC", font=marca_f, fill=AMBAR)
+        d.text((620, 40), "WARE IOT  ·  SIMULADOR NO PC", font=marca_f, fill=DESTAQUE)
         d.text((620, 78), cena.titulo, font=fonte("IBMPlexSansCondensed-Bold.ttf", 60), fill=TEXTO)
         x = 620; y = 1000
         for p in cena.pontos:
@@ -402,7 +486,7 @@ def fundo(cena: Cena, idx: int, total: int) -> Path:
             d.text((x + 18, y + 7), p, font=fonte("IBMPlexSans-500.ttf", 28), fill=DIM)
             x += w + 56
     # progresso discreto no pé
-    d.rectangle([0, A - 6, int(L * (idx + 1) / total), A], fill=AMBAR)
+    d.rectangle([0, A - 6, int(L * (idx + 1) / total), A], fill=DESTAQUE)
     arq = TRAB / "arte" / f"{cena.id}.png"; arq.parent.mkdir(parents=True, exist_ok=True)
     img.save(arq)
     return arq
@@ -414,28 +498,66 @@ def ff(*args):
     subprocess.run([str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y", *args], check=True)
 
 
-def montar(cena: Cena, arte: Path, audio: Path, dur: float, cel: Path | None, pan: Path | None) -> Path:
+CAMADAS: dict[str, list[Path]] = {}   # cartão → uma imagem transparente por ponto
+ZOOM_CARTAO = 0.035                   # empurrão lento: 3,5% ao longo do cartão
+
+
+def instantes_dos_pontos(cena: Cena, dur: float) -> list[float]:
+    """Quando cada ponto do cartão aparece: na palavra-gatilho da narração
+    (posição no texto × duração da fala — a voz sintética fala em ritmo quase
+    constante) ou, sem gatilho, espaçados por igual."""
+    n = len(cena.pontos)
+    if cena.gatilhos and len(cena.gatilhos) == n:
+        return [max(0.5, dur * max(0, cena.narracao.find(g)) / len(cena.narracao)) for g in cena.gatilhos]
+    return [0.5 + k * (dur * 0.8) / max(1, n) for k in range(n)]
+
+
+def montar(cena: Cena, arte: Path, audio: Path, dur: float, cel: Path | None, pan: Path | None,
+           barra: int = 0) -> Path:
     """Uma cena em 1920×1080 com a narração; a imagem congela no fim se a voz for mais longa."""
     out = TRAB / "cenas" / f"{cena.id}.mp4"; out.parent.mkdir(parents=True, exist_ok=True)
     total = dur + 0.9
     base = ["-loop", "1", "-framerate", "30", "-t", f"{total:.2f}", "-i", str(arte)]
     if cena.tipo == "cartao":
+        # Cartão parado é imagem congelada (a esteira de QA reprovou 26 s sem
+        # mudar um pixel): os pontos entram quando a voz chega neles, e o
+        # quadro todo se aproxima devagar. O zoom roda em 4K e desce para
+        # 1080p — em 1080p o zoompan arredonda para pixel inteiro e treme.
+        camadas = CAMADAS.get(cena.id, [])
+        entradas = list(base)
+        for c in camadas:
+            entradas += ["-loop", "1", "-framerate", "30", "-t", f"{total:.2f}", "-i", str(c)]
+        entradas += ["-i", str(audio)]
+        filtro, ultimo = "[0:v]format=rgba[b0]", "[b0]"
+        for k, t in enumerate(instantes_dos_pontos(cena, dur)[:len(camadas)]):
+            filtro += (f";[{k + 1}:v]format=rgba,fade=t=in:st={t:.2f}:d=0.5:alpha=1[p{k}]"
+                       f";{ultimo}[p{k}]overlay=0:0[b{k + 1}]")
+            ultimo = f"[b{k + 1}]"
+        quadros = round(total * 30)
+        filtro += (f";{ultimo}scale=3840:2160:flags=lanczos,"
+                   f"zoompan=z='1+{ZOOM_CARTAO}*on/{quadros}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                   f":d=1:s=1920x1080:fps=30,"
+                   f"drawbox=x=0:y={A - 6}:w={max(1, barra)}:h=6:color=0x2EC4D0:t=fill,"
+                   f"fade=t=in:st=0:d=0.4,format=yuv420p[v]")
         # apad: o áudio precisa ter a MESMA duração da cena, senão a emenda
         # com -c copy desalinha som e imagem das cenas seguintes.
-        filtro = "[0:v]fade=t=in:st=0:d=0.4,format=yuv420p[v];[1:a]apad[a]"
-        ff(*base, "-i", str(audio), "-filter_complex", filtro, "-map", "[v]", "-map", "[a]",
+        filtro += f";[{len(camadas) + 1}:a]apad[a]"
+        ff(*entradas, "-filter_complex", filtro, "-map", "[v]", "-map", "[a]",
            "-c:v", "libx264", "-crf", "18", "-r", "30", "-c:a", "aac", "-b:a", "160k", "-t", f"{total:.2f}", str(out))
         return out
     px = 172 if cena.tipo == "celular" else 82
-    # trim: descarta o segundo morto antes da ação (os gravadores levam ~1 s para pegar)
-    cel_f = (f"[1:v]trim=start={PRE_ROLL},setpts=PTS-STARTPTS,fps=30,scale=-2:976,"
+    # trim: descarta o segundo morto antes da ação (os gravadores levam ~1 s para pegar).
+    # fps ANTES do trim: o screenrecord só manda quadro quando a tela muda — com a
+    # tela parada, o único quadro é o do instante 0, o trim o jogava fora e a cena
+    # pulava direto para depois do primeiro toque (a lista de telas sumia do "inicio").
+    cel_f = (f"[1:v]fps=30,trim=start={PRE_ROLL},setpts=PTS-STARTPTS,scale=-2:976,"
              f"tpad=stop_mode=clone:stop_duration={total:.2f}[cel]")
     filtro = f"{cel_f};[0:v][cel]overlay={px}:52:shortest=0[b]"
     entradas = [*base, "-i", str(cel)]
     ultimo = "[b]"
     if pan:
         entradas += ["-i", str(pan)]
-        filtro += (f";[2:v]trim=start={PRE_ROLL},setpts=PTS-STARTPTS,fps=30,"
+        filtro += (f";[2:v]fps=30,trim=start={PRE_ROLL},setpts=PTS-STARTPTS,"
                    # cabe na área entre o título (y 170) e as etiquetas (y 1000)
                    f"scale=1240:800:force_original_aspect_ratio=decrease:flags=lanczos,"
                    f"tpad=stop_mode=clone:stop_duration={total:.2f}[pan];[b][pan]overlay=620:170[b2]")
@@ -470,17 +592,39 @@ def preparar(c: Celular):
     c.adb("shell", "settings", "put", "system", "show_touches", "1")
     c.adb("shell", "settings", "put", "secure", "stylus_handwriting_enabled", "0")
 
-    subprocess.run(["taskkill", "/F", "/FI", f"WINDOWTITLE eq {PAINEL_TITULO}"], capture_output=True)
-    subprocess.Popen([str(SIM / ".venv" / "Scripts" / "python.exe"), str(SIM / "simulador.py"), "--painel"], cwd=SIM)
+    fechar_simuladores()
+    painel = subprocess.Popen([str(SIM / ".venv" / "Scripts" / "python.exe"), str(SIM / "simulador.py"), "--painel"], cwd=SIM)
     time.sleep(3)
-    c.adb("shell", "am", "start", "-n", f"{PACOTE}/.MainActivity")
-    time.sleep(6)
+    # -W espera a primeira tela: a partida a frio passou de 10 s com o PC
+    # carregado, e o toque da cena seguinte caía na tela de abertura.
+    c.adb("shell", "am", "start", "-W", "-n", f"{PACOTE}/.MainActivity")
+    time.sleep(3)
+    return painel
+
+
+def fechar_simuladores():
+    """Fecha painéis de rodadas anteriores (o filtro do taskkill por título não pegava)."""
+    subprocess.run(["powershell", "-NoProfile", "-Command",
+                    "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+                    "Where-Object { $_.CommandLine -match 'simulador\\.py' } | "
+                    "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"], capture_output=True)
 
 
 def main():
     ensaio = ENSAIO
+    narrar_tudo(ROTEIRO)
     c = Celular()
-    preparar(c)
+    if REMONTAR:
+        rodar(c, False)
+        return
+    painel = preparar(c)
+    try:
+        rodar(c, ensaio)
+    finally:
+        painel.terminate()
+
+
+def rodar(c: Celular, ensaio: bool):
     marcas, cenas = [], []
     relogio = 0.0
     for i, cena in enumerate(ROTEIRO):
@@ -492,10 +636,17 @@ def main():
             c.foto(f"{i + 1:02d}-{cena.id}")
             continue
         cel = pan = None
-        if cena.tipo != "cartao":
+        if cena.tipo != "cartao" and REMONTAR:
+            cel = TRAB / "bruto" / f"{cena.id}-celular.mp4"
+            pan = TRAB / "bruto" / f"{cena.id}-painel.mp4" if cena.tipo == "dividido" else None
+            if not cel.exists() or (pan and not pan.exists()):
+                raise SystemExit(f"Falta a gravação da cena {cena.id}: rode sem 'remontar'.")
+            dur = max(dur, duracao(cel) - 1.2)
+        elif cena.tipo != "cartao":
             cel, pan = gravar(cena, c, minimo=dur)
             dur = max(dur, duracao(cel) - 1.2)
-        out = montar(cena, fundo(cena, i, len(ROTEIRO)), audio, dur, cel, pan)
+        out = montar(cena, fundo(cena, i, len(ROTEIRO)), audio, dur, cel, pan,
+                     barra=int(L * (i + 1) / len(ROTEIRO)))
         marcas.append((relogio, cena.titulo))
         relogio += duracao(out)
         cenas.append(out)
@@ -503,11 +654,11 @@ def main():
         print("Ensaio feito: fotos em", TRAB / "fotos")
         return
     SAIDA.mkdir(exist_ok=True)
-    final = SAIDA / "celiware-ihm-apresentacao.mp4"
+    final = SAIDA / "ware-iot-apresentacao.mp4"
     emendar(cenas, final)
     # arredonda ANTES de dividir (armadilha 4 da Retífica): 119,6 s virava "01:00"
     cap = "\n".join(f"{round(t) // 60:02d}:{round(t) % 60:02d}  {nome}" for t, nome in marcas)
-    (SAIDA / "celiware-ihm-apresentacao-capitulos.txt").write_text(cap + "\n", encoding="utf-8")
+    (SAIDA / "ware-iot-apresentacao-capitulos.txt").write_text(cap + "\n", encoding="utf-8")
     print(f"Pronto: {final} ({duracao(final):.0f}s)")
 
 

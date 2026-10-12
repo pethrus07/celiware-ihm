@@ -118,13 +118,14 @@ Android 11 ou mais novo, celular e PC no mesmo Wi-Fi:
 
 ## 6. Vídeo de apresentação (gerado)
 
-`tool/video/apresentacao.py` grava o app no emulador e o painel do simulador, narra com voz sintética e monta um vídeo 1920×1080 de ~2 min 40 s com 10 cenas. Nada é editado à mão: mudou o app, gera de novo.
+`tool/video/apresentacao.py` grava o app no emulador e o painel do simulador, narra com voz sintética e monta um vídeo 1920×1080 de ~3 min com 11 cenas. Nada é editado à mão: mudou o app, gera de novo.
 
-**Precisa:** emulador `IHM_Pixel` ligado com o app instalado; ffmpeg e edge-tts no PC; `tool/video/.trabalho/projeto-base.json` (o projeto de demonstração puxado do aparelho). O script monta o projeto do vídeo com `preparar_projeto.py` (acrescenta a "Cortadora (rede)" em `10.0.2.2:5020` e a tela "Cortadora na rede"), envia ao app, liga os toques visíveis e abre o painel.
+**Precisa:** emulador `IHM_Pixel` ligado com o app instalado **em profile** (`flutter build apk --profile`: compilado como o release, mas depurável — o `run-as` que põe o projeto do vídeo no app só funciona assim; o release recusa); ffmpeg no PC; a voz local no venv `~/.venvs/tts` (Kokoro 0.9.4, voz `pm_alex` — outro caminho pela variável `PYTHON_VOZ`); `tool/video/.trabalho/projeto-base.json` (o projeto de demonstração puxado do aparelho). O script monta o projeto do vídeo com `preparar_projeto.py` (acrescenta a "Cortadora (rede)" em `10.0.2.2:5020` e a tela "Cortadora na rede"), envia ao app, liga os toques visíveis e abre o painel. Depois de gravar, devolva ao emulador o que estava nele: o projeto do vídeo fica no app.
 
 ```
 python tool/video/apresentacao.py ensaio   # só roda as ações e tira fotos de conferência
 python tool/video/apresentacao.py          # grava, narra e monta
+python tool/video/apresentacao.py remontar # monta de novo das gravações em .trabalho/bruto (sem aparelho)
 ```
 
 Saída em `tool/video/saida/` (fora do git): o `.mp4` e um `.txt` de capítulos. A narração dita a duração de cada cena.
@@ -135,6 +136,10 @@ Armadilhas já resolvidas no script:
 - **Coordenadas de toque** são do Pixel 7 (1080×2400) e medidas nas fotos do ensaio; mudou layout, rode `ensaio` antes.
 - **Teclado numérico** fecha com a tecla voltar (`keyevent 4`), não com ESC.
 - **Capítulos** arredondam antes de dividir (119,6 s virava "01:00").
+- **Voz.** O edge-tts passou a receber 403 do serviço em out/2026 (nem anunciando a versão atual do Edge); a narração é local, com o Kokoro (`tool/video/falar_kokoro.py`), todas as cenas numa chamada só (o modelo leva ~30 s para carregar) e o volume nivelado em −16 LUFS. Palavra que a voz lê errado vai em `PRONUNCIA` — "Ware IoT" saía "Ariut", "Siemens" "se m", "faca" "feca"; cada grafia de lá ("Uéar ai ou tí", "Símens", "fácca"…) foi conferida por transcrição reversa. A tela continua com a grafia certa.
+- **O celular grava com quadros irregulares.** O `screenrecord` só manda quadro quando a tela muda; com a tela parada, o único quadro é o do instante 0. Por isso o `fps=30` vem **antes** do corte do segundo morto — na ordem inversa, o corte jogava fora esse quadro e a cena "inicio" pulava a lista de telas.
+- **Cartão não fica parado e fala não fica curta.** A esteira de QA (`~/Projetos/esteira-qa`, perfil tutorial) reprovou a versão de out/2026 com o fecho de 26 s sem mudar um pixel e 10 s de silêncio no editor e na queda de rede. Agora cada ponto do cartão entra quando a voz chega na palavra-gatilho (`gatilhos`), o quadro se aproxima 3,5% (zoom feito em 4K, senão o `zoompan` treme), e a narração de cada cena descreve a ação inteira — se a ação ficar mais longa, a fala cresce junto.
+- **Ensaio antes de gravar, sempre.** Em out/2026 três toques tinham mudado de lugar desde a gravação de 25/09 (Faca acionada, Liga máquina, a sugestão de endereço) e surgiram dois passos novos (escolher o equipamento no form, "Descartar alterações?" ao sair dele). E o ajuste vai a 60 m/min, não 120: a demonstração esquenta para 32 + 0,62 × velocidade e, a 120, passa de 85 °C no meio do editor — a faixa de alarme no topo empurra a tela e desvia os toques.
 
 ## 7. Arduino falso (protocolo cru)
 

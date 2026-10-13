@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
@@ -18,6 +20,7 @@ import '../../models/serial_config.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
+import 'network_scan_sheet.dart';
 import 'opcua_device_fields.dart';
 import 'raw_device_fields.dart';
 import 's7_device_fields.dart';
@@ -105,7 +108,21 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   ProbeResult? _probe;
   bool _probing = false;
 
+  /// Depois do primeiro erro (no Testar ou no Salvar), nome e IP se conferem
+  /// enquanto são corrigidos: o "Informe o IP" some assim que o IP fica certo,
+  /// sem precisar testar de novo.
+  AutovalidateMode _recheck = AutovalidateMode.disabled;
+
+  /// Como o cadastro abriu, para saber se há o que perder ao sair.
+  late final String _initial;
+
   bool get _editing => widget.device != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _initial = _snapshot();
+  }
 
   @override
   void dispose() {
@@ -160,6 +177,48 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         opcua: _isOpcUa ? _ua.build() : const OpcUaConfig(),
       );
 
+  /// O que o Salvar gravaria agora.
+  String _snapshot() => jsonEncode(_build().toJson());
+
+  bool get _dirty => _snapshot() != _initial;
+
+  /// Voltar (seta ou gesto do sistema; no tablet, tocar noutro equipamento da
+  /// lista): sem alteração, sai direto; com alteração, pergunta antes de jogar
+  /// fora — o mesmo diálogo do cadastro de variável.
+  Future<void> _leave() async {
+    if (!_dirty) {
+      Navigator.pop(context);
+      return;
+    }
+    final choice = await showDialog<_Leave>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        key: const ValueKey('descartar-alteracoes'),
+        title: const Text('Descartar alterações?'),
+        content: const Text('O que foi mudado neste equipamento ainda não foi salvo.', style: TextStyle(height: 1.4)),
+        actions: [
+          TextButton(key: const ValueKey('continuar-editando'), onPressed: () => Navigator.pop(ctx, _Leave.keep), child: const Text('Continuar editando')),
+          TextButton(
+            key: const ValueKey('descartar'),
+            style: TextButton.styleFrom(foregroundColor: Ind.textFor(Ind.alarm)),
+            onPressed: () => Navigator.pop(ctx, _Leave.discard),
+            child: const Text('Descartar'),
+          ),
+          FilledButton(key: const ValueKey('salvar-e-sair'), onPressed: () => Navigator.pop(ctx, _Leave.save), child: const Text('Salvar')),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case _Leave.save:
+        await _save();
+      case _Leave.discard:
+        Navigator.pop(context);
+      case _Leave.keep || null:
+        break;
+    }
+  }
+
   /// Trocar de protocolo leva junto a porta padrão — quem escolhe MQTT quase
   /// nunca quer a 502 que já estava no campo. Porta mexida à mão fica.
   void _setProtocol(_Protocol p) {
@@ -203,7 +262,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   Future<void> _test() async {
     // Testar só exige o IP — validar o formulário inteiro marcava erro no
     // nome, que não tem nada a ver com o teste.
-    if (_net && !(_ipField.currentState?.validate() ?? false)) return;
+    if (_net && !(_ipField.currentState?.validate() ?? false)) {
+      setState(() => _recheck = AutovalidateMode.onUserInteraction);
+      return;
+    }
     // Cabo USB sem a permissão do Android: explica antes da pergunta dele.
     if (_usb && !await _usbPermission()) return;
     if (!mounted) return;
@@ -241,7 +303,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   final _ipField = GlobalKey<FormFieldState<String>>();
 
   Future<void> _save() async {
-    if (!(_form.currentState?.validate() ?? false)) return;
+    if (!(_form.currentState?.validate() ?? false)) {
+      setState(() => _recheck = AutovalidateMode.onUserInteraction);
+      return;
+    }
     final c = AppScope.of(context).controller;
     final next = _build();
     c.saveDevice(next);
@@ -268,8 +333,31 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
       false;
 
   Future<void> _pickProfile() async {
+    _dropFocus();
     final r = await VendorProfileSheet.show(context, _profile);
     if (r != null) setState(() => _profile = r.id);
+  }
+
+  /// Antes de abrir uma folha por cima do cadastro. Sem isto, ao fechar a
+  /// folha o foco volta ao último campo de texto e o teclado abre de novo,
+  /// cobrindo o que acabou de ser escolhido.
+  void _dropFocus() => FocusManager.instance.primaryFocus?.unfocus();
+
+  /// "Procurar na rede" (item 94): varre o Wi-Fi do celular e preenche IP e
+  /// porta com o escolhido.
+  Future<void> _scanNetwork() async {
+    _dropFocus();
+    final known = {
+      for (final d in AppScope.of(context).controller.project.equipment)
+        if (d.id != _id && d.isNetwork) '${d.host}:${d.port}': d.name,
+    };
+    final found = await showNetworkScanSheet(context, port: int.tryParse(_port.text), known: known);
+    if (found == null || !mounted) return;
+    setState(() {
+      _host.text = found.host;
+      _port.text = '${found.port}';
+      _probe = null;
+    });
   }
 
   Future<void> _delete() async {
@@ -290,159 +378,181 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   Widget build(BuildContext context) {
     final tcp = !_demo;
     final usbSubtitle = 'RS-485 · RS-232 · ${_usbF.protocol.short}';
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_editing ? 'Equipamento' : 'Novo equipamento'),
-        actions: [
-          if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
-        ],
-      ),
-      // No tablet, campos e Salvar com no máximo 640 dp (TB-3).
-      bottomNavigationBar: FormWidth(child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: FilledButton.icon(key: const ValueKey('salvar-equipamento'), onPressed: _save, icon: const Icon(Icons.check_rounded), label: const Text('Salvar')),
-        ),
-      )),
-      body: FormWidth(child: Form(
-        key: _form,
-        // Só o essencial à vista: tipo, nome, IP e o teste. Porta, ID e tempos
-        // quase nunca mudam — ficam em "Mais opções", já mostrando o valor.
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 32),
-          children: [
-            ChoiceCards<_Where>(
-              options: [
-                ChoiceOption(value: _Where.network, title: 'Na rede', subtitle: _protocol.subtitle, icon: Icons.router_outlined),
-                ChoiceOption(value: _Where.usb, title: 'Cabo USB', subtitle: usbSubtitle, icon: Icons.usb_rounded),
-                const ChoiceOption(value: _Where.demo, title: 'Demonstração', subtitle: 'Simulada', icon: Icons.smart_toy_outlined),
-              ],
-              selected: _where,
-              onChanged: (k) => setState(() {
-                _where = k;
-                _probe = null;
-              }),
-            ),
-            const SizedBox(height: Ind.spaceLarge),
-            TextFormField(
-              key: const ValueKey('campo-nome-equipamento'),
-              controller: _name,
-              validator: Validators.name,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Nome', hintText: 'Ex.: CLP da cortadora'),
-            ),
-            // Cabo USB: o adaptador no lugar do IP.
-            if (_usb) ...[
-              const SizedBox(height: Ind.space),
-              UsbAdapterRow(fields: _usbF, onChanged: () => setState(() => _probe = null)),
-            ],
-            if (_net) ...[
-              const SizedBox(height: Ind.space),
-              TextFormField(
-                key: _ipField,
-                controller: _host,
-                validator: (v) => _net ? Validators.host(v) : null,
-                // OPC UA: o endereço opc.tcp://… inteiro também cabe aqui (colado).
-                keyboardType: _isOpcUa ? TextInputType.url : const TextInputType.numberWithOptions(decimal: true),
-                style: Ind.number(20),
-                decoration: InputDecoration(labelText: _mqtt ? 'IP do broker' : _isS7 ? 'IP do CLP' : _isOpcUa ? 'IP do servidor' : 'IP do equipamento', hintText: '192.168.0.10'),
-                onChanged: (_) => setState(() {
-                  _probe = null;
-                  if (_isOpcUa) _ua.takeEndpoint(_host, _port);
-                }),
-              ),
-            ],
-            // Cru: sem o perfil certo nada funciona — fica à vista, antes do
-            // teste (que confere se o perfil entende a mensagem).
-            if (_raw || _usbRaw) ...[
-              const SizedBox(height: Ind.space),
-              RawProfileRow(fields: _rw, device: _build, onChanged: () => setState(() => _probe = null)),
-            ],
-            const SizedBox(height: Ind.space),
-            OutlinedButton.icon(
-              key: const ValueKey('testar-conexao'),
-              onPressed: _probing ? null : _test,
-              icon: _probing
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.network_check_rounded),
-              label: Text(_probing ? 'Testando…' : 'Testar conexão'),
-            ),
-            if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7, opcua: _isOpcUa, raw: _raw ? _rw : null, usb: _usb ? _usbF : null))],
-            if (tcp) ...[
-              const SizedBox(height: Ind.spaceLarge),
-              Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  key: _moreKey,
-                  onExpansionChanged: (open) => revealAfterExpand(_moreKey, open),
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(bottom: 8),
-                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                  title: const Text('Mais opções'),
-                  subtitle: Text(_moreSummary(), style: TextStyle(color: Ind.textMuted, fontSize: 13)),
-                  children: [
-                    // Marca e modelo: com ela, as variáveis aceitam a memória
-                    // como no manual ("D200"). Genérico = endereço Modbus direto.
-                    // No MQTT, no S7 e no cru não há mapa de memória Modbus.
-                    if (!_mqtt && !_isS7 && !_raw && !_usbRaw && !_isOpcUa) ...[
-                      ListTile(
-                        key: const ValueKey('marca-modelo'),
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Marca e modelo'),
-                        subtitle: Text(_profileName ?? 'Genérico', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: _pickProfile,
-                      ),
-                      const SizedBox(height: Ind.spaceSmall),
-                    ],
-                    // Gateway serial→Ethernet (RS-485 do outro lado) que repassa
-                    // RTU/ASCII cru, ou um broker MQTT: escolhas raras, por isso
-                    // ficam aqui.
-                    if (_net) ...[
-                      Text('Protocolo', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Wrap(spacing: 8, runSpacing: 8, children: [
-                        for (final p in _Protocol.values)
-                          ChoiceChip(
-                            key: ValueKey('protocolo-${p.name}'),
-                            label: Text(p.chip),
-                            selected: _protocol == p,
-                            onSelected: (_) => setState(() => _setProtocol(p)),
-                          ),
-                      ]),
-                    ],
-                    if (_net && (_protocol == _Protocol.rtu || _protocol == _Protocol.ascii)) ...[
-                      const SizedBox(height: 6),
-                      Text('Para conversor RS-485 → Ethernet que repassa os bytes sem converter. Se o conversor faz a conversão para Modbus TCP, use Modbus TCP.',
-                          style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
-                    ],
-                    if (_usb)
-                      UsbMoreOptions(fields: _usbF, unit: _unit, timeout: _timeout, poll: _poll, onChanged: () => setState(() => _probe = null))
-                    else if (_raw)
-                      RawDeviceMoreOptions(fields: _rw, port: _port, timeout: _timeout, onChanged: () => setState(() => _probe = null))
-                    else if (_mqtt)
-                      ..._mqttOptions()
-                    else if (_isS7)
-                      S7DeviceOptions(fields: _s7, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
-                    else if (_isOpcUa)
-                      OpcUaDeviceOptions(fields: _ua, host: _host, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
-                    else ...[
-                      const SizedBox(height: Ind.space),
-                      StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
-                      const SizedBox(height: Ind.space),
-                      StepperField(label: 'Número na rede', controller: _unit, min: 0, max: 255, helper: 'ID do escravo (Unit ID) no manual. Quase sempre 1.', onChanged: () => setState(() {})),
-                      const SizedBox(height: Ind.space),
-                      StepperField(label: 'Tempo de resposta (ms)', controller: _timeout, min: 200, max: 10000),
-                      const SizedBox(height: Ind.space),
-                      StepperField(label: 'Ler a cada (ms)', controller: _poll, min: 100, max: 60000),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+    // Voltar com alteração não salva pergunta antes (ver _leave).
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_editing ? 'Equipamento' : 'Novo equipamento'),
+          actions: [
+            if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
           ],
         ),
-      )),
+        // No tablet, campos e Salvar com no máximo 640 dp (TB-3).
+        bottomNavigationBar: FormWidth(child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton.icon(key: const ValueKey('salvar-equipamento'), onPressed: _save, icon: const Icon(Icons.check_rounded), label: const Text('Salvar')),
+          ),
+        )),
+        body: FormWidth(child: Form(
+          key: _form,
+          // Só o essencial à vista: tipo, nome, IP e o teste. Porta, ID e tempos
+          // quase nunca mudam — ficam em "Mais opções", já mostrando o valor.
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(Ind.page, 12, Ind.page, 32),
+            children: [
+              ChoiceCards<_Where>(
+                options: [
+                  ChoiceOption(value: _Where.network, title: 'Na rede', subtitle: _protocol.subtitle, icon: Icons.router_outlined),
+                  ChoiceOption(value: _Where.usb, title: 'Cabo USB', subtitle: usbSubtitle, icon: Icons.usb_rounded),
+                  const ChoiceOption(value: _Where.demo, title: 'Demonstração', subtitle: 'Simulada', icon: Icons.smart_toy_outlined),
+                ],
+                selected: _where,
+                onChanged: (k) => setState(() {
+                  _where = k;
+                  _probe = null;
+                }),
+              ),
+              const SizedBox(height: Ind.spaceLarge),
+              TextFormField(
+                key: const ValueKey('campo-nome-equipamento'),
+                controller: _name,
+                validator: Validators.name,
+                autovalidateMode: _recheck,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Nome', hintText: 'Ex.: CLP da cortadora'),
+              ),
+              // Cabo USB: o adaptador no lugar do IP.
+              if (_usb) ...[
+                const SizedBox(height: Ind.space),
+                UsbAdapterRow(fields: _usbF, onChanged: () => setState(() => _probe = null)),
+              ],
+              if (_net) ...[
+                const SizedBox(height: Ind.space),
+                TextFormField(
+                  key: _ipField,
+                  controller: _host,
+                  validator: (v) => _net ? Validators.host(v) : null,
+                  autovalidateMode: _recheck,
+                  // OPC UA: o endereço opc.tcp://… inteiro também cabe aqui (colado).
+                  keyboardType: _isOpcUa ? TextInputType.url : const TextInputType.numberWithOptions(decimal: true),
+                  style: Ind.number(20),
+                  decoration: InputDecoration(
+                    labelText: _mqtt ? 'IP do broker' : _isS7 ? 'IP do CLP' : _isOpcUa ? 'IP do servidor' : 'IP do equipamento',
+                    hintText: '192.168.0.10',
+                    // "Informe o IP do equipamento (ex.: 192.168.0.10)" não cabe
+                    // numa linha em 320 dp.
+                    errorMaxLines: 2,
+                    // A lupa é ação, não estado: não fica vermelha junto com o erro.
+                    suffixIconColor: Ind.textDim,
+                    // Não sabe o IP? Procura no Wi-Fi. Só no Modbus TCP: é uma
+                    // leitura Modbus TCP que confirma quem respondeu.
+                    suffixIcon: _protocol == _Protocol.tcp
+                        ? IconButton(key: const ValueKey('procurar-na-rede'), tooltip: 'Procurar na rede', icon: const Icon(Icons.wifi_find_rounded), onPressed: _scanNetwork)
+                        : null,
+                  ),
+                  onChanged: (_) => setState(() {
+                    _probe = null;
+                    if (_isOpcUa) _ua.takeEndpoint(_host, _port);
+                  }),
+                ),
+              ],
+              // Cru: sem o perfil certo nada funciona — fica à vista, antes do
+              // teste (que confere se o perfil entende a mensagem).
+              if (_raw || _usbRaw) ...[
+                const SizedBox(height: Ind.space),
+                RawProfileRow(fields: _rw, device: _build, onChanged: () => setState(() => _probe = null)),
+              ],
+              const SizedBox(height: Ind.space),
+              OutlinedButton.icon(
+                key: const ValueKey('testar-conexao'),
+                onPressed: _probing ? null : _test,
+                icon: _probing
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.network_check_rounded),
+                label: Text(_probing ? 'Testando…' : 'Testar conexão'),
+              ),
+              if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7, opcua: _isOpcUa, raw: _raw ? _rw : null, usb: _usb ? _usbF : null))],
+              if (tcp) ...[
+                const SizedBox(height: Ind.spaceLarge),
+                Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    key: _moreKey,
+                    onExpansionChanged: (open) => revealAfterExpand(_moreKey, open),
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: const EdgeInsets.only(bottom: 8),
+                    expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                    title: const Text('Mais opções'),
+                    subtitle: Text(_moreSummary(), style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+                    children: [
+                      // Marca e modelo: com ela, as variáveis aceitam a memória
+                      // como no manual ("D200"). Genérico = endereço Modbus direto.
+                      // No MQTT, no S7 e no cru não há mapa de memória Modbus.
+                      if (!_mqtt && !_isS7 && !_raw && !_usbRaw && !_isOpcUa) ...[
+                        ListTile(
+                          key: const ValueKey('marca-modelo'),
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Marca e modelo'),
+                          subtitle: Text(_profileName ?? 'Genérico', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: _pickProfile,
+                        ),
+                        const SizedBox(height: Ind.spaceSmall),
+                      ],
+                      // Gateway serial→Ethernet (RS-485 do outro lado) que repassa
+                      // RTU/ASCII cru, ou um broker MQTT: escolhas raras, por isso
+                      // ficam aqui.
+                      if (_net) ...[
+                        Text('Protocolo', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        Wrap(spacing: 8, runSpacing: 8, children: [
+                          for (final p in _Protocol.values)
+                            ChoiceChip(
+                              key: ValueKey('protocolo-${p.name}'),
+                              label: Text(p.chip),
+                              selected: _protocol == p,
+                              onSelected: (_) => setState(() => _setProtocol(p)),
+                            ),
+                        ]),
+                      ],
+                      if (_net && (_protocol == _Protocol.rtu || _protocol == _Protocol.ascii)) ...[
+                        const SizedBox(height: 6),
+                        Text('Para conversor RS-485 → Ethernet que repassa os bytes sem converter. Se o conversor faz a conversão para Modbus TCP, use Modbus TCP.',
+                            style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
+                      ],
+                      if (_usb)
+                        UsbMoreOptions(fields: _usbF, unit: _unit, timeout: _timeout, poll: _poll, onChanged: () => setState(() => _probe = null))
+                      else if (_raw)
+                        RawDeviceMoreOptions(fields: _rw, port: _port, timeout: _timeout, onChanged: () => setState(() => _probe = null))
+                      else if (_mqtt)
+                        ..._mqttOptions()
+                      else if (_isS7)
+                        S7DeviceOptions(fields: _s7, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
+                      else if (_isOpcUa)
+                        OpcUaDeviceOptions(fields: _ua, host: _host, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
+                      else ...[
+                        const SizedBox(height: Ind.space),
+                        StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
+                        const SizedBox(height: Ind.space),
+                        StepperField(label: 'Número na rede', controller: _unit, min: 0, max: 255, helper: 'ID do escravo (Unit ID) no manual. Quase sempre 1.', onChanged: () => setState(() {})),
+                        const SizedBox(height: Ind.space),
+                        StepperField(label: 'Tempo de resposta (ms)', controller: _timeout, min: 200, max: 10000),
+                        const SizedBox(height: Ind.space),
+                        StepperField(label: 'Ler a cada (ms)', controller: _poll, min: 100, max: 60000),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        )),
+      ),
     );
   }
 
@@ -634,6 +744,9 @@ class _ProbeCard extends StatelessWidget {
 
 /// Onde o equipamento está.
 enum _Where { network, usb, demo }
+
+/// O que fazer com alterações não salvas ao sair.
+enum _Leave { keep, discard, save }
 
 /// Protocolo de um equipamento na rede.
 enum _Protocol {

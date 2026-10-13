@@ -130,6 +130,8 @@ class _ReadingListenerState extends State<_ReadingListener> {
 /// tratamento visual de problema — escrito uma vez só, para todos:
 ///
 ///   • sem variável ligada → borda tracejada âmbar + "Escolha a variável";
+///   • variável de modelo com o endereço a configurar → a mesma borda +
+///     "Endereço a configurar" (o runtime não lê; nada de valor inventado);
 ///   • aguardando primeira leitura → conteúdo normal, valor "---";
 ///   • sem comunicação → conteúdo **esmaecido** (último valor) + ícone;
 ///   • endereço inválido / configuração → borda vermelha + motivo.
@@ -180,7 +182,9 @@ class HmiFrame extends StatelessWidget {
 
   Widget _build(BuildContext context, AlarmEntry? alarm) {
     final r = reading ?? TagReading.waiting;
-    final missing = needsTag && tag == null;
+    // Variável de modelo de tela com o endereço a configurar: também "falta
+    // configurar" (cor de interação), não erro — o runtime nem tenta ler.
+    final missing = (needsTag && tag == null) || (tag?.addressPending ?? false);
     final broken = !missing && (r.quality == TagQuality.addressError || r.quality == TagQuality.configError);
     final lost = !missing && r.quality == TagQuality.commLost;
 
@@ -218,7 +222,7 @@ class HmiFrame extends StatelessWidget {
             SizedBox(width: tight ? 6 : 10),
             Expanded(
               child: missing
-                  ? _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent)
+                  ? _missingNotice()
                   : broken
                       ? _Notice(icon: Icons.report_gmailerrorred_rounded, text: r.message, color: Ind.alarm)
                       : body,
@@ -230,6 +234,10 @@ class HmiFrame extends StatelessWidget {
       return _stacked(borderColor, bw, lost, broken, missing, r, body);
     });
   }
+
+  /// "Escolha a variável" — ou, na variável sem endereço, o aviso dela.
+  Widget _missingNotice() =>
+      tag == null ? _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent) : const _PendingNotice();
 
   /// Cartão com o acabamento do sistema visual: camada, borda de 1 px,
   /// sombra em duas camadas e brilho no topo ([CardEdge]). A borda de
@@ -263,7 +271,7 @@ class HmiFrame extends StatelessWidget {
             ),
           Expanded(
             child: missing
-                ? _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent)
+                ? _missingNotice()
                 : broken
                     ? _Notice(icon: Icons.report_gmailerrorred_rounded, text: r.message, color: Ind.alarm)
                     : body,
@@ -296,6 +304,46 @@ class _Notice extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "Endereço a configurar" onde cabe inteiro; "A configurar" onde não cabe —
+/// encolher a frase longa num cartão de meia largura do celular de 320 dp
+/// deixava a letra com 9 dp.
+class _PendingNotice extends StatelessWidget {
+  const _PendingNotice();
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+        // Ícone (16) e o espaço (6) do aviso.
+        final text = _fitting(context, const ['Endereço a configurar', 'A configurar'], const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), box.maxWidth - 22);
+        return _Notice(icon: Icons.pending_outlined, text: text, color: Ind.accent);
+      });
+}
+
+/// O aviso no rosto do botão cuja variável está com o endereço a configurar
+/// (no lugar do modo, como "ESCOLHA A TELA"): "A CONFIGURAR", ou
+/// "CONFIGURAR" no botão estreito do celular de 320 dp.
+class PendingHint extends StatelessWidget {
+  const PendingHint({super.key});
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+        final style = TextStyle(color: Ind.accent, fontSize: 11, fontWeight: FontWeight.w700);
+        return FitText(_fitting(context, const ['A CONFIGURAR', 'CONFIGURAR'], style, box.maxWidth), style: style);
+      });
+}
+
+/// O primeiro texto de [options] que cabe em [width] sem encolher (senão, o
+/// último).
+String _fitting(BuildContext context, List<String> options, TextStyle style, double width) {
+  final full = DefaultTextStyle.of(context).style.merge(style);
+  for (final o in options.take(options.length - 1)) {
+    final painter = TextPainter(text: TextSpan(text: o, style: full), textDirection: TextDirection.ltr, maxLines: 1)..layout();
+    final fits = painter.width <= width;
+    painter.dispose();
+    if (fits) return o;
+  }
+  return options.last;
 }
 
 /// Texto que encolhe para caber na célula (números grandes em elemento 1×1).

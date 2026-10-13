@@ -168,6 +168,7 @@ class Tag {
     this.calc,
     this.ruleWritable = false,
     this.opcua,
+    this.addressPending = false,
   });
 
   final String id;
@@ -252,6 +253,14 @@ class Tag {
   /// ([acceptsRuleWrite]).
   final bool ruleWritable;
 
+  /// **Endereço a configurar**: a variável nasceu de um modelo de tela
+  /// (`lib/services/templates/`) num equipamento sem mapa da marca para ela,
+  /// e o app não inventa endereço. Enquanto estiver assim, área e endereço
+  /// são só o padrão: o runtime não lê nem grava (a tela mostra "a
+  /// configurar" no lugar do valor) e o cadastro abre com o endereço vazio.
+  /// Salvar o cadastro — que monta a variável de novo — tira a marca.
+  final bool addressPending;
+
   bool get isCalc => calc != null;
 
   /// Uma regra pode gravar aqui: marcada **e** gravável de fato.
@@ -296,6 +305,7 @@ class Tag {
   /// "HR 100" / "HR 100.3" / "COIL 5" / "HR 10..17" / "cortadora/estado · temp"
   /// / "DB1.DBW4".
   String get addressLabel {
+    if (addressPending) return 'Endereço a configurar';
     // A conta, com os nomes de agora, só quem tem o projeto mostra
     // (`CalcText.display`).
     if (calc != null) return 'Calculada';
@@ -336,6 +346,7 @@ class Tag {
     CalcSpec? calc,
     bool? ruleWritable,
     OpcUaTagAddress? opcua,
+    bool? addressPending,
   }) =>
       Tag(
         id: id,
@@ -362,6 +373,7 @@ class Tag {
         calc: calc ?? this.calc,
         ruleWritable: ruleWritable ?? this.ruleWritable,
         opcua: opcua ?? this.opcua,
+        addressPending: addressPending ?? this.addressPending,
       );
 
   /// Troca o texto da memória — inclusive para nulo (endereço digitado à mão),
@@ -391,6 +403,7 @@ class Tag {
         calc: calc,
         ruleWritable: ruleWritable,
         opcua: opcua,
+        addressPending: addressPending,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -474,6 +487,8 @@ class Tag {
         // Como o MQTT: só quando existe (projeto sem calculada fica igual).
         if (calc != null) 'calc': calc!.toJson(),
         if (ruleWritable) 'ruleWritable': true,
+        // Só quando falta: variável com endereço fica igual à de antes.
+        if (addressPending) 'addressPending': true,
       };
 
   factory Tag.fromJson(Map<String, dynamic> j) => Tag(
@@ -508,5 +523,6 @@ class Tag {
         calc: j['calc'] is Map ? CalcSpec.fromJson(Map<String, dynamic>.from(j['calc'] as Map)) : null,
         ruleWritable: (j['ruleWritable'] as bool?) ?? false,
         opcua: j['opcua'] is Map ? OpcUaTagAddress.fromJson(Map<String, dynamic>.from(j['opcua'] as Map)) : null,
+        addressPending: (j['addressPending'] as bool?) ?? false,
       ).normalized();
 }

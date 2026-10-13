@@ -34,6 +34,11 @@ class WriteActions {
       _toast(messenger, 'Esta tela é só de acompanhamento.');
       return false;
     }
+    if (tag.addressPending) {
+      // Antes de perguntar "gravar?": a resposta já é não.
+      _toast(messenger, pendingText(tag));
+      return false;
+    }
     if (!tag.canWrite) {
       _toast(messenger, '"${tag.name}" está marcada como só leitura.');
       return false;
@@ -83,6 +88,9 @@ class WriteActions {
 
   static void toast(BuildContext context, String text, {bool error = false}) =>
       _toast(ScaffoldMessenger.maybeOf(context), text, error: error);
+
+  /// Por que não grava: a variável veio de um modelo de tela sem endereço.
+  static String pendingText(Tag tag) => '"${tag.name}" ainda está com o endereço a configurar (em Variáveis).';
 }
 
 /// Teclado numérico grande, para luva e dedo sujo de graxa — o campo de texto

@@ -219,6 +219,8 @@ class _TagTile extends StatelessWidget {
         tagId: tag.id,
         builder: (context, _, r) {
           final (text, color) = switch (r.quality) {
+            // Variável de modelo sem endereço: falta configurar, não é erro.
+            _ when tag.addressPending => ('a configurar', Ind.accent),
             TagQuality.addressError || TagQuality.configError => ('erro', Ind.alarm),
             TagQuality.commLost => (TagCodec.format(tag, _scalar(r.value)), Ind.textMuted),
             // Ligado não é "bom": "Alarme ativo · LIGADO" em verde dizia o

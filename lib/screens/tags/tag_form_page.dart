@@ -130,7 +130,9 @@ class _TagFormPageState extends State<TagFormPage> {
   late List<EventNarration> _narrations = widget.tag?.narrations ?? const [];
 
   late final _name = TextEditingController(text: widget.tag?.name ?? '');
-  late final _address = TextEditingController(text: '${widget.tag?.address ?? 0}');
+  // Variável de modelo de tela com o endereço a configurar: abre vazio — o 0
+  // do padrão não é endereço de verdade, e Salvar exige o que falta.
+  late final _address = TextEditingController(text: widget.tag?.addressPending ?? false ? '' : '${widget.tag?.address ?? 0}');
   late final _bit = TextEditingController(text: '${widget.tag?.bitIndex ?? 0}');
   late final _length = TextEditingController(text: '${widget.tag?.length ?? (widget.fit == TagFit.numberList ? 8 : 1)}');
   late final _unit = TextEditingController(text: widget.tag?.unit ?? '');

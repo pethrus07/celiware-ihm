@@ -400,7 +400,8 @@ class _ButtonElementState extends State<ButtonElement> {
     final color = StateColorMeta.fromName(e.prop<String>('color', 'green')).color;
     final commanded = r.value == true || _holding;
     // Com retorno, acende pelo que a máquina confirma; sem, pelo comando.
-    final hasFeedback = fbTag != null;
+    // Retorno ainda sem endereço (modelo de tela) não confirma nada.
+    final hasFeedback = fbTag != null && !fbTag.addressPending;
     final lit = mode == ButtonMode.value ? false : (hasFeedback ? fb.value == true : commanded);
     final pending = hasFeedback && commanded && fb.value != true && mode != ButtonMode.momentary;
     final noFeedback = _trackPending(pending);
@@ -411,6 +412,12 @@ class _ButtonElementState extends State<ButtonElement> {
             hint: Text('SEM RETORNO', style: TextStyle(color: Ind.textFor(Ind.warn), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.4)))
         : _face(label: label, color: color, lit: lit, pending: pending, tag: tag);
 
+    // Variável de modelo de tela sem endereço: o rosto do botão, com o aviso
+    // no lugar do modo (como "ESCOLHA A TELA") — nada grava, e o toque diz por quê.
+    if (tag != null && tag.addressPending) {
+      final face = _face(label: label, color: color, lit: false, hint: const PendingHint());
+      return screen.editMode ? face : GestureDetector(onTap: () => WriteActions.toast(context, WriteActions.pendingText(tag)), child: face);
+    }
     if (tag == null || r.quality == TagQuality.addressError || r.quality == TagQuality.configError) {
       return HmiFrame(label: '', tag: tag, reading: r, child: const SizedBox());
     }

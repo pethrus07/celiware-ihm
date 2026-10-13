@@ -41,7 +41,9 @@ contra `docs/ARQUITETURA.md` em 12/10/2026):
 | Promessa | Onde |
 |---|---|
 | Demonstração que abre pronta, sem equipamento | §5.1 (`demo`), §6.8 "Demonstração" |
-| 12 elementos | `ElementCatalog` (§6.3, §6.4) |
+| 13 elementos (com OEE) | `ElementCatalog` (§6.3, §6.4); OEE em §5.3 |
+| Modelos de tela prontos | §6.1 "Modelos de tela"; endereço sem mapa fica "a configurar" (nada inventado) |
+| Lupa que procura os equipamentos Modbus do Wi-Fi | §6.5 "Procurar na rede" |
 | 40 valores ou mais numa tela de celular | GR-8, `table_element_test` (46 e 44) |
 | Valor ao vivo enquanto configura | §6.6 "Lendo agora" |
 | Escala, texto ASCII, botão com retorno, troca de tela, imagem por etapa e PDF | §1.2 (versão 1.1), §4.12, §4.13 |

@@ -80,7 +80,7 @@
           <ol>
             <li>Ligue o CLP no roteador ou switch da fábrica, com cabo de rede.</li>
             <li>Conecte o celular no mesmo Wi-Fi.</li>
-            <li>No app, cadastre o IP do CLP e toque em Testar conexão.</li>
+            <li>No app, cadastre o IP do CLP (ou toque na lupa para procurar no Wi-Fi) e toque em Testar conexão.</li>
           </ol>
           <p class="dim">O Wi-Fi não chega forte no painel? Um repetidor resolve.</p>
         </div>
@@ -122,7 +122,7 @@
           <ol>
             <li>Ligue o conversor nos fios <span class="nw">RS-485</span> (ou <span class="nw">RS-232</span>) do CLP ou inversor.</li>
             <li>No conversor, use a mesma velocidade e paridade do equipamento (estão no manual) e conecte-o ao Wi-Fi.</li>
-            <li>No app, cadastre o IP do conversor. No campo ID, use o endereço do equipamento na linha RS-485.</li>
+            <li>No app, cadastre o IP do conversor. Em <strong>Número na rede</strong> (o ID do escravo), use o endereço do equipamento na linha <span class="nw">RS-485</span>.</li>
           </ol>
           <p class="dim">O conversor só repassa os dados, sem traduzir para Modbus TCP? No app, escolha RTU em Mais opções → Protocolo.</p>
           <p class="dim">Sem rede no painel? Um cabo USB-OTG com adaptador <span class="nw">RS-485</span> ligado direto no celular também funciona: no app, escolha <strong>Cabo USB</strong> no cadastro do equipamento. É novo e ainda está em conferência com equipamento real.</p>
@@ -212,7 +212,7 @@
           <li><strong>Faixa de IP</strong><span>Celular em 192.168.0.x e CLP em 192.168.1.x não se falam: na maioria das redes, os três primeiros números precisam ser iguais. O app avisa quando a faixa é diferente.</span></li>
           <li><strong>Dados móveis</strong><span>Com o Wi-Fi da máquina sem internet, o Android tende a usar o 4G. O Ware IoT usa o Wi-Fi da máquina mesmo assim. Se ainda falhar, desligue os dados móveis ou toque em “manter conexão” no aviso de Wi-Fi sem internet.</span></li>
           <li><strong>Porta 502</strong><span>É a porta do Modbus TCP. Se o equipamento usa outra, ajuste em Mais opções. Confira também se o Modbus TCP está ligado nele: alguns vêm desligados de fábrica.</span></li>
-          <li><strong>ID do equipamento</strong><span>Costuma ser 1. Atrás de um conversor RS-485, use o endereço configurado no CLP ou inversor.</span></li>
+          <li><strong>Número na rede (ID)</strong><span>Costuma ser 1. Atrás de um conversor RS-485, use o endereço configurado no CLP ou inversor.</span></li>
         </ol>
       </div>
       <figure class="bloco__midia">

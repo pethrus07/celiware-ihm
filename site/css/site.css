@@ -1,7 +1,10 @@
 /* Ware IoT — folha única do site.
  *
- * Cores = tokens do app (lib/core/theme/app_theme.dart, ARQUITETURA §8):
- * fundo neutro, cor só para interação (verde-água) e estado.
+ * Cor de destaque = a do app (verde-água, lib/core/theme/app_theme.dart).
+ * O site é vitrine, não IHM: o topo de cada página, a galeria, as chamadas
+ * finais e o rodapé ficam num "palco" escuro com brilho verde-água (os prints
+ * do app são escuros e saltam nele); o resto alterna fundo claro e uma faixa
+ * tingida de verde-água — nada de cinza sobre cinza.
  * Tema claro e escuro pelo sistema (prefers-color-scheme).
  * Mobile primeiro: tudo cabe em 360 px; colunas só a partir de 760 px.
  */
@@ -33,27 +36,31 @@
 :root {
   color-scheme: light dark;
 
-  /* Claro "campo" (o mesmo do app) */
-  --well: #dadde2;
-  --bg: #e4e6ea;
-  --surface: #f7f8fa;
-  --surface-high: #ebedf0;
+  /* Claro: branco frio, faixa tingida de verde-água */
+  --well: #dfe7eb;
+  --bg: #f4f7f9;
+  --band: #e6f3f5;
+  --band-top: #f0f8f9;
+  --surface: #ffffff;
+  --surface-high: #e8f0f3;
   --raised: #ffffff;
-  --line: #d5d9df;
-  --border: rgba(16, 24, 40, 0.08);
-  --text: #1b1f24;
-  --text-dim: #474e58;
+  --line: #d6e0e5;
+  --border: rgba(10, 40, 50, 0.09);
+  --text: #121a21;
+  --text-dim: #44505c;
   --accent: #00808c;
-  --accent-text: #006b75; /* verde-água escurecido: 4,5:1 sobre o fundo cinza */
+  --accent-text: #006b75; /* verde-água escurecido: ≥ 4,5:1 sobre o fundo e a faixa */
   --accent-soft: rgba(0, 128, 140, 0.12);
+  --glow: rgba(0, 150, 165, 0.22);
   --on-accent: #ffffff;
   --ok: #1f9d57;
   --alarm: #d9363c;
   --alarm-mid: #e07a1f;
   --warn: #f2b705;
   --frame: #20242b; /* moldura do celular: escura nos dois temas */
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.08), 0 8px 24px rgba(16, 24, 40, 0.07);
-  --shadow-phone: 0 2px 4px rgba(16, 24, 40, 0.12), 0 24px 48px rgba(16, 24, 40, 0.18);
+  --shadow: 0 1px 2px rgba(10, 40, 50, 0.07), 0 10px 28px rgba(10, 40, 50, 0.08);
+  --shadow-phone: 0 2px 4px rgba(10, 30, 40, 0.14), 0 28px 56px -12px rgba(10, 30, 40, 0.32);
+  --phone-glow: 0 34px 90px -34px rgba(0, 150, 165, 0.55);
 
   --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-cond: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
@@ -69,18 +76,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --well: #0a0c0f;
-    --bg: #0e1014;
-    --surface: #171a1f;
-    --surface-high: #20242b;
-    --raised: #1c2026;
-    --line: #262a31;
-    --border: rgba(255, 255, 255, 0.07);
-    --text: #e8eaed;
-    --text-dim: #a1a7b0;
+    --well: #070a0e;
+    --bg: #0a0e13;
+    --band: #0c1a20;
+    --band-top: #0a141a;
+    --surface: #111820;
+    --surface-high: #1a232d;
+    --raised: #131c25;
+    --line: #1f2a35;
+    --border: rgba(255, 255, 255, 0.08);
+    --text: #e8eef2;
+    --text-dim: #a3aeb9;
     --accent: #2ec4d0;
     --accent-text: #2ec4d0;
-    --accent-soft: rgba(46, 196, 208, 0.12);
+    --accent-soft: rgba(46, 196, 208, 0.13);
+    --glow: rgba(46, 196, 208, 0.24);
     --on-accent: #03181a;
     --ok: #2fbf71;
     --alarm: #f2555a;
@@ -88,8 +98,35 @@
     --warn: #f5c518;
     --frame: #2a2f37;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.3);
-    --shadow-phone: 0 2px 4px rgba(0, 0, 0, 0.5), 0 24px 56px rgba(0, 0, 0, 0.55);
+    --shadow-phone: 0 2px 4px rgba(0, 0, 0, 0.5), 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+    --phone-glow: 0 34px 90px -30px rgba(46, 196, 208, 0.42);
   }
+}
+
+/* Palco: escuro com brilho verde-água nos dois temas. Os tokens são
+   redefinidos aqui dentro, então tudo o que está no palco (texto, links,
+   cartões, menu) já sai na versão escura sem regra própria. */
+.palco,
+.topo,
+.rodape {
+  --well: #050a0e;
+  --bg: #071218;
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-high: rgba(255, 255, 255, 0.11);
+  --raised: #0e1f27;
+  --line: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.12);
+  --text: #eef4f7;
+  --text-dim: #a9b8c2;
+  --accent: #2ec4d0;
+  --accent-text: #62dae4;
+  --accent-soft: rgba(46, 196, 208, 0.16);
+  --on-accent: #03181a;
+  --glow: rgba(46, 196, 208, 0.34);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-phone: 0 2px 4px rgba(0, 0, 0, 0.55), 0 34px 70px -14px rgba(0, 0, 0, 0.7);
+  --phone-glow: 0 40px 110px -30px rgba(46, 196, 208, 0.6);
+  color: var(--text);
 }
 
 @media (min-width: 760px) {
@@ -185,8 +222,39 @@ strong { font-weight: 600; }
 }
 .sobre--espaco { margin-top: 56px; }
 
+/* ── Palco ────────────────────────────────────────────────────────────── */
+.palco {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  background:
+    radial-gradient(ellipse 55% 65% at 80% 28%, rgba(46, 196, 208, 0.26), transparent 62%),
+    radial-gradient(ellipse 45% 55% at 8% 95%, rgba(47, 191, 113, 0.12), transparent 60%),
+    linear-gradient(165deg, #0c222a 0%, #08151b 45%, #060c11 100%);
+}
+/* A grade de pontos do editor do app, sumindo nas bordas */
+.palco::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(rgba(255, 255, 255, 0.075) 1px, transparent 1.6px) 0 0 / 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 80% at 70% 35%, #000 25%, transparent 78%);
+  mask-image: radial-gradient(ellipse 75% 80% at 70% 35%, #000 25%, transparent 78%);
+  pointer-events: none;
+}
+/* O topo de toda página fica no palco: o cabeçalho flutua por cima dele */
+.palco--heroi,
+.palco--cabeca { padding-top: 72px; }
+
 /* ── Topo ─────────────────────────────────────────────────────────────── */
-.topo { position: relative; z-index: 5; }
+.topo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+}
 
 .topo__linha {
   display: flex;
@@ -350,6 +418,10 @@ strong { font-weight: 600; }
 }
 .selo-play strong { display: block; font-size: 1.2rem; }
 .selo-play:hover { background: #000; }
+.palco .selo-play {
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32), 0 14px 34px -14px rgba(46, 196, 208, 0.7);
+}
 
 /* ── Seções ───────────────────────────────────────────────────────────── */
 .secao { padding-block: var(--section); }
@@ -362,7 +434,8 @@ strong { font-weight: 600; }
 .secao__cabeca--centro { margin-inline: auto; text-align: center; }
 .secao__cabeca--centro .lead { margin-inline: auto; }
 
-.faixa { background: var(--surface); }
+.faixa { background: linear-gradient(180deg, var(--band-top), var(--band)); }
+.secao { overflow-x: clip; }
 
 /* ── Herói ────────────────────────────────────────────────────────────── */
 .heroi {
@@ -373,26 +446,83 @@ strong { font-weight: 600; }
 }
 .heroi h1 { max-width: 11em; }
 
-@media (min-width: 760px) {
-  .heroi { grid-template-columns: 1.15fr 0.85fr; }
+/* Palavra em destaque no título: o verde-água do app em degradê */
+.destaque {
+  color: #62dae4;
+  background: linear-gradient(95deg, #7fe6ee 0%, #2ec4d0 55%, #59d68f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-/* Celular em CSS: moldura escura + print real */
+@media (min-width: 760px) {
+  .heroi { grid-template-columns: 1.1fr 0.9fr; }
+}
+
+/* Celular em CSS: moldura metálica + print real + brilho verde-água */
 .celular {
-  width: min(72vw, 290px);
+  width: min(78vw, 300px);
   margin-inline: auto;
-  padding: 10px;
-  border-radius: 42px;
-  background: var(--frame);
-  box-shadow: var(--shadow-phone), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  padding: 9px;
+  border-radius: 44px;
+  background: linear-gradient(150deg, #48525e 0%, #1d232b 38%, #0e1217 100%);
+  box-shadow: var(--shadow-phone), var(--phone-glow), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 .celular img {
   width: 100%;
-  border-radius: 32px;
+  border-radius: 35px;
   background: var(--well);
 }
-.celular--p { width: min(64vw, 250px); padding: 8px; border-radius: 34px; }
-.celular--p img { border-radius: 26px; }
+.celular--p { width: min(70vw, 270px); padding: 8px; border-radius: 38px; }
+.celular--p img { border-radius: 30px; }
+
+/* Herói: o print grande na frente, um segundo atrás e dois selos soltos */
+.heroi__midia {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding-block: 8px 24px;
+}
+.heroi__midia .celular--frente { position: relative; z-index: 2; width: min(80vw, 340px); }
+.celular--atras,
+.chip { display: none; }
+
+@media (min-width: 760px) {
+  .heroi__midia .celular--frente { width: min(100%, 340px); }
+}
+@media (min-width: 960px) {
+  .celular--atras {
+    display: block;
+    position: absolute;
+    z-index: 1;
+    right: -4%;
+    top: 12%;
+    width: 72%;
+    transform: rotate(7deg);
+    opacity: 0.62;
+  }
+  .chip {
+    position: absolute;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(9, 22, 28, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.8);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    color: #eef4f7;
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+  .chip svg { width: 18px; height: 18px; flex: none; }
+  .chip--ok { left: -6%; top: 22%; }
+  .chip--alarme { right: -2%; bottom: 14%; }
+}
 
 /* ── 3 passos ─────────────────────────────────────────────────────────── */
 .passos {
@@ -415,12 +545,13 @@ strong { font-weight: 600; }
   top: -4px;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  font: 600 1.35rem/1 var(--font-cond);
+  background: linear-gradient(140deg, #4fd6e0, #1fa3ae);
+  color: #03181a;
+  box-shadow: 0 10px 24px -10px rgba(0, 150, 165, 0.7);
+  font: 600 1.4rem/1 var(--font-cond);
 }
 .passos h3 { margin-bottom: 6px; }
 .passos p { color: var(--text-dim); margin-bottom: 4px; }
@@ -449,26 +580,28 @@ strong { font-weight: 600; }
 
 /* Recorte do print (mostra a parte que importa, sem o rodapé do celular) */
 .recorte {
-  width: min(64vw, 250px);
+  width: min(76vw, 290px);
   margin-inline: auto;
-  padding: 8px;
-  border-radius: 34px;
-  background: var(--frame);
-  box-shadow: var(--shadow-phone), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  padding: 9px;
+  border-radius: 40px;
+  background: linear-gradient(150deg, #48525e 0%, #1d232b 38%, #0e1217 100%);
+  box-shadow: var(--shadow-phone), var(--phone-glow), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 .recorte img {
   width: 100%;
   aspect-ratio: 9 / 16;
   object-fit: cover;
   object-position: top;
-  border-radius: 26px;
+  border-radius: 31px;
   background: var(--well);
 }
 .recorte--meio img { object-position: 50% 45%; }
 
 @media (min-width: 760px) {
-  .galeria { grid-template-columns: repeat(3, 1fr); gap: 32px; }
-  .recorte { width: 100%; max-width: 260px; }
+  .galeria { grid-template-columns: repeat(3, 1fr); gap: 28px; align-items: end; }
+  .recorte { width: 100%; max-width: 300px; }
+  /* O do meio um pouco à frente: dá ritmo à fila */
+  .galeria li:nth-child(2) .recorte { transform: translateY(-28px) scale(1.05); }
 }
 
 /* ── Cartões (hardware, recursos) ─────────────────────────────────────── */
@@ -493,25 +626,29 @@ strong { font-weight: 600; }
   height: 100%;
   padding: 24px;
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--raised);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
-.faixa .cartao { background: var(--raised); }
+.cartao:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow), 0 18px 40px -22px var(--glow);
+}
 .cartao h3 { margin: 0; }
 .cartao p { color: var(--text-dim); margin: 0; }
 .cartao .botao { margin-top: auto; align-self: flex-start; }
 .cartao__icone {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   margin-bottom: 8px;
-  border-radius: 12px;
-  background: var(--surface-high);
-  color: var(--text);
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
-.faixa .cartao__icone { background: var(--surface-high); }
 .cartao__icone svg { width: 28px; height: 28px; }
 .cartao__acao { margin-top: auto; padding-top: 12px; }
 
@@ -535,6 +672,11 @@ strong { font-weight: 600; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
 }
 .confianca svg { width: 20px; height: 20px; color: var(--ok); flex: none; }
 
@@ -571,7 +713,8 @@ strong { font-weight: 600; }
 /* ── Rodapé ───────────────────────────────────────────────────────────── */
 .rodape {
   padding-block: 48px;
-  border-top: 1px solid var(--line);
+  background: #060c11;
+  border-top: 1px solid rgba(46, 196, 208, 0.25);
   color: var(--text-dim);
   font-size: 0.95rem;
 }
@@ -607,8 +750,10 @@ strong { font-weight: 600; }
 }
 
 /* ── Páginas internas ─────────────────────────────────────────────────── */
-.cabeca { padding-block: clamp(24px, 6vw, 72px) clamp(16px, 3vw, 32px); }
+.cabeca { padding-block: clamp(32px, 6vw, 72px) clamp(40px, 6vw, 72px); }
 .cabeca h1 { font-size: clamp(2.1rem, 1.6rem + 2.6vw, 3.25rem); max-width: 14em; }
+/* Logo abaixo do palco, a primeira seção não precisa de respiro extra em cima */
+.palco--cabeca + .secao--alto { padding-top: clamp(40px, 6vw, 72px); }
 
 .atalhos {
   display: flex;
@@ -642,7 +787,25 @@ strong { font-weight: 600; }
 .bloco__texto { max-width: 34em; }
 .bloco__texto ul { padding-left: 1.2em; margin: 0 0 var(--space); }
 .bloco__texto li + li { margin-top: 6px; }
-.bloco__midia { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; margin: 0; }
+.bloco__midia {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+  margin: 0;
+}
+/* Brilho verde-água atrás dos prints */
+.bloco__midia::before {
+  content: "";
+  position: absolute;
+  inset: 6% 4%;
+  z-index: -1;
+  background: radial-gradient(closest-side, var(--glow), transparent);
+  pointer-events: none;
+}
+.bloco__midia .bloco__midia::before { display: none; }
 figure.bloco__midia { flex-direction: column; align-items: center; }
 .legenda {
   max-width: 20em;
@@ -656,22 +819,25 @@ figure.bloco__midia { flex-direction: column; align-items: center; }
 .cta-final .acoes { justify-content: center; }
 
 /* Dois prints lado a lado: no celular cada um ocupa metade */
-.bloco__midia--dupla { flex-wrap: nowrap; gap: 16px; }
+.bloco__midia--dupla { flex-wrap: nowrap; gap: 14px; align-items: flex-start; }
 .bloco__midia--dupla .celular {
-  width: calc(50% - 8px);
-  max-width: 230px;
+  width: calc(50% - 7px);
+  max-width: 270px;
   margin: 0;
   padding: 6px;
-  border-radius: 26px;
+  border-radius: 28px;
 }
-.bloco__midia--dupla .celular img { border-radius: 20px; }
+.bloco__midia--dupla .celular img { border-radius: 22px; }
+/* O segundo desce um pouco: os dois não ficam como uma fila de miniaturas */
+.bloco__midia--dupla .celular + .celular { margin-top: 32px; }
 
 @media (min-width: 760px) {
   .bloco { grid-template-columns: 1fr 1fr; }
   .bloco--inverso .bloco__midia { order: -1; }
-  .bloco__midia--dupla { gap: 24px; }
-  .bloco__midia--dupla .celular { padding: 8px; border-radius: 32px; }
-  .bloco__midia--dupla .celular img { border-radius: 24px; }
+  .bloco__midia--dupla { gap: 22px; }
+  .bloco__midia--dupla .celular { padding: 8px; border-radius: 36px; }
+  .bloco__midia--dupla .celular img { border-radius: 28px; }
+  .bloco__midia--dupla .celular + .celular { margin-top: 56px; }
 }
 
 /* Cenários de conexão */
@@ -683,8 +849,9 @@ figure.bloco__midia { flex-direction: column; align-items: center; }
   height: 40px;
   margin-bottom: 12px;
   border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  background: linear-gradient(140deg, #4fd6e0, #1fa3ae);
+  color: #03181a;
+  box-shadow: 0 10px 24px -10px rgba(0, 150, 165, 0.7);
   font: 600 1.25rem/1 var(--font-cond);
 }
 .cenario ol { padding-left: 1.3em; margin: 0 0 var(--space); }
@@ -751,7 +918,8 @@ figure.bloco__midia { flex-direction: column; align-items: center; }
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--surface-high);
+  background: var(--accent-soft);
+  color: var(--accent-text);
   font: 600 1rem/1 var(--font-cond);
 }
 .checklist strong { display: block; }

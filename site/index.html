@@ -108,21 +108,28 @@
 </header>
 
 <main id="conteudo">
-  <section class="wrap heroi" aria-labelledby="titulo">
-    <div>
-      <h1 id="titulo">Seu celular vira a IHM da máquina.</h1>
-      <p class="lead">Grátis, sem cadastro e sem nuvem. Conecte no CLP pela rede e monte a tela de operação em minutos.</p>
-      <div class="acoes">
-        <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dhome%26utm_content%3Dheroi">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
-          <span><small>Baixar grátis na</small><strong>Google Play</strong></span>
-        </a>
-        <a class="link-seta" href="como-conectar">Como conectar</a>
+  <section class="palco palco--heroi" aria-labelledby="titulo">
+    <div class="wrap heroi">
+      <div>
+        <h1 id="titulo">Seu celular vira a <span class="destaque">IHM da máquina.</span></h1>
+        <p class="lead">Grátis, sem cadastro e sem nuvem. Conecte no CLP pela rede e monte a tela de operação em minutos.</p>
+        <div class="acoes">
+          <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dhome%26utm_content%3Dheroi">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
+            <span><small>Baixar grátis na</small><strong>Google Play</strong></span>
+          </a>
+          <a class="link-seta" href="como-conectar">Como conectar</a>
+        </div>
       </div>
-    </div>
-    <div class="celular">
-      <img src="img/operacao.webp" width="540" height="1200" fetchpriority="high"
-           alt="Tela de operação no Ware IoT: máquina em ciclo a 80 m/min, botões Liga e Reset, contador de produção e medidor de temperatura do motor.">
+      <div class="heroi__midia">
+        <div class="celular celular--atras" aria-hidden="true"><img src="img/alarme-na-tela.webp" width="540" height="1200" alt=""></div>
+        <div class="celular celular--frente">
+          <img src="img/operacao.webp" width="540" height="1200" fetchpriority="high"
+             alt="Tela de operação no Ware IoT: máquina em ciclo a 80 m/min, botões Liga e Reset, contador de produção e medidor de temperatura do motor.">
+        </div>
+        <span class="chip chip--ok" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#2FBF71"/><circle cx="12" cy="12" r="10" fill="none" stroke="#2FBF71" stroke-opacity=".35" stroke-width="2"/></svg>Lendo o CLP ao vivo</span>
+        <span class="chip chip--alarme" aria-hidden="true"><svg viewBox="0 0 30 30"><path fill="#F2555A" d="M15 1 29 15 15 29 1 15z"/><text x="15" y="19.5" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">1</text></svg>Alarme na hora</span>
+      </div>
     </div>
   </section>
 
@@ -149,7 +156,7 @@
     </div>
   </section>
 
-  <section class="secao" aria-labelledby="prints">
+  <section class="secao palco" aria-labelledby="prints">
     <div class="wrap">
       <div class="secao__cabeca secao__cabeca--centro">
         <h2 id="prints">Do jeito que aparece no celular</h2>

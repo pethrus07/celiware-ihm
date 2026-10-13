@@ -312,6 +312,10 @@ void main() {
     // A folha abriu sozinha; a escolha marca várias de uma vez.
     await tester.tap(find.byKey(const ValueKey('escolher-variaveis')));
     await live(tester, 600);
+    // A folha nasce mais baixa (a faixa do topo tem lugar fixo): puxa um
+    // pouco para a última da lista sair de trás do "Pronto".
+    await tester.drag(find.byKey(const ValueKey('marcar-sp')), const Offset(0, -80));
+    await live(tester, 300);
     for (final id in ['sp', 'temp', 'porta', 'nome']) {
       await tester.tap(find.byKey(ValueKey('marcar-$id')));
       await live(tester, 100);
@@ -399,8 +403,9 @@ void main() {
     tester.view.padding = const FakeViewPadding(top: 32 * 3, bottom: 24 * 3);
     await open(tester, const ScreenRunPage(screenId: 'd'));
     final android = visible();
-    expect(android, greaterThanOrEqualTo(40));
-    expect(android, 46, reason: 'as duas tabelas inteiras');
+    // Com a faixa do topo de lugar fixo (56 dp, ver AlarmBannerHost), as duas
+    // tabelas já não cabem inteiras (eram 46): ficam 42 à vista sem rolar.
+    expect(android, greaterThanOrEqualTo(42));
     // ...e o pior caso de recorte de câmera (47 e 34 dp).
     tester.view.padding = const FakeViewPadding(top: 47 * 3, bottom: 34 * 3);
     await live(tester, 600);

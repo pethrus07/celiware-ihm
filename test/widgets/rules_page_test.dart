@@ -128,6 +128,9 @@ void main() {
     expect(find.text('Grava DESLIGADO em "Liga máquina" (Cortadora de rótulos)'), findsOneWidget);
     expect(memory.bit(ModbusArea.coil, DemoMap.coilRun), isTrue, reason: 'nada gravado sem o toque');
 
+    // A pergunta mora na faixa do topo; tocar abre a decisão.
+    await tester.tap(find.byKey(const ValueKey('proposta-regra')));
+    await live(tester, 400);
     await tester.tap(find.byKey(const ValueKey('proposta-confirmar')));
     await live(tester, 800);
     expect(memory.bit(ModbusArea.coil, DemoMap.coilRun), isFalse);

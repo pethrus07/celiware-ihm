@@ -394,6 +394,7 @@ void main() {
     await live(tester, 300);
     expect(find.byKey(const ValueKey('sugestao-endereco')), findsOneWidget);
     expect(find.text('Endereço acima de 65535'), findsOneWidget);
+    await reveal(tester, find.byKey(const ValueKey('sugestao-endereco')));
     await tapKey(tester, 'sugestao-endereco');
     expect(fieldText(tester, 'campo-endereco'), '100');
     expect(find.text('Endereço acima de 65535'), findsNothing);
@@ -437,6 +438,11 @@ void main() {
     await tapKey(tester, 'opcao-TagDataType.bool');
     expect(find.byKey(const ValueKey('bit-em-registrador-entrada')), findsNothing, reason: 'só aparece para bit de palavra');
     await tapKey(tester, 'opcao-_Where.bitInRegister');
+    // Sobe um pouco: a escolha nova nasce rente ao Salvar (a faixa do topo
+    // tem lugar fixo), e o cartão de cima continua à vista.
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.drag(formScroll(), const Offset(0, -150));
+    await live(tester, 300);
     await tapKey(tester, 'bit-em-registrador-entrada');
     await tapKey(tester, 'opcao-_Where.bitInRegister'); // tocar de novo no cartão não desfaz a escolha
     expect(tester.widget<ChoiceChip>(find.byKey(const ValueKey('bit-em-registrador-entrada'))).selected, isTrue);

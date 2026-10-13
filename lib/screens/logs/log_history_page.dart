@@ -387,35 +387,43 @@ class _LogHistoryPageState extends State<LogHistoryPage> {
 
   /// O que o dedo marca: hora e o valor de cada curva — o valor exato quando
   /// a fatia é uma linha só, mínimo a máximo quando junta várias.
+  ///
+  /// Área de **altura fixa**: uma linha para a hora e uma por curva, com ou
+  /// sem toque. Sem toque, a mesma área é a legenda (cor e nome de cada
+  /// curva) e a linha da hora mostra o trecho à vista. Antes a leitura
+  /// entrava em cima do gráfico só depois do toque e o empurrava ~44 dp para
+  /// baixo — o gráfico fugia do dedo, e no arrasto do toque longo o ponto lido
+  /// não era mais o que estava sob ele. Uma curva por linha: o valor que muda
+  /// nunca faz a legenda quebrar em mais uma linha.
   Widget _readout(LogGroup g, List<HistorySeries> series) {
+    final line = MediaQuery.textScalerOf(context).scale(20);
+    Widget row(Widget child) => SizedBox(height: line, child: Align(alignment: Alignment.centerLeft, child: child));
     final c = _cursor;
     final w = _window;
+    final span = _vTo - _vFrom;
     if (c == null || w == null) {
-      return Wrap(spacing: 14, runSpacing: 4, children: [
-        for (final s in series) _legend(s, null),
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        row(Text('${_clock(_vFrom, span)} – ${_clock(_vTo, span)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Ind.number(15, color: Ind.textMuted))),
+        for (final s in series) row(_legend(s, null)),
       ]);
     }
-    final span = _vTo - _vFrom;
     final b = HistoryPainter.nearBucket(w, c, g.gapThreshold.inMilliseconds);
     final when = b == null
         ? _clock(c, span)
         : b.rows == 1 || b.lastMs - b.firstMs < 1000
             ? _clock(b.firstMs, span)
             : '${_clock(b.firstMs, span)} – ${_clock(b.lastMs, span)}';
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(when, key: const ValueKey('hora-cursor'), style: Ind.number(15, color: Ind.text)),
-      const SizedBox(height: 6),
-      Wrap(spacing: 14, runSpacing: 4, children: [
-        for (final s in series)
-          _legend(
-            s,
-            b == null
-                ? 'sem registro'
-                : b.counts[s.index] == 0
-                    ? 'sem comunicação'
-                    : _range(s.tag, b.min[s.index]!, b.max[s.index]!),
-          ),
-      ]),
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      row(Text(when, key: const ValueKey('hora-cursor'), maxLines: 1, overflow: TextOverflow.ellipsis, style: Ind.number(15, color: Ind.text))),
+      for (final s in series)
+        row(_legend(
+          s,
+          b == null
+              ? 'sem registro'
+              : b.counts[s.index] == 0
+                  ? 'sem comunicação'
+                  : _range(s.tag, b.min[s.index]!, b.max[s.index]!),
+        )),
     ]);
   }
 
@@ -432,19 +440,16 @@ class _LogHistoryPageState extends State<LogHistoryPage> {
     return '${TagCodec.format(t, lo, withUnit: false)} a ${TagCodec.format(t, hi)}';
   }
 
-  Widget _legend(HistorySeries s, String? value) => Row(mainAxisSize: MainAxisSize.min, children: [
+  /// Cor e nome da curva; com o toque, o valor ao lado. Nome longo é que
+  /// encolhe ("Temperatura do mo…: 74,0 °C"), nunca o valor.
+  Widget _legend(HistorySeries s, String? value) => Row(children: [
         Container(width: 12, height: 3, decoration: BoxDecoration(color: s.color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 6),
         Flexible(
-          child: Text.rich(
-            TextSpan(children: [
-              TextSpan(text: value == null ? s.tag.name : '${s.tag.name}: ', style: TextStyle(color: Ind.textDim, fontSize: 13)),
-              if (value != null) TextSpan(text: value, style: Ind.number(14, color: Ind.textFor(s.color))),
-            ]),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Text(value == null ? s.tag.name : '${s.tag.name}: ',
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textDim, fontSize: 13)),
         ),
+        if (value != null) Text(value, maxLines: 1, style: Ind.number(14, color: Ind.textFor(s.color))),
       ]);
 
   Widget _chart(LogGroup g, List<HistorySeries> series) {

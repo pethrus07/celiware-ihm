@@ -127,7 +127,10 @@ void main() {
         final c = await boot(tester, phone);
         await configure(tester, 'op_temp');
         for (final (key, label) in [('faixa-atencao', 'Atenção'), ('faixa-alarme-medidor', 'Alarme')]) {
-          await tester.ensureVisible(find.byKey(ValueKey(key)));
+          // Rola até o campo: com a faixa do topo sempre reservada, a folha
+          // é mais baixa e a lista ainda não montou a seção das faixas.
+          await tester.scrollUntilVisible(find.byKey(ValueKey(key)), 200,
+              scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
           await live(tester, 200);
           expect(cut(tester, find.descendant(of: find.byKey(ValueKey(key)), matching: find.text(label))), isFalse, reason: label);
         }

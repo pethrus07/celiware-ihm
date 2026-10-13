@@ -367,7 +367,10 @@ void main() {
 
     testWidgets('tablet deitado: a fina ocupa até 1.200 dp; a normal segue centralizada', (tester) async {
       final r = await draw(tester, tablet, fina);
-      expect(r.width + HmiCanvas.gapFor(HmiCanvas.maxFineWidth / 12), closeTo(HmiCanvas.maxFineWidth, 1));
+      // O respiro é do desenho (célula do celular) e cresce com a ampliação.
+      const cell = HmiCanvas.maxFineWidth / 12;
+      final zoom = HmiCanvas.zoomFor(cell, 12);
+      expect(r.width + HmiCanvas.gapFor(cell / zoom) * zoom, closeTo(HmiCanvas.maxFineWidth, 1));
       final n = await draw(tester, tablet, normal);
       expect(n.width, lessThanOrEqualTo(6 * HmiCanvas.maxCell));
       expect(n.center.dx, closeTo(tablet.width / 2, 1));

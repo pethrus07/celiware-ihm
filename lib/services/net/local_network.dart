@@ -145,6 +145,45 @@ class LocalNetwork {
     return (_toInt(pa) & m) == (_toInt(pb) & m);
   }
 
+  /// Máscara mais larga que a procura na rede aceita: uma /24 (254 endereços).
+  static const widestScan = 24;
+
+  /// Os vizinhos de [ip] que a procura na rede testa: a faixa dele, mas
+  /// **nunca mais que uma /24**. Máscara mais larga (/16, /8) não alarga a
+  /// procura — fica na /24 em volta do celular; mais estreita (/25, /28)
+  /// encolhe junto. Sem o endereço da rede, o de difusão e o próprio [ip].
+  static List<String> neighbors(String ip, int prefix) {
+    final p = _parts(ip);
+    if (p == null || prefix < 1 || prefix > 32) return const [];
+    final bits = prefix < widestScan ? widestScan : prefix;
+    final me = _toInt(p);
+    final base = me & _mask(bits);
+    final size = 1 << (32 - bits);
+    // /31 (enlace ponto a ponto) não tem endereço de rede nem de difusão.
+    final first = size > 2 ? base + 1 : base;
+    final last = size > 2 ? base + size - 2 : base + size - 1;
+    return [for (var a = first; a <= last; a++) if (a != me) _fromInt(a)];
+  }
+
+  /// A faixa que [neighbors] percorre, para mostrar: "192.168.1.x" (a /24)
+  /// ou "10.0.0.16/28" (rede menor que uma /24).
+  static String scanLabel(String ip, int prefix) {
+    final p = _parts(ip);
+    if (p == null) return ip;
+    if (prefix <= widestScan) return '${p[0]}.${p[1]}.${p[2]}.x';
+    return '${_fromInt(_toInt(p) & _mask(prefix))}/$prefix';
+  }
+
+  /// Ordem numérica de IPv4 ("192.168.1.9" antes de "192.168.1.10"); o que
+  /// não é IP vai depois, em ordem alfabética.
+  static int compareIPv4(String a, String b) {
+    final pa = _parts(a), pb = _parts(b);
+    if (pa != null && pb != null) return _toInt(pa).compareTo(_toInt(pb));
+    if (pa != null) return -1;
+    if (pb != null) return 1;
+    return a.compareTo(b);
+  }
+
   static List<int>? _parts(String ip) {
     final s = ip.trim().split('.');
     if (s.length != 4) return null;

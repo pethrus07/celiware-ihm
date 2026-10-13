@@ -221,6 +221,7 @@ strong { font-weight: 600; }
   color: var(--text-dim);
 }
 .sobre--espaco { margin-top: 56px; }
+h2.sobre { margin-bottom: 32px; }
 
 /* ── Palco ────────────────────────────────────────────────────────────── */
 .palco {
@@ -377,6 +378,7 @@ strong { font-weight: 600; }
   line-height: 1.2;
 }
 .botao:hover { filter: brightness(1.08); }
+button.botao { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
 
 .botao--linha {
   background: transparent;
@@ -395,33 +397,76 @@ strong { font-weight: 600; }
 .link-seta::after { content: "\00a0›"; }
 .link-seta:hover { text-decoration: underline; }
 
-/* Selo da loja: textual, sem o logotipo do Google */
+/* Selo oficial da Google Play em português (img/google-play-pt-br.svg, do
+   Google Partner Marketing Hub — ver README). A arte não é alterada: nada de
+   sombra, cor ou recorte nela; 56 px de altura (mínimo do Google: 28 px). */
 .selo-play {
   display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 56px;
-  padding: 8px 20px 8px 16px;
-  border-radius: 12px;
-  background: #0b0d10;
-  color: #ffffff;
-  text-decoration: none;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
-  line-height: 1.15;
+  border-radius: 9px;
+  line-height: 0;
 }
-.selo-play svg { width: 26px; height: 26px; flex: none; }
-.selo-play small {
-  display: block;
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
-  color: #c9ced6;
+.selo-play img { width: auto; height: 56px; }
+.selo-play:hover { filter: brightness(1.12); }
+.selo-play:focus-visible { outline-offset: 4px; }
+
+/* Chamada de baixar: selo, fatos colados nele e, no computador, o QR.
+   Sem JavaScript: selo sempre, QR a partir de 760 px. Com o js/site.js, a
+   raiz ganha .aparelho-android, .aparelho-iphone ou .aparelho-pc. */
+/* Cada fato com o seu tique: quebra de linha sem ponto solto no começo */
+.fatos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 18px 0 0;
+  color: var(--text-dim);
+  font-size: 0.95rem;
 }
-.selo-play strong { display: block; font-size: 1.2rem; }
-.selo-play:hover { background: #000; }
-.palco .selo-play {
-  background: #000;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32), 0 14px 34px -14px rgba(46, 196, 208, 0.7);
+.fatos span { position: relative; padding-left: 20px; white-space: nowrap; }
+.fatos span::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.42em;
+  width: 11px;
+  height: 6px;
+  border-left: 2px solid var(--accent-text);
+  border-bottom: 2px solid var(--accent-text);
+  transform: rotate(-45deg);
 }
+.fatos-demo { margin: 4px 0 0; color: var(--text-dim); font-size: 0.95rem; }
+.fatos-demo strong { color: var(--text); }
+.cta-final .fatos { justify-content: center; }
+
+.chamada__iphone { display: none; max-width: 30em; }
+.chamada__iphone p { margin: 0 0 12px; }
+.chamada__aviso { display: block; margin-top: 8px; color: var(--text-dim); font-size: 0.95rem; overflow-wrap: anywhere; }
+.chamada__aviso:empty { display: none; }
+.aparelho-iphone .chamada__iphone { display: block; }
+.aparelho-iphone .selo-play { display: none; }
+
+.qr { display: none; }
+@media (min-width: 760px) {
+  .qr {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 24px;
+    padding: 12px 20px 12px 12px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+}
+.aparelho-pc .qr { display: flex; }
+.aparelho-android .qr,
+.aparelho-iphone .qr { display: none; }
+/* Fundo branco com margem: a "zona quieta" que o leitor de QR precisa */
+.qr img { width: 118px; height: 118px; flex: none; padding: 6px; border-radius: 10px; background: #ffffff; }
+.qr p { margin: 0; max-width: 15em; color: var(--text-dim); font-size: 0.95rem; text-align: left; }
+.qr strong { display: block; color: var(--text); }
+.cta-final .qr { margin-inline: auto; }
 
 /* ── Seções ───────────────────────────────────────────────────────────── */
 .secao { padding-block: var(--section); }
@@ -636,6 +681,7 @@ strong { font-weight: 600; }
   border-color: var(--accent);
   box-shadow: var(--shadow), 0 18px 40px -22px var(--glow);
 }
+.cartao--texto:hover { transform: none; border-color: var(--border); box-shadow: var(--shadow); }
 .cartao h3 { margin: 0; }
 .cartao p { color: var(--text-dim); margin: 0; }
 .cartao .botao { margin-top: auto; align-self: flex-start; }
@@ -657,28 +703,113 @@ strong { font-weight: 600; }
   color: var(--text-dim);
 }
 
-/* ── Faixa de confiança ───────────────────────────────────────────────── */
-.confianca {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px 28px;
+/* ── Números do produto e "por que é grátis" ──────────────────────────── */
+/* Só números conferidos no código (lib/): nunca contagem de usuários. */
+.numeros {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px 16px;
   margin: 0;
   padding: 0;
   list-style: none;
-  font-weight: 600;
+  text-align: center;
 }
-.confianca li {
-  display: inline-flex;
+.numeros li:last-child { grid-column: 1 / -1; }
+.numeros strong {
+  display: block;
+  font: 600 clamp(2.6rem, 2rem + 2.4vw, 3.5rem) / 1 var(--font-cond);
+  color: var(--accent-text);
+  letter-spacing: -0.01em;
+}
+.numeros span { display: block; margin-top: 8px; color: var(--text-dim); font-size: 0.98rem; line-height: 1.35; }
+@media (min-width: 760px) {
+  .numeros { grid-template-columns: repeat(5, 1fr); }
+  .numeros li:last-child { grid-column: auto; }
+}
+
+.porque {
+  max-width: 38em;
+  margin: clamp(40px, 6vw, 56px) auto 0;
+  text-align: center;
+  color: var(--text-dim);
+}
+.porque strong { color: var(--text); }
+
+/* ── Print anotado (os três diferenciais) ─────────────────────────────── */
+.anotado {
+  display: grid;
+  gap: 40px;
   align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: var(--raised);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
 }
-.confianca svg { width: 20px; height: 20px; color: var(--ok); flex: none; }
+.anotado .celular { position: relative; width: min(80vw, 320px); }
+.marcador {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  background: #2ec4d0;
+  color: #03181a;
+  font: 600 1.1rem/1 var(--font-cond);
+  box-shadow: 0 0 0 4px rgba(46, 196, 208, 0.35), 0 8px 18px rgba(0, 0, 0, 0.55);
+}
+.anotado__lista {
+  display: grid;
+  gap: 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: nota;
+}
+.anotado__lista li {
+  counter-increment: nota;
+  position: relative;
+  padding-left: 52px;
+}
+.anotado__lista li::before {
+  content: counter(nota);
+  position: absolute;
+  left: 0;
+  top: -2px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #2ec4d0;
+  color: #03181a;
+  font: 600 1.1rem/1 var(--font-cond);
+}
+.anotado__lista strong { display: block; font-size: 1.15rem; margin-bottom: 4px; }
+.anotado__lista span { color: var(--text-dim); }
+@media (min-width: 760px) {
+  .anotado { grid-template-columns: 0.9fr 1.1fr; gap: 64px; }
+}
+
+/* ── Para quem é ──────────────────────────────────────────────────────── */
+.marcas {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.marcas li { position: relative; padding-left: 28px; color: var(--text-dim); }
+.marcas li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.45em;
+  width: 14px;
+  height: 8px;
+  border-left: 2.4px solid var(--ok);
+  border-bottom: 2.4px solid var(--ok);
+  transform: rotate(-45deg);
+}
 
 /* ── Perguntas ────────────────────────────────────────────────────────── */
 .faq { max-width: 46em; margin-inline: auto; }
@@ -984,6 +1115,92 @@ figure.bloco__midia { flex-direction: column; align-items: center; }
   font-size: 0.95rem;
 }
 .selos .breve { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--text-dim); font-weight: 400; }
+
+/* Compatibilidade: estado de cada ligação, sem prometer o que não foi visto.
+   O estado vai em texto e em forma (não só em cor). */
+.legenda-estados {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 var(--space-l);
+  padding: 0;
+  list-style: none;
+}
+.legenda-estados li { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.legenda-estados .dim { font-size: 0.95rem; }
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-high);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.estado::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.estado--real::before { background: var(--ok); }
+.estado--sim::before { border: 2px solid var(--accent); background: linear-gradient(90deg, var(--accent) 50%, transparent 50%); }
+.estado--nao::before { width: 10px; height: 2px; border-radius: 1px; background: var(--text-dim); }
+.estado--mapa::before { border: 2px solid var(--text-dim); background: transparent; }
+
+.compat-bloco + .compat-bloco { margin-top: 48px; }
+.compat {
+  width: 100%;
+  border-collapse: collapse;
+}
+.compat caption {
+  margin-bottom: 8px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 1.15rem;
+}
+.compat th,
+.compat td {
+  padding: 14px 12px 14px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.compat thead th {
+  padding-block: 8px;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.compat tbody th { font-weight: 600; }
+.compat tbody th small { display: block; font-weight: 400; color: var(--text-dim); font-size: 0.92rem; }
+.compat td:last-child,
+.compat th:last-child { padding-right: 0; width: 1%; }
+
+/* Modelos de tela (recursos) */
+.modelos {
+  display: grid;
+  gap: var(--space);
+  margin: clamp(40px, 6vw, 64px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 640px) { .modelos { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .modelos { grid-template-columns: repeat(3, 1fr); } }
+.modelos li {
+  padding: 20px 22px;
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.modelos + .bloco { margin-top: var(--section); }
+.modelos h3 { margin: 0 0 6px; }
+.modelos p { margin: 0; color: var(--text-dim); }
 
 /* Tutoriais */
 .tutorial + .tutorial { margin-top: var(--section); }

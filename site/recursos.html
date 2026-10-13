@@ -14,6 +14,7 @@
 <link rel="preload" href="fonts/IBMPlexSans-Regular-Latin1.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold-Latin1.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/site.css">
+<script src="js/site.js" defer></script>
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="Ware IoT">
@@ -143,6 +144,17 @@
         </div>
       </article>
 
+      <!-- Os seis modelos de lib/services/templates/screen_templates.dart (13/10/2026).
+           Ainda não há print de cada modelo: entram aqui quando forem capturados. -->
+      <ul class="modelos" aria-label="Os modelos prontos">
+        <li><h3>Máquina</h3><p>Estado, liga com retorno, reset, velocidade, ajuste, produção e alarme.</p></li>
+        <li><h3>Inversor</h3><p>Liga, sentido, referência, frequência, corrente e falha. O completo soma rampas, torque, barramento, temperatura e horas.</p></li>
+        <li><h3>Servo</h3><p>Liga, sentido, referência, velocidade, corrente e falha. Também em básico e completo.</p></li>
+        <li><h3>Leitor de código de barras</h3><p>Último código lido, contagem de leituras e status do leitor.</p></li>
+        <li><h3>Temperatura</h3><p>Três temperaturas com faixa e alarmes, e a tendência dos últimos 10 minutos.</p></li>
+        <li><h3>Balança</h3><p>Peso, tara, zero, peso estável e contagem de pesagens.</p></li>
+      </ul>
+
       <article class="bloco" aria-labelledby="r-variaveis">
         <div class="bloco__texto">
           <h2 id="r-variaveis">Memórias com nome de gente</h2>
@@ -209,7 +221,7 @@
         <li>MQTT</li>
         <li>Arduino e ESP</li>
       </ul>
-      <p class="nota">Siemens S7, OPC UA (sem criptografia), MQTT, Arduino/ESP, o cabo USB e as câmeras são novos no app: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real.</p>
+      <p class="nota">Todos passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real. <a href="como-conectar#compatibilidade">Veja o estado de cada um</a>.</p>
     </div>
   </section>
 
@@ -218,11 +230,14 @@
       <h2 id="r-baixar">Experimente com a máquina de demonstração</h2>
       <p class="lead">Grátis, sem cadastro e sem nuvem.</p>
       <div class="acoes">
-        <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Drecursos%26utm_content%3Dfim">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
-          <span><small>Baixar grátis na</small><strong>Google Play</strong></span>
-        </a>
+        <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Drecursos%26utm_content%3Dfim"><img src="img/google-play-pt-br.svg" width="189" height="56" loading="lazy" alt="Disponível no Google Play"></a>
+        <div class="chamada__iphone">
+          <p><strong>O Ware IoT é só para Android.</strong> Mande o link para o celular Android que vai ficar na máquina.</p>
+          <button class="botao" type="button" data-mandar="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Drecursos%26utm_content%3Dmandar-link">Mandar o link</button>
+          <span class="chamada__aviso" role="status"></span>
+        </div>
       </div>
+      <p class="fatos"><span>Android 7 ou mais novo</span><span>Grátis</span><span>Sem cadastro</span></p>
       <p class="nota">O Ware IoT é uma IHM, não um sistema de segurança. Não substitui intertravamentos nem o botão de emergência.</p>
     </div>
   </section>

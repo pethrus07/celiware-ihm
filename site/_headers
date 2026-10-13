@@ -17,6 +17,9 @@
 /css/*
   Cache-Control: public, max-age=86400
 
+/js/*
+  Cache-Control: public, max-age=86400
+
 # Documentação do repositório publicada junto: fora dos buscadores.
 /README.md
   X-Robots-Tag: noindex

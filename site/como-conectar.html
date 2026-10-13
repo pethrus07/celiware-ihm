@@ -14,6 +14,7 @@
 <link rel="preload" href="fonts/IBMPlexSans-Regular-Latin1.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold-Latin1.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/site.css">
+<script src="js/site.js" defer></script>
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="Ware IoT">
@@ -67,6 +68,7 @@
         <li><a href="#rs485">2 · Só RS-485/232</a></li>
         <li><a href="#longe">3 · De longe, pelo 4G</a></li>
         <li><a href="#nao-conecta">Não conecta?</a></li>
+        <li><a href="#compatibilidade">Compatibilidade</a></li>
       </ul>
     </div>
   </div>
@@ -227,16 +229,75 @@
     </div>
   </section>
 
+  <!-- Compatibilidade honesta (13/10/2026). Fonte do estado: docs/ROADMAP.md (itens 8, 9
+       e 12 da reunião), docs/REQUISITOS-ETAPA4.md e docs/RASTREABILIDADE-LISTA-CLIENTE.md.
+       Nenhum protocolo nem perfil tem registro de teste em equipamento real até hoje.
+       Só mude uma linha para "Equipamento real" com o registro do teste nesses documentos. -->
+  <section class="secao" id="compatibilidade" aria-labelledby="t-compat">
+    <div class="wrap">
+      <div class="secao__cabeca">
+        <h2 id="t-compat">Compatibilidade</h2>
+        <p class="lead">O que o app fala e até onde já foi testado. Sem prometer o que ainda não vimos funcionar.</p>
+      </div>
+      <ul class="legenda-estados">
+        <li><span class="estado estado--real">Equipamento real</span><span class="dim">Conferido num CLP ou equipamento de verdade. Ainda nenhum.</span></li>
+        <li><span class="estado estado--sim">Simulador</span><span class="dim">Passa nos nossos testes com simulador.</span></li>
+        <li><span class="estado estado--mapa">Mapa do manual</span><span class="dim">Endereços conforme o manual da marca, sem conferência em bancada.</span></li>
+        <li><span class="estado estado--nao">Ainda não</span><span class="dim">O app não fala. Sem data.</span></li>
+      </ul>
+
+      <div class="compat-bloco">
+        <table class="compat">
+          <caption>Protocolos e ligações</caption>
+          <thead><tr><th scope="col">Como liga</th><th scope="col">Estado</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Modbus TCP<small>CLP, inversor ou IHM na rede, porta 502</small></th><td><span class="estado estado--sim">Simulador</span></td></tr>
+            <tr><th scope="row">Modbus RTU e ASCII por conversor<small>RS-485 ou RS-232 → Wi-Fi</small></th><td><span class="estado estado--sim">Simulador</span></td></tr>
+            <tr><th scope="row">Modbus RTU e ASCII por cabo USB-OTG<small>Adaptador RS-485/232 ligado no celular</small></th><td><span class="estado estado--sim">Simulador</span></td></tr>
+            <tr><th scope="row">Siemens S7<small>S7-300, 400, 1200 e 1500, com PUT/GET</small></th><td><span class="estado estado--sim">Simulador</span></td></tr>
+            <tr><th scope="row">OPC UA sem criptografia<small>Modo None, com ou sem usuário e senha</small></th><td><span class="estado estado--sim">Simulador</span></td></tr>
+            <tr><th scope="row">MQTT<small>Broker na rede local</small></th><td><span class="estado estado--sim">Simulador</span></td></tr>
+            <tr><th scope="row">Arduino e ESP<small>Mensagem própria por TCP, UDP ou cabo USB</small></th><td><span class="estado estado--sim">Simulador</span></td></tr>
+            <tr><th scope="row">Câmera IP<small>RTSP, aberta por um botão da tela</small></th><td><span class="estado estado--sim">Simulador</span></td></tr>
+            <tr><th scope="row">OPC UA com criptografia<small>Sign e SignAndEncrypt</small></th><td><span class="estado estado--nao">Ainda não</span></td></tr>
+            <tr><th scope="row">EtherNet/IP, PROFINET e HTTP</th><td><span class="estado estado--nao">Ainda não</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="compat-bloco">
+        <table class="compat">
+          <caption>Mapas de memória das marcas</caption>
+          <thead><tr><th scope="col">Marca e linha</th><th scope="col">Estado</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Inovance H3U e H5U<small>CLP</small></th><td><span class="estado estado--mapa">Mapa do manual</span></td></tr>
+            <tr><th scope="row">INVT IVC1, IVC1L, IVC2L e IVC3<small>CLP</small></th><td><span class="estado estado--mapa">Mapa do manual</span></td></tr>
+            <tr><th scope="row">WEG TPW04<small>CLP</small></th><td><span class="estado estado--mapa">Mapa do manual</span></td></tr>
+            <tr><th scope="row">Delta DVP<small>CLP</small></th><td><span class="estado estado--mapa">Mapa do manual</span></td></tr>
+            <tr><th scope="row">Inovance MD500<small>Inversor</small></th><td><span class="estado estado--mapa">Mapa do manual</span></td></tr>
+            <tr><th scope="row">INVT GD20<small>Inversor</small></th><td><span class="estado estado--mapa">Mapa do manual</span></td></tr>
+          </tbody>
+        </table>
+        <p class="nota">Sem perfil da marca, a variável usa o endereço Modbus que está no manual do equipamento.</p>
+      </div>
+
+      <p class="nota"><strong>Seu CLP não está aqui?</strong> <a href="contato">Fale com a gente</a>.</p>
+    </div>
+  </section>
+
   <section class="secao palco" aria-labelledby="t-teste">
     <div class="wrap cta-final">
       <h2 id="t-teste">Sem equipamento por perto?</h2>
       <p class="lead">O app já vem com uma máquina de demonstração. Dá para conhecer tudo antes de ligar no CLP.</p>
       <div class="acoes">
-        <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dcomo-conectar%26utm_content%3Dfim">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
-          <span><small>Baixar grátis na</small><strong>Google Play</strong></span>
-        </a>
+        <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dcomo-conectar%26utm_content%3Dfim"><img src="img/google-play-pt-br.svg" width="189" height="56" loading="lazy" alt="Disponível no Google Play"></a>
+        <div class="chamada__iphone">
+          <p><strong>O Ware IoT é só para Android.</strong> Mande o link para o celular Android que vai ficar na máquina.</p>
+          <button class="botao" type="button" data-mandar="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dcomo-conectar%26utm_content%3Dmandar-link">Mandar o link</button>
+          <span class="chamada__aviso" role="status"></span>
+        </div>
       </div>
+      <p class="fatos"><span>Android 7 ou mais novo</span><span>Grátis</span><span>Sem cadastro</span></p>
     </div>
   </section>
 </main>

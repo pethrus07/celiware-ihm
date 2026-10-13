@@ -14,6 +14,7 @@
 <link rel="preload" href="fonts/IBMPlexSans-Regular-Latin1.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold-Latin1.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/site.css">
+<script src="js/site.js" defer></script>
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="Ware IoT">
@@ -52,12 +53,16 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
+    { "@type": "Question", "name": "É seguro comandar a máquina pelo celular?",
+      "acceptedAnswer": { "@type": "Answer", "text": "O Ware IoT é uma IHM: mostra a máquina e manda comandos para o CLP, como a tela do painel. Não é um sistema de segurança e não substitui intertravamentos nem o botão de emergência. Esses continuam no CLP e no painel. O botão só acende quando a máquina confirma, e os ajustes pedem confirmação antes de gravar. De longe, prefira telas só de acompanhamento." } },
     { "@type": "Question", "name": "É grátis mesmo?",
       "acceptedAnswer": { "@type": "Answer", "text": "Sim. Sem anúncio, sem assinatura e sem cadastro. A Celiware ganha com o hardware que vende na loja, não com o app." } },
+    { "@type": "Question", "name": "Funciona com o meu CLP?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Se ele fala Modbus TCP, de qualquer marca, sim. Modbus RTU e ASCII funcionam por um conversor ligado na rede ou por um cabo USB-OTG no celular. O app também fala Siemens S7, OPC UA (sem criptografia), MQTT e a mensagem própria de um Arduino ou ESP. Para CLPs Inovance, INVT, WEG e Delta e os inversores MD500 e GD20, já traz o mapa de memória do manual. Tudo passa nos nossos testes com simulador, mas ainda não foi conferido em equipamento real. Veja a tabela de compatibilidade." } },
+    { "@type": "Question", "name": "E se cair o Wi-Fi?",
+      "acceptedAnswer": { "@type": "Answer", "text": "A tela continua com o último valor lido, esmaecido, e o selo de conexão fica vermelho: nunca aparece um zero falso. O app tenta de novo sozinho, com espera crescente até 10 segundos, e volta a ler assim que a rede volta. Comando que a máquina não confirmou não acende o botão." } },
     { "@type": "Question", "name": "Precisa de internet?",
       "acceptedAnswer": { "@type": "Answer", "text": "Não. O celular só precisa estar na mesma rede Wi-Fi da máquina. Internet só para baixar o app ou para ver a máquina de longe, pelo roteador 4G." } },
-    { "@type": "Question", "name": "Quais CLPs e protocolos funcionam?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede ou por um cabo USB-OTG ligado no celular. O app também fala Siemens S7, OPC UA (sem criptografia), MQTT e a mensagem própria de um Arduino ou ESP. Esses protocolos e o cabo USB são novos: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real." } },
     { "@type": "Question", "name": "Funciona com RS-485?",
       "acceptedAnswer": { "@type": "Answer", "text": "Sim, com um conversor RS-485 → Wi-Fi: ele fica ligado no fio da máquina e o celular conversa com ele pela rede. Ou com um cabo USB-OTG e um adaptador RS-485 ligados direto no celular (novo no app, ainda em conferência com equipamento real)." } },
     { "@type": "Question", "name": "Meus dados vão para a nuvem?",
@@ -114,11 +119,19 @@
         <h1 id="titulo">Seu celular vira a <span class="destaque">IHM da máquina.</span></h1>
         <p class="lead">Grátis, sem cadastro e sem nuvem. Conecte no CLP pela rede e monte a tela de operação em minutos.</p>
         <div class="acoes">
-          <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dhome%26utm_content%3Dheroi">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
-            <span><small>Baixar grátis na</small><strong>Google Play</strong></span>
-          </a>
+          <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dhome%26utm_content%3Dheroi"><img src="img/google-play-pt-br.svg" width="189" height="56" alt="Disponível no Google Play"></a>
+          <div class="chamada__iphone">
+            <p><strong>O Ware IoT é só para Android.</strong> Mande o link para o celular Android que vai ficar na máquina.</p>
+            <button class="botao" type="button" data-mandar="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dhome%26utm_content%3Dmandar-link">Mandar o link</button>
+            <span class="chamada__aviso" role="status"></span>
+          </div>
           <a class="link-seta" href="como-conectar">Como conectar</a>
+        </div>
+        <p class="fatos"><span>Android 7 ou mais novo</span><span>Grátis</span><span>Sem cadastro</span></p>
+        <p class="fatos-demo"><strong>Sem CLP por perto?</strong> Já vem uma máquina de demonstração.</p>
+        <div class="qr">
+          <img src="img/qr-play.svg" width="106" height="106" alt="Código QR que abre o Ware IoT na Google Play.">
+          <p><strong>Está no computador?</strong> Aponte a câmera do celular Android para baixar.</p>
         </div>
       </div>
       <div class="heroi__midia">
@@ -130,6 +143,24 @@
         <span class="chip chip--ok" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#2FBF71"/><circle cx="12" cy="12" r="10" fill="none" stroke="#2FBF71" stroke-opacity=".35" stroke-width="2"/></svg>Lendo o CLP ao vivo</span>
         <span class="chip chip--alarme" aria-hidden="true"><svg viewBox="0 0 30 30"><path fill="#F2555A" d="M15 1 29 15 15 29 1 15z"/><text x="15" y="19.5" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">1</text></svg>Alarme na hora</span>
       </div>
+    </div>
+  </section>
+
+  <!-- Números conferidos no código em 13/10/2026: ElementType (13, sem o "unknown"),
+       ButtonMode (7), ScreenTemplates (6 tipos além do "Em branco"; inversor e servo
+       têm básico e completo), DeviceKind (6 protocolos: Modbus TCP, RTU/ASCII, S7,
+       OPC UA, MQTT, mensagem própria). Nunca contagem de usuários. -->
+  <section class="secao secao--curta" aria-labelledby="numeros">
+    <div class="wrap">
+      <h2 id="numeros" class="sobre centro">O app em números</h2>
+      <ul class="numeros">
+        <li><strong>13</strong><span>elementos de tela</span></li>
+        <li><strong>7</strong><span>jeitos de agir no botão</span></li>
+        <li><strong>6</strong><span>tipos de modelo pronto</span></li>
+        <li><strong>6</strong><span>protocolos</span></li>
+        <li><strong>R$&nbsp;0</strong><span>para baixar e usar</span></li>
+      </ul>
+      <p class="porque"><strong>Por que é grátis?</strong> A Celiware ganha com o hardware que vende na loja, não com anúncio, assinatura ou os seus dados. Seus dados ficam no celular.</p>
     </div>
   </section>
 
@@ -160,29 +191,56 @@
     <div class="wrap">
       <div class="secao__cabeca secao__cabeca--centro">
         <h2 id="prints">Do jeito que aparece no celular</h2>
-        <p class="lead">Prints do app com a máquina de demonstração que já vem dentro dele.</p>
+        <p class="lead">Print do app com a máquina de demonstração que já vem dentro dele.</p>
       </div>
-      <ul class="galeria">
-        <li>
-          <figure>
-            <div class="recorte recorte--meio"><img src="img/graficos.webp" width="540" height="1200" loading="lazy" alt="Operação: medidor de temperatura, tendência dos últimos 2 minutos e produção por hora."></div>
-            <figcaption><strong>Operação</strong>Valores e gráficos ao vivo, direto do CLP.</figcaption>
-          </figure>
+      <div class="anotado">
+        <div class="celular">
+          <img src="img/alarme-na-tela.webp" width="540" height="1200" loading="lazy" alt="Tela de operação em alarme: faixa vermelha no topo com Motor superaquecido, selo Online 68 ms, botão LIGA com o aviso SEM RETORNO e marcas de alarme nos elementos.">
+          <span class="marcador" style="--x: 7%; --y: 39.5%" aria-hidden="true">1</span>
+          <span class="marcador" style="--x: 42%; --y: 20.8%" aria-hidden="true">2</span>
+          <span class="marcador" style="--x: 66%; --y: 8.8%" aria-hidden="true">3</span>
+        </div>
+        <ol class="anotado__lista">
+          <li><strong>Acende quando a máquina confirma</strong><span>Não quando você toca. Aqui o CLP não confirmou o LIGA, e o botão avisa: SEM RETORNO.</span></li>
+          <li><strong>Sem comunicação, nunca um zero falso</strong><span>O selo de conexão fica vermelho e a tela mostra o último valor lido, esmaecido.</span></li>
+          <li><strong>Alarme sempre no mesmo lugar</strong><span>Na faixa do topo, em qualquer tela. O espaço já é reservado: a tela não pula quando um alarme chega.</span></li>
+        </ol>
+      </div>
+      <p class="nota centro"><a class="link-seta" href="recursos">Ver todos os recursos</a></p>
+    </div>
+  </section>
+
+  <section class="secao" aria-labelledby="para-quem">
+    <div class="wrap">
+      <div class="secao__cabeca">
+        <h2 id="para-quem">Para quem é</h2>
+      </div>
+      <ul class="cartoes cartoes--3">
+        <li class="cartao cartao--texto">
+          <h3>Integrador</h3>
+          <ul class="marcas">
+            <li>Monta a tela no celular, sem computador e sem programar.</li>
+            <li>Digita a memória como no manual (D100, M0) em CLPs Inovance, INVT, WEG e Delta.</li>
+            <li>Manda o projeto pronto para o cliente por WhatsApp ou e-mail.</li>
+          </ul>
         </li>
-        <li>
-          <figure>
-            <div class="recorte"><img src="img/alarmes.webp" width="540" height="1200" loading="lazy" alt="Lista de alarmes com as três prioridades: losango 1 alta, triângulo 2 média e quadrado 3 baixa, cada um com o botão Reconhecer."></div>
-            <figcaption><strong>Alarmes</strong>Cor, forma e número, no padrão ISA-18.2.</figcaption>
-          </figure>
+        <li class="cartao cartao--texto">
+          <h3>Dono ou líder de produção</h3>
+          <ul class="marcas">
+            <li>Produção, velocidade e OEE na tela, calculados com as memórias do CLP.</li>
+            <li>Tela só de acompanhamento, para olhar sem comandar.</li>
+            <li>Histórico gravado no celular, com planilha para o Excel.</li>
+          </ul>
         </li>
-        <li>
-          <figure>
-            <div class="recorte"><img src="img/editor.webp" width="540" height="1200" loading="lazy" alt="Editor de tela em grade, com o botão Liga selecionado e a barra Configurar, duplicar, tirar e acrescentar."></div>
-            <figcaption><strong>Editor</strong>Monte a tela no próprio celular, em grade.</figcaption>
-          </figure>
+        <li class="cartao cartao--texto">
+          <h3>Operador</h3>
+          <ul class="marcas">
+            <li>Botão que só acende quando a máquina confirma.</li>
+            <li>Alarme com cor, forma e número, também falado no fone.</li>
+            <li>Receita aplicada com uma confirmação.</li>
+          </ul>
         </li>
       </ul>
-      <p class="nota centro"><a class="link-seta" href="recursos">Ver todos os recursos</a></p>
     </div>
   </section>
 
@@ -216,34 +274,31 @@
     </div>
   </section>
 
-  <section class="secao secao--curta" aria-label="Por que confiar">
-    <div class="wrap">
-      <ul class="confianca">
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Grátis</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Sem cadastro</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Sem nuvem</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Seus dados ficam no celular</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="secao faixa" aria-labelledby="perguntas">
+  <section class="secao" aria-labelledby="perguntas">
     <div class="wrap">
       <div class="secao__cabeca secao__cabeca--centro">
         <h2 id="perguntas">Perguntas frequentes</h2>
       </div>
       <div class="faq">
         <details>
+          <summary>É seguro comandar a máquina pelo celular?</summary>
+          <div class="resposta"><p>O Ware IoT é uma IHM: mostra a máquina e manda comandos para o CLP, como a tela do painel. Não é um sistema de segurança e não substitui intertravamentos nem o botão de emergência. Esses continuam no CLP e no painel.</p><p>O botão só acende quando a máquina confirma, e os ajustes pedem confirmação antes de gravar. De longe, prefira telas só de acompanhamento.</p></div>
+        </details>
+        <details>
           <summary>É grátis mesmo?</summary>
           <div class="resposta"><p>Sim. Sem anúncio, sem assinatura e sem cadastro. A Celiware ganha com o hardware que vende na loja, não com o app.</p></div>
         </details>
         <details>
-          <summary>Precisa de internet?</summary>
-          <div class="resposta"><p>Não. O celular só precisa estar na mesma rede Wi-Fi da máquina. Internet só para baixar o app ou para ver a máquina de longe, pelo roteador 4G.</p></div>
+          <summary>Funciona com o meu CLP?</summary>
+          <div class="resposta"><p>Se ele fala Modbus TCP, de qualquer marca, sim. Modbus RTU e ASCII funcionam por um conversor ligado na rede ou por um cabo USB-OTG no celular. O app também fala Siemens S7, OPC UA (sem criptografia), MQTT e a mensagem própria de um Arduino ou ESP. Para CLPs Inovance, INVT, WEG e Delta e os inversores MD500 e GD20, já traz o mapa de memória do manual.</p><p>Tudo passa nos nossos testes com simulador, mas ainda não foi conferido em equipamento real. <a href="como-conectar#compatibilidade">Veja a tabela de compatibilidade</a>.</p></div>
         </details>
         <details>
-          <summary>Quais CLPs e protocolos funcionam?</summary>
-          <div class="resposta"><p>Qualquer CLP, inversor ou IHM que fale Modbus TCP, de qualquer marca. Modbus RTU e ASCII funcionam por um conversor ligado na rede ou por um cabo USB-OTG ligado no celular.</p><p>O app também fala Siemens S7, OPC UA (sem criptografia), MQTT e a mensagem própria de um Arduino ou ESP. Esses protocolos e o cabo USB são novos: passam nos nossos testes com simulador, mas ainda não foram conferidos em equipamento real.</p></div>
+          <summary>E se cair o Wi-Fi?</summary>
+          <div class="resposta"><p>A tela continua com o último valor lido, esmaecido, e o selo de conexão fica vermelho: nunca aparece um zero falso. O app tenta de novo sozinho, com espera crescente até 10 segundos, e volta a ler assim que a rede volta. Comando que a máquina não confirmou não acende o botão.</p></div>
+        </details>
+        <details>
+          <summary>Precisa de internet?</summary>
+          <div class="resposta"><p>Não. O celular só precisa estar na mesma rede Wi-Fi da máquina. Internet só para baixar o app ou para ver a máquina de longe, pelo roteador 4G.</p></div>
         </details>
         <details>
           <summary>Funciona com RS-485?</summary>
@@ -268,6 +323,26 @@
       </div>
       <!-- Instituto Automação (item 184 da lista do cliente): discreto, com o mesmo rastreio dos links da loja. -->
       <p class="nota centro">Começando agora? <a class="externo" href="https://institutoautomacao.com.br/?utm_source=site&amp;utm_medium=home&amp;utm_campaign=ware-iot&amp;utm_content=perguntas">Quero aprender automação</a></p>
+    </div>
+  </section>
+
+  <section class="secao palco" aria-labelledby="baixar">
+    <div class="wrap cta-final">
+      <h2 id="baixar">Seu celular vira a <span class="destaque">IHM da máquina.</span></h2>
+      <p class="lead">Grátis, sem cadastro e sem nuvem. Experimente com a máquina de demonstração antes de ligar no CLP.</p>
+      <div class="acoes">
+        <a class="selo-play" href="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dhome%26utm_content%3Dfim"><img src="img/google-play-pt-br.svg" width="189" height="56" alt="Disponível no Google Play"></a>
+        <div class="chamada__iphone">
+          <p><strong>O Ware IoT é só para Android.</strong> Mande o link para o celular Android que vai ficar na máquina.</p>
+          <button class="botao" type="button" data-mandar="https://play.google.com/store/apps/details?id=com.celiware.ihm&amp;referrer=utm_source%3Dsite%26utm_medium%3Dhome%26utm_content%3Dmandar-link">Mandar o link</button>
+          <span class="chamada__aviso" role="status"></span>
+        </div>
+      </div>
+      <p class="fatos"><span>Android 7 ou mais novo</span><span>Grátis</span><span>Sem cadastro</span></p>
+      <div class="qr">
+        <img src="img/qr-play.svg" width="106" height="106" alt="Código QR que abre o Ware IoT na Google Play.">
+        <p><strong>Está no computador?</strong> Aponte a câmera do celular Android para baixar.</p>
+      </div>
     </div>
   </section>
 </main>

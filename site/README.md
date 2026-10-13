@@ -1,8 +1,10 @@
 # Site do Ware IoT
 
-Site do produto: HTML e CSS estáticos, sem framework, sem build e sem
-JavaScript. Mobile primeiro, tema claro e escuro pelo sistema, com as cores e a
-fonte do app (`docs/ARQUITETURA.md` §8). Requisitos: `docs/REQUISITOS-ETAPA4.md` §6.
+Site do produto: HTML e CSS estáticos, sem framework e sem build. Um único
+script pequeno e opcional (`js/site.js`, chamada que reconhece o aparelho): sem
+ele, tudo funciona igual. Mobile primeiro, tema claro e escuro pelo sistema, com
+as cores e a fonte do app (`docs/ARQUITETURA.md` §8). Requisitos:
+`docs/REQUISITOS-ETAPA4.md` §6.
 
 | Página | Arquivo | Endereço |
 |---|---|---|
@@ -14,8 +16,10 @@ fonte do app (`docs/ARQUITETURA.md` §8). Requisitos: `docs/REQUISITOS-ETAPA4.md
 | Contato | `contato.html` | `/contato` |
 | Página de erro | `404.html` | qualquer endereço que não existe |
 
-Outros arquivos: `css/site.css` (folha única), `fonts/` (IBM Plex, licença em
-`fonts/OFL.txt`), `img/` (prints em WebP e a imagem de compartilhamento),
+Outros arquivos: `css/site.css` (folha única), `js/site.js` (reconhece o
+aparelho; ver "Conversão"), `fonts/` (IBM Plex, licença em `fonts/OFL.txt`),
+`img/` (prints em WebP, a imagem de compartilhamento, o selo oficial da Google
+Play `google-play-pt-br.svg` e o QR `qr-play.svg`),
 `favicon.svg`/`favicon.ico`/`apple-touch-icon.png`, `sitemap.xml`,
 `robots.txt` e `_headers` (cabeçalhos e cache no Cloudflare Pages).
 
@@ -125,9 +129,74 @@ usam esse formato. A `404.html` aparece sozinha em endereços que não existem.
 2. Colocar `https://DOMINIO/privacidade` no Play Console (Política de
    privacidade) e no app (Mais → Sobre). A Play exige a página no ar antes do envio.
 3. Enviar o `sitemap.xml` no Google Search Console (opcional).
-4. Quando o app estiver na Play, dá para trocar o selo textual "Baixar grátis na
-   Google Play" pelo selo oficial do Google (gerador de selos da Play, para
-   parceiros), mantendo o mesmo link.
+4. Apontar a câmera de um celular Android para o QR da página inicial (tela de
+   computador) e conferir que abre o Ware IoT na Play.
+
+## Conversão (13/10/2026)
+
+Lote 1 inteiro e os itens 12–14 do lote 2 da seção "Site — conversão" do
+`docs/ROADMAP.md` (pesquisa em `docs/pesquisa-etapa4/8-site-conversao.md`).
+Nada inventado: nenhum número de usuário, logo, depoimento, avaliação ou preço.
+
+- **Chamada de baixar** (início no topo e no fim; Recursos e Como conectar no
+  fim): o selo oficial e, colados nele, "Android 7 ou mais novo · Grátis · Sem
+  cadastro"; no topo do início, também "Sem CLP por perto? Já vem uma máquina de
+  demonstração". O início agora termina numa chamada que repete o título.
+- **QR** (só no início, a partir de 760 px): `img/qr-play.svg`, gerado offline
+  com a biblioteca Python `segno` 1.6.6 (correção M, versão 8, 53 módulos com
+  2 de margem; o fundo branco do CSS completa a zona quieta). Mostrado com
+  106 px, 2 px por módulo, número inteiro para sair nítido; lido de volta com o
+  OpenCV numa captura de tela a 1280 px. Aponta para
+  `https://play.google.com/store/apps/details?id=com.celiware.ihm&referrer=utm_source%3Dsite%26utm_medium%3Dhome%26utm_content%3Dqr`.
+  Para regerar (com outro link):
+  `python -c "import segno; segno.make('LINK', error='m').save('site/img/qr-play.svg', kind='svg', scale=1, border=2, dark='#0b0d10', light='#ffffff', xmldecl=False, omitsize=True, nl=False)"`.
+- **Chamada que reconhece o aparelho** (`js/site.js`, carregado com `defer` no
+  início, em Recursos e em Como conectar): põe na raiz `.aparelho-android` (só o
+  selo), `.aparelho-iphone` ("O Ware IoT é só para Android" + "Mandar o link",
+  pela folha de compartilhar do iPhone ou copiando o link, com
+  `utm_content=mandar-link`) ou `.aparelho-pc` (selo e QR). Sem JavaScript: selo
+  sempre, QR a partir de 760 px, só pelo CSS.
+- **Selo oficial da Google Play**: `img/google-play-pt-br.svg` é o arquivo
+  `GetItOnGooglePlay_Badge_Web_color_Portuguese-Brazil.svg` (atualizado pelo
+  Google em 14/11/2025), baixado em 13/10/2026 do Google Partner Marketing Hub
+  (https://partnermarketinghub.withgoogle.com/brands/google-play/google-play/lockups-icons-badges/
+  → Badges → Get it on Google Play → Digital → svg), sem nenhuma alteração
+  (SHA-256 `0829e2ec…8229bf1f8`). Mostrado com 56 px de altura (mínimo do
+  Google: 28 px), sem sombra nem efeito. O botão "Baixar grátis" do menu é texto
+  e continua igual.
+- **Números do produto** (início): 13 elementos · 7 jeitos de agir no botão · 6
+  tipos de modelo pronto · 6 protocolos · R$ 0, conferidos no código em 13/10
+  (`ElementType`, `ButtonMode`, `ScreenTemplates`, `DeviceKind`; o comentário no
+  HTML diz de onde vem cada um). Mudou o app, confira de novo. Logo abaixo,
+  **"Por que é grátis?"** à vista (antes só nas perguntas). A faixa de selos
+  "Grátis · Sem cadastro · Sem nuvem" saiu: o que ela dizia está nos fatos do
+  botão e no "por que é grátis".
+- **Print anotado** (início, no lugar da galeria de três): `alarme-na-tela` com
+  três marcas numeradas (botão SEM RETORNO, selo de conexão, faixa de alarme) e
+  a lista dos três diferenciais ao lado; no celular, a lista vem embaixo. As
+  marcas são posicionadas em % do print: trocou o print, confira a posição.
+- **Para quem é** (início): integrador, dono ou líder de produção, operador,
+  cada um com três fatos do app.
+- **Perguntas** (início, e o JSON-LD FAQPage junto): "É seguro comandar a
+  máquina pelo celular?" no topo; "Quais CLPs e protocolos funcionam?" virou
+  "Funciona com o meu CLP?" (com o link para a compatibilidade); nova "E se cair
+  o Wi-Fi?" (último valor esmaecido, selo vermelho, nova tentativa sozinha com
+  espera de 1 s a 10 s — `DeviceSession`).
+- **Compatibilidade** (`como-conectar#compatibilidade`, com links do início e de
+  Recursos): duas tabelas, protocolos/ligações e mapas das marcas, com o estado
+  em texto e forma. Estado de 13/10: nenhum protocolo nem perfil conferido em
+  equipamento real (ROADMAP itens 8, 9 e 12; `REQUISITOS-ETAPA4.md`;
+  `RASTREABILIDADE-LISTA-CLIENTE.md`); protocolos, cabo USB e câmeras =
+  "Simulador"; perfis de marca = "Mapa do manual" (sem bancada); OPC UA com
+  criptografia, EtherNet/IP, PROFINET e HTTP = "Ainda não" (sem data — por isso
+  não "em breve"). Só passe uma linha para "Equipamento real" com o registro do
+  teste nesses documentos. Fecho: "Seu CLP não está aqui? Fale com a gente".
+- **Modelos de tela** (Recursos, logo depois de "Comece de um modelo pronto"):
+  seis cartões (máquina, inversor, servo, leitor de código de barras,
+  temperatura, balança) descritos a partir de
+  `lib/services/templates/screen_templates.dart`. Ainda não existe print de
+  cada modelo; o print da escolha de modelos (`nova-tela-modelo.webp`) já está
+  no bloco de cima. Quando houver os prints, entram nos cartões.
 
 ## Como foi feito e medido (11/10/2026)
 
@@ -161,5 +230,10 @@ usam esse formato. A `404.html` aparece sozinha em endereços que não existem.
   (LCP 1,8–2,4 s, CLS 0) e 100 em Acessibilidade, Boas práticas e SEO no início,
   Recursos, Tutoriais e Como conectar. Em 11/10, antes do palco: 99–100 em Desempenho e 100 em
   Acessibilidade, Boas práticas e SEO, nas seis páginas; LCP entre 1,6 e 2,1 s.
+- **Lighthouse 12.8 (celular), servidor local, 13/10, depois do lote de
+  conversão:** início 98 (LCP 2,3 s, CLS 0, 200 KB), Recursos 97 (LCP 2,6 s,
+  329 KB), Como conectar 99 (LCP 2,0 s, 125 KB); 100 em Acessibilidade, Boas
+  práticas e SEO nas três. `npm run conferir-site` (em `tool/`): tudo certo
+  nas 7 páginas × 3 larguras × 2 temas.
 - **Sem rolagem horizontal** em 360 e 390 px; alvos de toque com 48 px ou mais
   (exceto links dentro de frases).

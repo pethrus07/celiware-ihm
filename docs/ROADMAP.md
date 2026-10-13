@@ -185,27 +185,27 @@ número de usuário, logo ou depoimento que não exista.
 
 1. **Fatos colados no botão:** "Android 7 ou mais novo · Grátis · Sem
    cadastro" e "Sem CLP por perto? Já vem uma máquina de demonstração"
-   (Datacake, Things; NN/g 2016, transparência antecipada).
+   (Datacake, Things; NN/g 2016, transparência antecipada). **Feito em 13/10** (topo do início; os três fatos também nas chamadas finais).
 2. **Chamada final na página inicial:** repete o título, com o selo e o QR
-   (todas as melhores; hoje a página termina nas perguntas).
+   (todas as melhores; hoje a página termina nas perguntas). **Feito em 13/10.**
 3. **QR para quem abre no computador**, só a partir de 760 px, com
-   `utm_content=qr` (Linear Mobile, Raycast, Arc).
+   `utm_content=qr` (Linear Mobile, Raycast, Arc). **Feito em 13/10** (SVG estático gerado com `segno`; no início, topo e fim).
 4. **Chamada que reconhece o aparelho:** Android vê o selo; iPhone vê "o Ware
-   IoT é só para Android" com "mandar o link"; computador vê o QR.
+   IoT é só para Android" com "mandar o link"; computador vê o QR. **Feito em 13/10** (`site/js/site.js`; sem JavaScript, tudo como antes).
 5. **"Por que é grátis" à vista** (hoje só nas perguntas): "a Celiware ganha
    com o hardware da loja, não com anúncio, assinatura ou os seus dados"
-   (Home Assistant, UniFi, Shelly).
+   (Home Assistant, UniFi, Shelly). **Feito em 13/10** (logo abaixo dos números).
 6. **Faixa de números do produto:** 13 elementos · 7 jeitos de agir · 6
    modelos prontos · 6 protocolos · R$ 0 (NN/g 2007). Nunca contagem de
-   usuários.
+   usuários. **Feito em 13/10** (números conferidos no código; "6 tipos de modelo pronto": inversor e servo têm básico e completo).
 7. **Prints anotados** com os três diferenciais: "acende quando a máquina
    confirma", "sem comunicação, último valor esmaecido — nunca zero falso",
-   "alarme sempre no mesmo lugar" (Linear Mobile; NN/g 2010).
+   "alarme sempre no mesmo lugar" (Linear Mobile; NN/g 2010). **Feito em 13/10** (um print, `alarme-na-tela`, com três marcas; no celular a lista vem embaixo).
 8. **Pergunta "É seguro comandar a máquina pelo celular?"** no topo das
    perguntas, com a resposta franca que já existe (IHM, não intertravamento),
-   e "Funciona com o meu CLP?" e "E se cair o Wi-Fi?" (NN/g 2014).
+   e "Funciona com o meu CLP?" e "E se cair o Wi-Fi?" (NN/g 2014). **Feito em 13/10** (e o JSON-LD FAQPage).
 9. **Selo oficial da Google Play** em português, no lugar do botão próprio
-   (regras do Google).
+   (regras do Google). **Feito em 13/10** (arte oficial do Partner Marketing Hub, sem alteração; origem no `site/README.md`).
 
 **Lote 2 — médio esforço, sem dependência externa**
 
@@ -224,12 +224,12 @@ número de usuário, logo ou depoimento que não exista.
 12. **Compatibilidade honesta:** tabela por protocolo e por perfil de marca
     com três estados — conferido em equipamento real · testado em simulador ·
     em breve — e "Seu CLP não está aqui? Fale com a gente" (TagoIO, Datacake;
-    NN/g 2016, especificações).
+    NN/g 2016, especificações). **Feito em 13/10** em `como-conectar#compatibilidade`. Como nada tem data, o terceiro estado virou "ainda não" (sem data) em vez de "em breve"; nenhum item está como conferido em equipamento real.
 13. **Galeria dos modelos de tela** (máquina, inversor, servo, leitor,
-    temperatura, balança), com print de cada um (ThingsBoard, TagoIO).
+    temperatura, balança), com print de cada um (ThingsBoard, TagoIO). **Feito em 13/10** em cartões, sem print de cada modelo (ainda não existem; entram quando forem capturados).
 14. **Para quem é:** três entradas — integrador, dono ou líder de produção,
     operador — cada uma com os seus três fatos (IXON, MachineMetrics,
-    Ubidots).
+    Ubidots). **Feito em 13/10.**
 
 **Depende do Pedro ou do cliente (lote 3)**
 

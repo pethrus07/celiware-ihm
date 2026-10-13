@@ -59,7 +59,7 @@ upgrade de R$ [valor].
 |---|---|---|---|
 | 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | **Feito (1.3.2).** Falta a prova em celular real com Wi-Fi sem internet + 4G. |
 | 1 | Publicação na Play Store | reunião | **Lado técnico pronto (12/10):** `.aab` de loja com portões (sem chave de upload não sai), alvo 36, 16 KB, privacidade no app, ficha pt-BR, gráfico de recursos, 8 capturas de celular e 5 de tablet, formulários (`docs/loja/`). Falta o que é do dono, na ordem de `PUBLICACAO.md`: decisões (identificador, grátis é definitivo), site no ar, D-U-N-S, conta de organização, chave de upload. |
-| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100), com o link "Quero aprender automação" para o Instituto (item 184) e os protocolos novos marcados como ainda sem teste em equipamento real (12/10). Falta publicar: links da loja, e-mail e domínio (marcadores no `site/README.md`). |
+| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100), com o link "Quero aprender automação" para o Instituto (item 184) e os protocolos novos marcados como ainda sem teste em equipamento real (12/10). Visual refeito em 13/10 (palco escuro com brilho, prints maiores); próximos passos de conversão na seção "Site — conversão". Falta publicar: links da loja, e-mail e domínio (marcadores no `site/README.md`). |
 | 3 | ~~Versão para Windows do próprio app~~ — **adiada em 11/10/2026** (decisão do Pedro) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
 | 4 | Grade maior e mais variáveis por tela | reunião | **Feito:** grade fina 6 ↔ 12 colunas, mover e redimensionar sem arrastar, Tabela de valores (até 30 variáveis), ≥ 40 variáveis numa tela de celular (GR-1 a GR-10). |
 | 5 | Correções no "editar memória" | 2, 11 · reunião | **Feito:** nada se perde calado, sugestões de sinal e CDAB, hexadecimal, bit de registrador de entrada (EM-1 a EM-12). |
@@ -171,6 +171,77 @@ Roteiro completo em `PUBLICACAO.md`; ficha, imagens e formulários prontos em `d
 - Teste interno com o cliente antes de abrir ao público. Quem tem o APK do
   WhatsApp precisa exportar o projeto, desinstalar e instalar pela loja (a
   assinatura muda).
+
+## Site — conversão (pesquisa de 13/10/2026)
+
+O visual já foi refeito em 12–13/10: palco escuro com brilho verde-água no
+topo de cada página, na galeria, nas chamadas finais e no rodapé; faixas
+tingidas no lugar do cinza sobre cinza; prints maiores; herói com dois
+celulares. O que vem agora saiu da leitura de 64 páginas e 13 fontes
+(`docs/pesquisa-etapa4/8-site-conversao.md`). Regra: nada inventado — sem
+número de usuário, logo ou depoimento que não exista.
+
+**Lote 1 — sem depender de ninguém**
+
+1. **Fatos colados no botão:** "Android 7 ou mais novo · Grátis · Sem
+   cadastro" e "Sem CLP por perto? Já vem uma máquina de demonstração"
+   (Datacake, Things; NN/g 2016, transparência antecipada).
+2. **Chamada final na página inicial:** repete o título, com o selo e o QR
+   (todas as melhores; hoje a página termina nas perguntas).
+3. **QR para quem abre no computador**, só a partir de 760 px, com
+   `utm_content=qr` (Linear Mobile, Raycast, Arc).
+4. **Chamada que reconhece o aparelho:** Android vê o selo; iPhone vê "o Ware
+   IoT é só para Android" com "mandar o link"; computador vê o QR.
+5. **"Por que é grátis" à vista** (hoje só nas perguntas): "a Celiware ganha
+   com o hardware da loja, não com anúncio, assinatura ou os seus dados"
+   (Home Assistant, UniFi, Shelly).
+6. **Faixa de números do produto:** 13 elementos · 7 jeitos de agir · 6
+   modelos prontos · 6 protocolos · R$ 0 (NN/g 2007). Nunca contagem de
+   usuários.
+7. **Prints anotados** com os três diferenciais: "acende quando a máquina
+   confirma", "sem comunicação, último valor esmaecido — nunca zero falso",
+   "alarme sempre no mesmo lugar" (Linear Mobile; NN/g 2010).
+8. **Pergunta "É seguro comandar a máquina pelo celular?"** no topo das
+   perguntas, com a resposta franca que já existe (IHM, não intertravamento),
+   e "Funciona com o meu CLP?" e "E se cair o Wi-Fi?" (NN/g 2014).
+9. **Selo oficial da Google Play** em português, no lugar do botão próprio
+   (regras do Google).
+
+**Lote 2 — médio esforço, sem dependência externa**
+
+10. **Herói interativo:** o celular do herói vira uma tela de operação viva em
+    HTML — tocar em LIGA, o botão aguarda e acende quando "confirma", a
+    produção sobe, um alarme chega na faixa e a pessoa reconhece. Etiqueta
+    "Simulação — no app os valores vêm do CLP"; o print fica como reserva
+    sem JavaScript; respeita `prefers-reduced-motion` (FlowFuse Dashboard,
+    Home Assistant). Caminho forte, depois: a máquina de demonstração do
+    próprio app em build web, carregada só no toque.
+11. **"Veja funcionando":** trechos mudos de 6–12 s do vídeo de apresentação
+    em loop dentro do celular (ligar e confirmar; alarme chegando e
+    reconhecido; tela sendo montada), carregados só quando aparecem, e
+    "Vídeo completo · 3 min" (Arc, Blynk; NN/g 2014). Depende do Pedro
+    aprovar o vídeo.
+12. **Compatibilidade honesta:** tabela por protocolo e por perfil de marca
+    com três estados — conferido em equipamento real · testado em simulador ·
+    em breve — e "Seu CLP não está aqui? Fale com a gente" (TagoIO, Datacake;
+    NN/g 2016, especificações).
+13. **Galeria dos modelos de tela** (máquina, inversor, servo, leitor,
+    temperatura, balança), com print de cada um (ThingsBoard, TagoIO).
+14. **Para quem é:** três entradas — integrador, dono ou líder de produção,
+    operador — cada uma com os seus três fatos (IXON, MachineMetrics,
+    Ubidots).
+
+**Depende do Pedro ou do cliente (lote 3)**
+
+- Foto, ficha técnica (PDF) e preço real do hardware nos cartões de "O que
+  você precisa" — os links da loja ainda são marcadores.
+- WhatsApp de suporte com horário, no "Por que não conecta?" e nas perguntas.
+- "Qual peça eu preciso?" (três perguntas → a peça certa na loja), quando
+  houver os links.
+- Diagramas de ligação com a foto da peça no lugar do ícone.
+- Versão e "Novidades", depois da primeira publicação na Play.
+- Foto real de bancada (CLP + conversor + celular com o app); depois, casos
+  reais com autorização e a nota da Play quando existir.
 
 ## Campo e fabricantes
 

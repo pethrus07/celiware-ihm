@@ -146,9 +146,20 @@ usam esse formato. A `404.html` aparece sozinha em endereços que não existem.
 - **Fontes:** IBM Plex Sans (400 e 600) e Sans Condensed (600), recortes
   Latin1 oficiais da IBM (`@ibm/plex-sans` e `@ibm/plex-sans-condensed`
   1.1.0), servidas pelo próprio site. Nenhuma requisição a terceiros.
-- **Peso da home:** cerca de 210 KB sem compressão, com todas as imagens
+- **Visual (13/10/2026):** o topo de cada página, a galeria, as chamadas
+  finais e o rodapé ficam num "palco" escuro com brilho verde-água e a grade
+  de pontos do editor do app, nos dois temas (classe `.palco`, que redefine
+  os tokens de cor por dentro); o resto alterna fundo claro e uma faixa
+  tingida. No herói, um segundo print atrás e dois selos soltos aparecem só a
+  partir de 960 px. Tudo em CSS, sem imagem nova. Próximos passos de
+  conversão: `docs/ROADMAP.md`, seção "Site — conversão".
+- **Peso transferido** (Lighthouse, 13/10, depois do palco): início 258 KB,
+  Recursos 319 KB, Tutoriais 244 KB, Como conectar 111 KB. Em 11/10, antes do
+  palco, a home tinha cerca de 210 KB sem compressão, com todas as imagens
   (limite: 500 KB). A primeira dobra fica perto de 130 KB.
-- **Lighthouse (celular), servidor local:** 99–100 em Desempenho e 100 em
+- **Lighthouse 12.8 (celular), servidor local, 13/10, depois do palco:** 98–99 em Desempenho
+  (LCP 1,8–2,4 s, CLS 0) e 100 em Acessibilidade, Boas práticas e SEO no início,
+  Recursos, Tutoriais e Como conectar. Em 11/10, antes do palco: 99–100 em Desempenho e 100 em
   Acessibilidade, Boas práticas e SEO, nas seis páginas; LCP entre 1,6 e 2,1 s.
 - **Sem rolagem horizontal** em 360 e 390 px; alvos de toque com 48 px ou mais
   (exceto links dentro de frases).

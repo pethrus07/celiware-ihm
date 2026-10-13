@@ -190,31 +190,14 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
       Navigator.pop(context);
       return;
     }
-    final choice = await showDialog<_Leave>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        key: const ValueKey('descartar-alteracoes'),
-        title: const Text('Descartar alterações?'),
-        content: const Text('O que foi mudado neste equipamento ainda não foi salvo.', style: TextStyle(height: 1.4)),
-        actions: [
-          TextButton(key: const ValueKey('continuar-editando'), onPressed: () => Navigator.pop(ctx, _Leave.keep), child: const Text('Continuar editando')),
-          TextButton(
-            key: const ValueKey('descartar'),
-            style: TextButton.styleFrom(foregroundColor: Ind.textFor(Ind.alarm)),
-            onPressed: () => Navigator.pop(ctx, _Leave.discard),
-            child: const Text('Descartar'),
-          ),
-          FilledButton(key: const ValueKey('salvar-e-sair'), onPressed: () => Navigator.pop(ctx, _Leave.save), child: const Text('Salvar')),
-        ],
-      ),
-    );
+    final choice = await confirmDiscard(context, body: 'O que foi mudado neste equipamento ainda não foi salvo.');
     if (!mounted) return;
     switch (choice) {
-      case _Leave.save:
+      case LeaveChoice.save:
         await _save();
-      case _Leave.discard:
+      case LeaveChoice.discard:
         Navigator.pop(context);
-      case _Leave.keep || null:
+      case LeaveChoice.keep:
         break;
     }
   }
@@ -508,7 +491,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                       // RTU/ASCII cru, ou um broker MQTT: escolhas raras, por isso
                       // ficam aqui.
                       if (_net) ...[
-                        Text('Protocolo', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+                        const SectionHeader('Protocolo', padding: EdgeInsets.zero),
                         const SizedBox(height: 8),
                         Wrap(spacing: 8, runSpacing: 8, children: [
                           for (final p in _Protocol.values)
@@ -744,9 +727,6 @@ class _ProbeCard extends StatelessWidget {
 
 /// Onde o equipamento está.
 enum _Where { network, usb, demo }
-
-/// O que fazer com alterações não salvas ao sair.
-enum _Leave { keep, discard, save }
 
 /// Protocolo de um equipamento na rede.
 enum _Protocol {

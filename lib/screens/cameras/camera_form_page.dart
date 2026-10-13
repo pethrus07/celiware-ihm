@@ -15,8 +15,6 @@ import '../../widgets/common/common.dart';
 import '../../widgets/hmi/write_actions.dart';
 import '../screens_page.dart';
 
-enum _Leave { save, discard, keep }
-
 /// Cadastro de câmera (CM-1): nome, máquina, endereço do vídeo, usuário e
 /// senha à vista; fluxo leve e foto em "Mais opções".
 ///
@@ -192,31 +190,14 @@ class _CameraFormPageState extends State<CameraFormPage> {
       Navigator.pop(context);
       return;
     }
-    final choice = await showDialog<_Leave>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        key: const ValueKey('descartar-alteracoes'),
-        title: const Text('Descartar alterações?'),
-        content: const Text('O que foi mudado nesta câmera ainda não foi salvo.', style: TextStyle(height: 1.4)),
-        actions: [
-          TextButton(key: const ValueKey('continuar-editando'), onPressed: () => Navigator.pop(ctx, _Leave.keep), child: const Text('Continuar editando')),
-          TextButton(
-            key: const ValueKey('descartar'),
-            style: TextButton.styleFrom(foregroundColor: Ind.textFor(Ind.alarm)),
-            onPressed: () => Navigator.pop(ctx, _Leave.discard),
-            child: const Text('Descartar'),
-          ),
-          FilledButton(key: const ValueKey('salvar-e-sair'), onPressed: () => Navigator.pop(ctx, _Leave.save), child: const Text('Salvar')),
-        ],
-      ),
-    );
+    final choice = await confirmDiscard(context, body: 'O que foi mudado nesta câmera ainda não foi salvo.');
     if (!mounted) return;
     switch (choice) {
-      case _Leave.save:
+      case LeaveChoice.save:
         await _save();
-      case _Leave.discard:
+      case LeaveChoice.discard:
         Navigator.pop(context);
-      case _Leave.keep || null:
+      case LeaveChoice.keep:
         break;
     }
   }

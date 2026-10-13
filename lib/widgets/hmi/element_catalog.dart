@@ -110,10 +110,10 @@ class ElementInfo {
 /// | value       | tagId, label                                                                            |
 /// | input       | tagId, label, min, max                                                                  |
 /// | multistate  | tagId, label, states: [{value, text, color}]                                            |
-/// | bar         | tagId, label, min, max, color                                                           |
+/// | bar         | tagId, label, min, max, warn, alarm (cor só nas faixas; `color` antigo é ignorado)      |
 /// | gauge       | tagId, label, min, max, warn, alarm                                                     |
 /// | trend       | tagIds (até 3), label, windowSec, min?, max? (sem min/max = escala automática)           |
-/// | barChart    | tagId (lista), label                                                                    |
+/// | barChart    | tagId (lista), label, axis (hour = hora real, a última é a de agora · index = 1..n)     |
 /// | label       | text, size (s·m·l), align (left·center)                                                 |
 /// | image       | data (PNG em base64), fit (contain·cover), source (fixed·byValue),                      |
 /// |             | tagId + images: [{value, data}] (modo byValue: uma imagem por código)                   |
@@ -350,7 +350,7 @@ class ElementCatalog {
           ],
         };
       case ElementType.bar:
-        return {...base, 'label': label, 'min': 0, 'max': 100, 'color': 'blue'};
+        return {...base, 'label': label, 'min': 0, 'max': 100};
       case ElementType.gauge:
         return {...base, 'label': label, 'min': 0, 'max': 100};
       case ElementType.trend:

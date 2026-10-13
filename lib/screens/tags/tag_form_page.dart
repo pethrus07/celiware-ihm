@@ -39,9 +39,6 @@ import 'narration_editor.dart';
 /// combinação área Modbus + tipo.
 enum _Where { coil, discrete, bitInRegister, bitInInput, holding, input }
 
-/// O que fazer com alterações não salvas ao voltar.
-enum _Leave { save, discard, keep }
-
 /// Cadastro/edição de variável.
 ///
 /// Três recursos para errar menos:
@@ -570,36 +567,19 @@ class _TagFormPageState extends State<TagFormPage> {
       return;
     }
     final alarmsChanged = _alarmsJson() != _initialAlarms;
-    final choice = await showDialog<_Leave>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        key: const ValueKey('descartar-alteracoes'),
-        title: const Text('Descartar alterações?'),
-        content: Text(
-          alarmsChanged
-              ? 'O que foi mudado nesta variável, inclusive os alarmes, ainda não foi salvo.'
-              : 'O que foi mudado nesta variável ainda não foi salvo.',
-          style: const TextStyle(height: 1.4),
-        ),
-        actions: [
-          TextButton(key: const ValueKey('continuar-editando'), onPressed: () => Navigator.pop(ctx, _Leave.keep), child: const Text('Continuar editando')),
-          TextButton(
-            key: const ValueKey('descartar'),
-            style: TextButton.styleFrom(foregroundColor: Ind.textFor(Ind.alarm)),
-            onPressed: () => Navigator.pop(ctx, _Leave.discard),
-            child: const Text('Descartar'),
-          ),
-          FilledButton(key: const ValueKey('salvar-e-sair'), onPressed: () => Navigator.pop(ctx, _Leave.save), child: const Text('Salvar')),
-        ],
-      ),
+    final choice = await confirmDiscard(
+      context,
+      body: alarmsChanged
+          ? 'O que foi mudado nesta variável, inclusive os alarmes, ainda não foi salvo.'
+          : 'O que foi mudado nesta variável ainda não foi salvo.',
     );
     if (!mounted) return;
     switch (choice) {
-      case _Leave.save:
+      case LeaveChoice.save:
         _save();
-      case _Leave.discard:
+      case LeaveChoice.discard:
         Navigator.pop(context);
-      case _Leave.keep || null:
+      case LeaveChoice.keep:
         break;
     }
   }
@@ -1478,26 +1458,15 @@ class _DecimalsStepper extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context) => Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Casas decimais', style: TextStyle(color: Ind.text, fontSize: 16)),
-            const SizedBox(height: 2),
-            Text('Ex.: ${75.2468.toStringAsFixed(value).replaceAll('.', ',')}', style: TextStyle(color: Ind.textMuted, fontSize: 12.5)),
-          ]),
-        ),
-        IconButton.outlined(
-          key: const ValueKey('decimais-menos'),
-          onPressed: value > 0 ? () => onChanged(value - 1) : null,
-          icon: const Icon(Icons.remove_rounded),
-        ),
-        SizedBox(width: 44, child: Text('$value', key: const ValueKey('casas-decimais'), textAlign: TextAlign.center, style: Ind.number(18))),
-        IconButton.outlined(
-          key: const ValueKey('decimais-mais'),
-          onPressed: value < 6 ? () => onChanged(value + 1) : null,
-          icon: const Icon(Icons.add_rounded),
-        ),
-      ]);
+  Widget build(BuildContext context) => StepperCounter(
+        label: 'Casas decimais',
+        caption: 'Ex.: ${75.2468.toStringAsFixed(value).replaceAll('.', ',')}',
+        value: value,
+        keyPrefix: 'decimais',
+        valueKey: const ValueKey('casas-decimais'),
+        onDecrease: value > 0 ? () => onChanged(value - 1) : null,
+        onIncrease: value < 6 ? () => onChanged(value + 1) : null,
+      );
 }
 
 /// Aviso em amarelo de atenção, uma frase por linha.

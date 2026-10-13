@@ -244,9 +244,17 @@ class ElementConfigSheet extends StatelessWidget {
         w.add(const SizedBox(height: 10));
         w.add(_MinMax(e: e, set: set));
       case ElementType.bar:
-        w.add(const SectionHeader('Escala', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+        // Sem "cor da barra": neutra, como o arco do medidor; cor só nas faixas.
+        w.add(const SectionHeader('Escala e faixas', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
         w.add(_MinMax(e: e, set: set, defaults: (0, 100)));
-        w.add(_ColorProp(label: 'Cor da barra', value: e.prop<String>('color', 'blue'), onChanged: (v) => set('color', v)));
+        w.add(const SizedBox(height: Ind.space));
+        w.add(Text('A barra fica amarela e vermelha a partir destes valores. Vazio = sem faixa.', style: TextStyle(color: Ind.textDim)));
+        w.add(const SizedBox(height: 10));
+        w.add(Row(children: [
+          Expanded(child: _NumProp(key: const ValueKey('faixa-atencao-barra'), label: 'Atenção', value: e.props['warn'] as num?, onChanged: (v) => set('warn', v), color: Ind.warn)),
+          const SizedBox(width: 10),
+          Expanded(child: _NumProp(key: const ValueKey('faixa-alarme-barra'), label: 'Alarme', value: e.props['alarm'] as num?, onChanged: (v) => set('alarm', v), color: Ind.alarm)),
+        ]));
       case ElementType.gauge:
         w.add(const SectionHeader('Escala e faixas', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
         w.add(_MinMax(e: e, set: set, defaults: (0, 100)));
@@ -327,8 +335,14 @@ class ElementConfigSheet extends StatelessWidget {
         w.addAll(oeeFields(project, e, save,
             picker: (selected, onChanged) =>
                 _TagPicker(project: project, fit: TagFit.number, selected: selected, preferDevices: screenDevices, onChanged: onChanged)));
-      case ElementType.value:
       case ElementType.barChart:
+        final axis = e.prop<String>('axis', 'hour');
+        w.add(const SectionHeader('Embaixo de cada barra', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)));
+        w.add(Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final (v, t) in [('hour', 'Hora · a última é a de agora'), ('index', 'Posição · 1, 2, 3…')])
+            ChoiceChip(key: ValueKey('eixo-$v'), label: Text(t), selected: axis == v, onSelected: (_) => set('axis', v)),
+        ]));
+      case ElementType.value:
       case ElementType.unknown:
         break;
     }
@@ -1065,15 +1079,17 @@ class _GeometryEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final e = element;
-    Widget step(String label, int value, HmiElement Function(int delta) change, String key) => Row(children: [
-          Expanded(child: Text(label, style: TextStyle(color: Ind.textDim))),
-          IconButton.outlined(key: ValueKey('$key-menos'), onPressed: ElementCatalog.fits(screen, change(-1)) ? () => _try(change(-1)) : null, icon: const Icon(Icons.remove_rounded)),
-          SizedBox(width: 44, child: Text('$value', textAlign: TextAlign.center, style: Ind.number(18))),
-          IconButton.outlined(key: ValueKey('$key-mais'), onPressed: ElementCatalog.fits(screen, change(1)) ? () => _try(change(1)) : null, icon: const Icon(Icons.add_rounded)),
-        ]);
+    // O mesmo − / + (e as setas no mesmo botão) dos campos numéricos.
+    Widget step(String label, int value, HmiElement Function(int delta) change, String key) => StepperCounter(
+          label: label,
+          value: value,
+          keyPrefix: key,
+          onDecrease: ElementCatalog.fits(screen, change(-1)) ? () => _try(change(-1)) : null,
+          onIncrease: ElementCatalog.fits(screen, change(1)) ? () => _try(change(1)) : null,
+        );
     Widget arrow(IconData icon, int dx, int dy, String key) {
       final next = e.copyWith(x: e.x + dx, y: e.y + dy);
-      return IconButton.outlined(key: ValueKey(key), onPressed: ElementCatalog.fits(screen, next) ? () => _try(next) : null, icon: Icon(icon));
+      return StepButton(key: ValueKey(key), size: const Size(52, 52), onTap: ElementCatalog.fits(screen, next) ? () => _try(next) : null, icon: icon);
     }
 
     return Theme(
@@ -1091,7 +1107,7 @@ class _GeometryEditor extends StatelessWidget {
           step('Altura', e.h, (d) => e.copyWith(h: e.h + d), 'altura'),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: Text('Mover', style: TextStyle(color: Ind.textDim))),
+            Expanded(child: Text('Mover', style: TextStyle(color: Ind.text, fontSize: 16))),
             arrow(Icons.arrow_back_rounded, -1, 0, 'mover-esquerda'),
             const SizedBox(width: 6),
             arrow(Icons.arrow_upward_rounded, 0, -1, 'mover-cima'),

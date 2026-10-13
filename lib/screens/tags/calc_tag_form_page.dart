@@ -25,8 +25,6 @@ import 'calc_expression_field.dart';
 import 'narration_editor.dart';
 import 'tag_uses.dart';
 
-enum _Leave { save, discard, keep }
-
 /// Cadastro de variável calculada (LG-1 a LG-3).
 ///
 /// Enxuto: nome, a conta e o resultado ao vivo no topo — o "Lendo agora" das
@@ -169,31 +167,14 @@ class _CalcTagFormPageState extends State<CalcTagFormPage> {
       Navigator.pop(context);
       return;
     }
-    final choice = await showDialog<_Leave>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        key: const ValueKey('descartar-alteracoes'),
-        title: const Text('Descartar alterações?'),
-        content: const Text('O que foi mudado nesta variável ainda não foi salvo.', style: TextStyle(height: 1.4)),
-        actions: [
-          TextButton(key: const ValueKey('continuar-editando'), onPressed: () => Navigator.pop(ctx, _Leave.keep), child: const Text('Continuar editando')),
-          TextButton(
-            key: const ValueKey('descartar'),
-            style: TextButton.styleFrom(foregroundColor: Ind.textFor(Ind.alarm)),
-            onPressed: () => Navigator.pop(ctx, _Leave.discard),
-            child: const Text('Descartar'),
-          ),
-          FilledButton(key: const ValueKey('salvar-e-sair'), onPressed: () => Navigator.pop(ctx, _Leave.save), child: const Text('Salvar')),
-        ],
-      ),
-    );
+    final choice = await confirmDiscard(context, body: 'O que foi mudado nesta variável ainda não foi salvo.');
     if (!mounted) return;
     switch (choice) {
-      case _Leave.save:
+      case LeaveChoice.save:
         _save();
-      case _Leave.discard:
+      case LeaveChoice.discard:
         Navigator.pop(context);
-      case _Leave.keep || null:
+      case LeaveChoice.keep:
         break;
     }
   }
@@ -396,26 +377,15 @@ class _CalcTagFormPageState extends State<CalcTagFormPage> {
                 ),
             ]),
             const SizedBox(height: Ind.space),
-            Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Casas decimais', style: TextStyle(color: Ind.text, fontSize: 16)),
-                  const SizedBox(height: 2),
-                  Text('Ex.: ${75.2468.toStringAsFixed(_decimals).replaceAll('.', ',')}', style: TextStyle(color: Ind.textMuted, fontSize: 12.5)),
-                ]),
-              ),
-              IconButton.outlined(
-                key: const ValueKey('decimais-menos'),
-                onPressed: _decimals > 0 ? () => setState(() => _decimals--) : null,
-                icon: const Icon(Icons.remove_rounded),
-              ),
-              SizedBox(width: 44, child: Text('$_decimals', key: const ValueKey('casas-decimais'), textAlign: TextAlign.center, style: Ind.number(18))),
-              IconButton.outlined(
-                key: const ValueKey('decimais-mais'),
-                onPressed: _decimals < 6 ? () => setState(() => _decimals++) : null,
-                icon: const Icon(Icons.add_rounded),
-              ),
-            ]),
+            StepperCounter(
+              label: 'Casas decimais',
+              caption: 'Ex.: ${75.2468.toStringAsFixed(_decimals).replaceAll('.', ',')}',
+              value: _decimals,
+              keyPrefix: 'decimais',
+              valueKey: const ValueKey('casas-decimais'),
+              onDecrease: _decimals > 0 ? () => setState(() => _decimals--) : null,
+              onIncrease: _decimals < 6 ? () => setState(() => _decimals++) : null,
+            ),
             const SizedBox(height: Ind.space),
           ],
           TextFormField(

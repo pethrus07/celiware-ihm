@@ -256,10 +256,8 @@ class UsbMoreOptions extends StatelessWidget {
   final TextEditingController poll;
   final VoidCallback onChanged;
 
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(top: Ind.space, bottom: 8),
-        child: Text(text, style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
-      );
+  // O cabeçalho de seção do app (um estilo só em todo formulário).
+  Widget _label(String text) => SectionHeader(text, padding: const EdgeInsets.fromLTRB(0, Ind.space, 0, 10));
 
   Widget _chips<T>(String key, List<T> values, T selected, String Function(T) label, void Function(T) pick) => Wrap(spacing: 8, runSpacing: 8, children: [
         for (final v in values)

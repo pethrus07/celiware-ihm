@@ -166,10 +166,8 @@ class MqttMoreOptions extends StatelessWidget {
   final bool isBool;
   final VoidCallback onChanged;
 
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(text, style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
-      );
+  // O cabeçalho de seção do app, como "Validade da mensagem" logo acima.
+  Widget _label(String text) => SectionHeader(text, padding: const EdgeInsets.fromLTRB(0, 8, 0, 10));
 
   @override
   Widget build(BuildContext context) {

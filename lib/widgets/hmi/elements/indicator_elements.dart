@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/hmi_screen.dart';
 import '../../../services/runtime/tag_codec.dart';
+import '../../common/common.dart';
 import '../hmi_frame.dart';
 
 /// Estilo da lâmpada (`props.style`).
@@ -43,17 +44,34 @@ class LampElement extends StatelessWidget {
         // senão o "brilho" da paleta.
         final colored = style == LampStyle.classic || abnormal;
         final ledColor = colored ? chosen.color : Ind.lampOn;
-        final text = on ? e.prop<String>('onText', 'LIGADO') : e.prop<String>('offText', 'DESLIGADO');
+        final onText = e.prop<String>('onText', 'LIGADO'), offText = e.prop<String>('offText', 'DESLIGADO');
+        final text = on ? onText : offText;
         final textColor = !on ? Ind.textMuted : (colored ? chosen.textColor : Ind.text);
         return HmiFrame(
           label: e.prop<String>('label', tag?.name ?? ''),
           tag: tag,
           reading: r,
+          // Rótulo ao lado só se sobrar para LED + a palavra mais longa do
+          // estado a 14 pt; senão o rótulo sobe e o estado fica legível.
+          minBodyWidth: stateMinWidth([onText, offText], context),
           child: LayoutBuilder(builder: (context, box) {
-            // Proporcional à altura: grande num 2×2, discreta numa linha só.
-            final d = math.min((box.maxHeight * 0.46).clamp(16.0, 40.0), box.maxWidth);
-            // Sem largura para LED + texto: só o LED.
+            // Proporcional à altura: grande num 2×2, discreta numa linha só —
+            // e nunca mais alta que o espaço (rótulo em cima deixa ~17 dp).
+            final d = math.min(math.min((box.maxHeight * 0.46).clamp(16.0, 40.0), box.maxWidth), box.maxHeight);
+            final word = r.value == null ? '---' : text;
+            final wordStyle = TextStyle(fontFamily: Ind.condensed, fontWeight: on ? FontWeight.w700 : FontWeight.w600, fontSize: 20, color: textColor, letterSpacing: 0.4, height: 1.0);
+            // Sem largura para LED + palavra lado a lado (2×2 no celular):
+            // palavra embaixo do LED. Só o LED, sem a palavra, falhava para
+            // daltônico — o estado sempre vai escrito.
             final showText = box.maxWidth >= d + 44;
+            if (!showText && box.maxHeight >= 44) {
+              final led = math.min(d, box.maxHeight - 24);
+              return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                _Led(size: led, on: on, color: ledColor, glow: colored || Ind.isDark),
+                const SizedBox(height: 6),
+                Flexible(child: FitText(word, style: wordStyle)),
+              ]);
+            }
             return Row(
               children: [
                 if (!showText) const Spacer(),
@@ -61,12 +79,8 @@ class LampElement extends StatelessWidget {
                 // (sinal que pisca a cada 400 ms deixava a tela desenhando).
                 _Led(size: d, on: on, color: ledColor, glow: colored || Ind.isDark),
                 if (showText) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FitText(r.value == null ? '---' : text,
-                        alignment: Alignment.centerLeft,
-                        style: TextStyle(fontFamily: Ind.condensed, fontWeight: on ? FontWeight.w700 : FontWeight.w600, fontSize: 20, color: textColor, letterSpacing: 0.4)),
-                  ),
+                  SizedBox(width: d < 20 ? 8 : 12),
+                  Expanded(child: FitText(word, alignment: Alignment.centerLeft, style: wordStyle)),
                 ] else
                   const Spacer(),
               ],
@@ -76,6 +90,20 @@ class LampElement extends StatelessWidget {
       },
     );
   }
+}
+
+/// Largura que o corpo de lâmpada/indicador pede ao [HmiFrame] para o
+/// rótulo ficar ao lado: ícone (ou LED) + respiro + o texto de estado mais
+/// longo a 14 pt — abaixo disso a palavra do estado fica miúda (era 7 pt num
+/// 3×1 de 360 dp) e o arranjo com o rótulo em cima lê melhor.
+double stateMinWidth(Iterable<String> texts, BuildContext context, {double icon = 20}) {
+  const style = TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 14, letterSpacing: 0.4);
+  final scaler = MediaQuery.textScalerOf(context);
+  var w = 0.0;
+  for (final t in texts) {
+    w = math.max(w, TextFit.width(t.toUpperCase(), style, scaler: scaler));
+  }
+  return icon + 12 + w;
 }
 
 /// LED de painel. O poço (anel rebaixado) existe aceso ou apagado — é o que
@@ -210,28 +238,38 @@ class MultistateElement extends StatelessWidget {
           label: e.prop<String>('label', tag?.name ?? ''),
           tag: tag,
           reading: r,
+          // Pelos textos cadastrados (não pelo de agora): o arranjo não muda
+          // a cada troca de estado.
+          minBodyWidth: stateMinWidth([for (final s in states) '${s['text'] ?? ''}'], context, icon: 30),
           // Tinta de ~14% da cor no cartão + borda: o estado ocupa o cartão
           // inteiro, visível de longe; neutro fica neutro.
           color: strong ? Color.alphaBlend(color.withValues(alpha: Ind.isDark ? 0.14 : 0.12), Ind.surface) : null,
           border: strong ? color.withValues(alpha: 0.55) : null,
           child: LayoutBuilder(builder: (context, box) {
-            final icon = (box.maxHeight * 0.5).clamp(18.0, 30.0);
+            // O círculo nunca passa da altura (com o rótulo em cima sobram
+            // ~17 dp); o ícone acompanha.
+            var ring = (box.maxHeight * 0.5).clamp(18.0, 30.0) + 12;
+            var icon = ring - 12;
+            if (ring > box.maxHeight) {
+              ring = box.maxHeight;
+              icon = ring * 0.66;
+            }
             return Row(
               children: [
                 Container(
-                  width: icon + 12,
-                  height: icon + 12,
+                  width: ring,
+                  height: ring,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: code == null ? Ind.well : (strong ? color.withValues(alpha: 0.18) : Ind.well),
                   ),
                   child: Icon(code == null ? Icons.more_horiz_rounded : _iconFor(sc), size: icon, color: fg),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: ring < 24 ? 8 : 12),
                 Expanded(
                   child: FitText(text.toUpperCase(),
                       alignment: Alignment.centerLeft,
-                      style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 26, color: fg, letterSpacing: 0.4)),
+                      style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 26, color: fg, letterSpacing: 0.4, height: 1.0)),
                 ),
               ],
             );
@@ -245,21 +283,45 @@ class MultistateElement extends StatelessWidget {
 /// Barra de nível entre [min] e [max]: trilho rebaixado, régua de quartos e
 /// um **ponteiro** na ponta do preenchimento (ISA-101: o olho acha presença
 /// melhor que ausência — só a barra "some" quando o valor cai).
+///
+/// Preenchimento **neutro**, como o do medidor: cor só quando o valor entra
+/// na faixa de atenção (`warn`, amarelo) ou de alarme (`alarm`, vermelho) —
+/// as faixas aparecem como um traço fino sob a régua. A barra nascia azul, a
+/// cor de informação, e azul parado na tela parecia um estado.
 class BarElement extends StatelessWidget {
   const BarElement({super.key, required this.element});
   final HmiElement element;
+
+  /// Cor do preenchimento para o valor [v]: neutra fora das faixas.
+  static Color fillFor(double? v, {double? warn, double? alarm}) {
+    final z = zoneFor(v, warn: warn, alarm: alarm);
+    return z ?? Ind.text.withValues(alpha: Ind.isDark ? 0.82 : 0.75);
+  }
+
+  /// Faixa em que o valor está (nulo = normal) — a mesma regra do medidor.
+  static Color? zoneFor(double? v, {double? warn, double? alarm}) => v == null
+      ? null
+      : (alarm != null && v >= alarm)
+          ? Ind.alarm
+          : (warn != null && v >= warn)
+              ? Ind.warn
+              : null;
 
   @override
   Widget build(BuildContext context) {
     final e = element;
     final min = e.prop<num>('min', 0).toDouble();
     final max = e.prop<num>('max', 100).toDouble();
-    final color = StateColorMeta.fromName(e.prop<String>('color', 'blue'), StateColor.blue).color;
+    final warn = (e.props['warn'] as num?)?.toDouble();
+    final alarm = (e.props['alarm'] as num?)?.toDouble();
+    double frac(double x) => max <= min ? 0.0 : ((x - min) / (max - min)).clamp(0.0, 1.0);
     return TagBuilder(
       tagId: e.tagId,
       builder: (context, tag, r) {
         final v = r.value is num ? (r.value as num).toDouble() : null;
-        final frac = v == null || max <= min ? 0.0 : ((v - min) / (max - min)).clamp(0.0, 1.0);
+        final f = v == null ? 0.0 : frac(v);
+        final zone = zoneFor(v, warn: warn, alarm: alarm);
+        final color = fillFor(v, warn: warn, alarm: alarm);
         return HmiFrame(
           label: e.prop<String>('label', tag?.name ?? ''),
           tag: tag,
@@ -280,11 +342,14 @@ class BarElement extends StatelessWidget {
                           height: h,
                           child: Container(
                             decoration: Ind.wellBox(radius: h / 2),
-                            child: Align(alignment: Alignment.centerLeft, child: _BarFill(frac: frac, color: color, radius: h / 2)),
+                            child: Align(alignment: Alignment.centerLeft, child: _BarFill(key: const ValueKey('barra-preenchimento'), frac: f, color: color, radius: h / 2)),
                           ),
                         ),
-                        // Régua: marcas em 0, 25, 50, 75 e 100%.
-                        Positioned.fill(top: h + 3, child: CustomPaint(painter: _TicksPainter())),
+                        // Régua: marcas em 0, 25, 50, 75 e 100%, e as faixas.
+                        Positioned.fill(
+                          top: h + 3,
+                          child: CustomPaint(painter: _TicksPainter(warn: warn == null ? null : frac(warn), alarm: alarm == null ? null : frac(alarm))),
+                        ),
                       ]),
                     ),
                   );
@@ -293,7 +358,8 @@ class BarElement extends StatelessWidget {
               const SizedBox(width: 12),
               ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 56),
-                child: FitText(tag == null ? '---' : TagCodec.format(tag, v), alignment: Alignment.centerRight, style: Ind.number(22)),
+                child: FitText(tag == null ? '---' : TagCodec.format(tag, v),
+                    alignment: Alignment.centerRight, style: Ind.number(22, color: zone == null ? Ind.text : Ind.textFor(zone))),
               ),
             ],
           ),
@@ -304,6 +370,10 @@ class BarElement extends StatelessWidget {
 }
 
 class _TicksPainter extends CustomPainter {
+  _TicksPainter({this.warn, this.alarm});
+
+  /// Início das faixas, em fração da escala (nulo = sem faixa).
+  final double? warn, alarm;
   final int rev = Ind.revision;
 
   @override
@@ -315,17 +385,26 @@ class _TicksPainter extends CustomPainter {
       final x = (size.width - 1) * i / 4 + 0.5;
       canvas.drawLine(Offset(x, 0), Offset(x, i.isEven ? 4 : 2.5), p);
     }
+    // Faixas como no medidor: traço fino de onde começam até o fim da escala.
+    final band = Paint()..strokeWidth = 2;
+    final w = size.width;
+    if (warn != null) {
+      canvas.drawLine(Offset(w * warn!, 5.5), Offset(w * (alarm ?? 1), 5.5), band..color = Ind.warn);
+    }
+    if (alarm != null) {
+      canvas.drawLine(Offset(w * alarm!, 5.5), Offset(w, 5.5), band..color = Ind.alarm);
+    }
   }
 
   @override
-  bool shouldRepaint(_TicksPainter o) => o.rev != rev;
+  bool shouldRepaint(_TicksPainter o) => o.rev != rev || o.warn != warn || o.alarm != alarm;
 }
 
 /// Preenchimento da barra com ponteiro na ponta. Anima só quando o valor
 /// **anda** (mais de 3% da faixa): a animação a cada leitura deixava a tela
 /// desenhando sem parar — bateria indo embora pela oscilação de ±1%.
 class _BarFill extends StatefulWidget {
-  const _BarFill({required this.frac, required this.color, required this.radius});
+  const _BarFill({super.key, required this.frac, required this.color, required this.radius});
   final double frac;
   final Color color;
   final double radius;
@@ -356,10 +435,11 @@ class _BarFillState extends State<_BarFill> {
             gradient: LinearGradient(colors: [widget.color.withValues(alpha: 0.75), widget.color]),
           ),
           alignment: Alignment.centerRight,
-          // Ponteiro: traço claro na ponta, visível mesmo com barra curta.
+          // Ponteiro: traço na cor do cartão na ponta, visível mesmo com barra
+          // curta — e no escuro, onde o preenchimento neutro é claro.
           child: widget.frac <= 0
               ? null
-              : Container(width: 3, margin: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 2), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(2))),
+              : Container(width: 3, margin: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 2), decoration: BoxDecoration(color: Ind.surface.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(2))),
         ),
       );
 }

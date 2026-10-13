@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/tag.dart';
+import '../../widgets/common/common.dart';
 
 /// Resultado da escolha de variável: um id, ou nenhuma ([tagId] nulo).
 class TagPick {
@@ -83,11 +84,9 @@ String whenLabel(DateTime at) {
   return '${two(l.day)}/${two(l.month)}/${l.year} $hm';
 }
 
-/// Rótulo de seção dentro de folha (caixa alta pequena).
-Widget sheetLabel(String text) => Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(text.toUpperCase(), style: Ind.tag(size: 11)),
-    );
+/// Rótulo de seção dentro de folha: o [SectionHeader] do app, sem o
+/// respiro de cima (a folha já começa com o seu).
+Widget sheetLabel(String text) => SectionHeader(text, padding: const EdgeInsets.only(bottom: 10));
 
 /// Barra de baixo de folha com o botão principal e o erro logo acima dele
 /// (no meio de uma lista longa, o aviso ficaria fora da tela).

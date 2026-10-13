@@ -390,7 +390,9 @@ class Ind {
         contentPadding: const EdgeInsets.symmetric(horizontal: page),
         minVerticalPadding: 14,
         iconColor: p.textDim,
-        subtitleTextStyle: TextStyle(color: p.textMuted, fontSize: 13),
+        // Com a família: o estilo do tema substitui o herdado (sem ela, o
+        // resumo do "Mais opções" saía na letra do sistema).
+        subtitleTextStyle: TextStyle(fontFamily: sans, color: p.textMuted, fontSize: 13),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: p.surface,
@@ -430,7 +432,9 @@ class Ind {
           minimumSize: const Size(64, 52),
           padding: const EdgeInsets.symmetric(horizontal: 22),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusSmall)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+          // Com a família: o estilo do botão substitui o do texto em volta, e
+          // sem ela o preenchido saía na letra do sistema, não na Plex.
+          textStyle: const TextStyle(fontFamily: sans, fontWeight: FontWeight.w700, fontSize: 15),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -463,7 +467,8 @@ class Ind {
         backgroundColor: p.surfaceHigh,
         selectedColor: p.accent.withValues(alpha: 0.2),
         side: BorderSide(color: p.line),
-        labelStyle: TextStyle(color: p.text, fontWeight: FontWeight.w600),
+        // Família explícita: o estilo do tema substitui o do chip.
+        labelStyle: TextStyle(fontFamily: sans, color: p.text, fontWeight: FontWeight.w600),
       ),
       dividerTheme: DividerThemeData(color: p.line, space: 1),
       bottomSheetTheme: BottomSheetThemeData(

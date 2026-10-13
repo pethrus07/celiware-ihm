@@ -22,6 +22,7 @@ import 'package:ihm/services/demo/demo_process.dart';
 import 'package:ihm/services/demo/demo_project.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/storage/project_repository.dart';
+import 'package:ihm/widgets/common/common.dart';
 import 'package:ihm/widgets/hmi/element_catalog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -513,14 +514,15 @@ void main() {
     expect(fieldText(tester, 'campo-unidade'), 'A');
 
     await reveal(tester, find.byKey(const ValueKey('decimais-mais')));
-    IconButton btn(String k) => tester.widget<IconButton>(find.byKey(ValueKey(k)));
+    // O mesmo botão − / + dos campos numéricos (StepButton), não outro desenho.
+    StepButton btn(String k) => tester.widget<StepButton>(find.byKey(ValueKey(k)));
     String decimals() => tester.widget<Text>(find.byKey(const ValueKey('casas-decimais'))).data!;
-    expect(btn('decimais-menos').onPressed, isNull);
+    expect(btn('decimais-menos').onTap, isNull);
     for (var i = 0; i < 6; i++) {
       await tapKey(tester, 'decimais-mais', wait: 100);
     }
     expect(decimals(), '6');
-    expect(btn('decimais-mais').onPressed, isNull, reason: 'para em 6');
+    expect(btn('decimais-mais').onTap, isNull, reason: 'para em 6');
     for (var i = 0; i < 4; i++) {
       await tapKey(tester, 'decimais-menos', wait: 100);
     }

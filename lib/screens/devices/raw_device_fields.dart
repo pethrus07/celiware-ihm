@@ -99,7 +99,7 @@ class RawDeviceMoreOptions extends StatelessWidget {
         Text('Para Arduino, ESP, balança ou leitor que manda a própria mensagem, sem Modbus. Como ler a mensagem fica em "Mensagem do equipamento".',
             style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
         const SizedBox(height: Ind.space),
-        Text('Por onde', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+        const SectionHeader('Por onde', padding: EdgeInsets.zero),
         const SizedBox(height: 8),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final t in RawTransport.values)

@@ -85,7 +85,7 @@ class _ScreenRunPageState extends State<ScreenRunPage> {
       forceStart: widget.startTour,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(screen.name),
+          title: AdaptiveTitle(screen.name),
           actions: [
             IconButton(
               key: _editKey,

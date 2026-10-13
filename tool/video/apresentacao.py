@@ -132,14 +132,17 @@ class Cena:
 
 
 # Coordenadas do Pixel 7 (1080×2400), medidas nas capturas do ensaio.
-LIGA, CONFIRMAR = (204, 948), (697, 1412)
-AJUSTE = (300, 1300)
+# Desde a build 11 a faixa do topo é reservada (56 dp ≈ 147 px): o que
+# pende do topo desceu ~147 px, diálogo centrado desceu a metade, e o que
+# pende de baixo (teclado, barra de abas, + Elemento) ficou onde estava.
+LIGA, CONFIRMAR = (204, 1096), (694, 1482)
+AJUSTE = (300, 1446)
 TECLA = {"1": (209, 1884), "2": (540, 1884), "6": (871, 1715), "0": (540, 2054)}
 GRAVAR = (708, 2220)
-LAPIS, CONCLUIR = (890, 220), (925, 220)
+LAPIS, CONCLUIR = (890, 366), (938, 366)
 ELEMENTO, MAIS_ELEMENTO = (462, 2242), (980, 2242)
-PALETA_BOTAO, PALETA_LAMPADA = (288, 1060), (792, 1060)
-ESCOLHER_VARIAVEL = (540, 1128)
+PALETA_BOTAO, PALETA_LAMPADA = (288, 1264), (792, 1264)
+ESCOLHER_VARIAVEL = (540, 1254)
 ABA_TELAS, ABA_VARIAVEIS = (135, 2256), (675, 2256)
 FAB = (840, 2042)
 TELA_OPERACAO, TELA_REDE = (540, 540), (300, 2000)
@@ -182,23 +185,23 @@ def c_editor(c: Celular):
     c.toque(*PALETA_LAMPADA, espera=1.6)        # já abre a configuração
     marco(c, "editor-config-lampada")
     c.toque(*ESCOLHER_VARIAVEL, espera=1.3)
-    c.toque(540, 1684, espera=1.6)              # Faca acionada
+    c.toque(540, 1794, espera=1.6)              # Faca acionada
     c.tecla(4, espera=1.2)                      # fecha a configuração
     c.toque(*MAIS_ELEMENTO, espera=1.4)
     c.toque(*PALETA_BOTAO, espera=1.6)
     marco(c, "editor-config-botao")
     c.toque(*ESCOLHER_VARIAVEL_BOTAO, espera=1.3)
     marco(c, "editor-escolha-botao")
-    c.toque(540, 1290, espera=1.6)              # Liga máquina
+    c.toque(540, 1400, espera=1.6)              # Liga máquina
     c.tecla(4, espera=1.2)
     c.toque(*CONCLUIR, espera=3.0)
 
 
-ESCOLHER_VARIAVEL_BOTAO = (540, 1290)
-EQUIP_DEMO = (288, 770)                         # "Cortadora de rótulos" (o form abre na rede)
-ENDERECO = (378, 1928)
+ESCOLHER_VARIAVEL_BOTAO = (540, 1416)
+EQUIP_DEMO = (288, 918)                         # "Cortadora de rótulos" (o form abre na rede)
+ENDERECO = (378, 2088)
 SUGESTAO = (540, 1732)                          # o form rola ao focar o endereço
-DESCARTAR = (794, 1380)                         # "Descartar alterações?" ao sair do form
+DESCARTAR = (540, 1466)                         # "Descartar alterações?" ao sair do form
 
 
 def c_variavel(c: Celular):
@@ -259,7 +262,8 @@ ROTEIRO = [
          # A narração acompanha a ação (~25 s): mais curta, sobravam 10 s de silêncio.
          # Sem "crio", "escolho", "concluo": a voz fecha o -o final e a
          # transcrição ouvia "cri", "escolha", "conclui".
-         narracao="Montar uma tela é tão simples quanto usar. Vou criar uma tela nova, o Painel. "
+         narracao="Montar uma tela é tão simples quanto usar. Vou criar uma tela nova, o Painel, em branco; "
+                  "também dá para começar de um modelo pronto. "
                   "Toco em Elemento, toco na lâmpada e ligo na variável da faca: "
                   "ela já aparece com o valor ao vivo. Depois, um botão ligado em Liga máquina. "
                   "Toco em Concluir, e a tela está pronta. Não existe botão de salvar: tudo fica gravado na hora.",
@@ -287,14 +291,16 @@ ROTEIRO = [
     # O fecho era um cartão só, de 26 s, com os "próximos passos" na tela
     # enquanto a voz falava de outra coisa: virou dois.
     Cena("base", "Por baixo disso tudo", tipo="cartao",
-         narracao="Por baixo disso tudo: quase oitocentos testes automáticos, simulador para testar sem hardware, "
+         narracao="Por baixo disso tudo: quase mil testes automáticos, simulador para testar sem hardware, "
                   "tutorial em cada tela e documentação técnica completa. "
-                  "O app já tem receitas, registro em planilha e alarme falado no fone, "
+                  "O app já tem receitas, registro em planilha, alarme falado no fone, "
+                  "modelos de tela prontos e procura de equipamentos na rede, "
                   "e fala também Siemens S7, OPC UA, MQTT e Arduino, que passam nos testes com simulador.",
-         pontos=["Quase 800 testes automáticos", "Simulador para testar sem hardware",
+         pontos=["Quase 1.000 testes automáticos", "Simulador para testar sem hardware",
                  "Tutorial em cada tela e documentação técnica", "Receitas, planilha e alarme falado no fone",
+                 "Modelos de tela prontos e procura na rede",
                  "Siemens S7, OPC UA, MQTT e Arduino, testados no simulador"],
-         gatilhos=["quase", "simulador", "tutorial", "receitas", "Siemens"]),
+         gatilhos=["quase", "simulador", "tutorial", "receitas", "modelos", "Siemens"]),
     Cena("fecho", "Próximos passos", tipo="cartao",
          narracao="Próximos passos: conferir tudo na cortadora e nas máquinas das marcas parceiras, "
                   "e publicar na Play Store.",

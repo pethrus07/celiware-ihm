@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +9,7 @@ import '../../models/tag.dart';
 import '../../services/alarms/alarm_engine.dart';
 import '../alarms/alarm_widgets.dart';
 import '../../services/runtime/tag_store.dart';
+import '../common/common.dart';
 
 /// Como a tela está sendo usada — os elementos leem daqui.
 class HmiScreenContext extends InheritedWidget {
@@ -146,6 +149,7 @@ class HmiFrame extends StatelessWidget {
     this.padding = const EdgeInsets.fromLTRB(14, 12, 14, 12),
     this.color,
     this.border,
+    this.minBodyWidth = 0,
   });
 
   final String label;
@@ -154,6 +158,11 @@ class HmiFrame extends StatelessWidget {
   final TagReading? reading;
   final bool needsTag;
   final EdgeInsets padding;
+
+  /// Largura que o corpo precisa para continuar legível com o rótulo ao
+  /// lado (elemento de uma linha). Sem ela, o rótulo sobe e o corpo fica
+  /// com a largura toda.
+  final double minBodyWidth;
 
   /// Cor do cartão (nulo = cartão padrão da paleta).
   final Color? color;
@@ -202,42 +211,101 @@ class HmiFrame extends StatelessWidget {
 
     Widget body = child;
     if (lost) body = Opacity(opacity: 0.38, child: body);
+    final content = missing
+        ? _missingNotice()
+        : broken
+            ? _Notice(icon: Icons.report_gmailerrorred_rounded, text: r.message, color: Ind.alarm)
+            : body;
 
-    // Elemento de 1 linha: rótulo ao lado, não em cima. Empilhar os dois numa
-    // célula baixa espremia tudo.
     return LayoutBuilder(builder: (context, box) {
       if (box.maxHeight < 76 && label.isNotEmpty) {
-        // Linha da grade fina (~26 dp): a largura é que aperta. Margem menor e
-        // rótulo numa linha só deixam o número legível.
-        final tight = box.maxHeight < 40;
-        return _panel(
-          borderColor: borderColor,
-          width: bw,
-          padding: EdgeInsets.symmetric(horizontal: tight ? 8 : 14),
-          child: Row(children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: box.maxWidth * (tight ? 0.4 : 0.34)),
-              child: Text(label.toUpperCase(), maxLines: tight ? 1 : 2, overflow: TextOverflow.ellipsis, style: Ind.tag(size: tight ? 10 : 11)),
-            ),
-            SizedBox(width: tight ? 6 : 10),
-            Expanded(
-              child: missing
-                  ? _missingNotice()
-                  : broken
-                      ? _Notice(icon: Icons.report_gmailerrorred_rounded, text: r.message, color: Ind.alarm)
-                      : body,
-            ),
-            if (lost) Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.wifi_off_rounded, size: 14, color: Ind.warn)),
-          ]),
-        );
+        return _oneLine(context, box, borderColor, bw, lost, broken || missing, content);
       }
-      return _stacked(borderColor, bw, lost, broken, missing, r, body);
+      return _stacked(context, box, borderColor, bw, lost, broken, content);
     });
   }
 
   /// "Escolha a variável" — ou, na variável sem endereço, o aviso dela.
   Widget _missingNotice() =>
       tag == null ? _Notice(icon: Icons.link_off_rounded, text: 'Escolha a variável', color: Ind.accent) : const _PendingNotice();
+
+  /// Elemento de uma linha de grade (lâmpada, indicador, barra 3×1 ou 6×1).
+  /// Três arranjos, nesta ordem — o rótulo nunca acaba em "…" no tamanho
+  /// padrão, de 320 a 412 dp:
+  ///
+  ///   1. **ao lado** (como num painel): o rótulo inteiro em até 40% da
+  ///      largura, em até 2 linhas, e o corpo com pelo menos [minBodyWidth];
+  ///   2. **em cima**: não cabendo ao lado, o rótulo ganha a largura toda numa
+  ///      linha e o corpo (LED e estado, número) desce — no celular, "FACA
+  ///      ACIONA…" com um "DESLIGADO" de 7 pt viraram rótulo e estado
+  ///      inteiros e legíveis;
+  ///   3. **ao lado, encolhido**: na grade fina (~26 dp de altura) não há
+  ///      altura para dois andares; o rótulo encolhe até 75% para caber.
+  Widget _oneLine(BuildContext context, BoxConstraints box, Color? borderColor, double bw, bool lost, bool notice, Widget content) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final h = box.maxHeight;
+    final tight = h < 40;
+    final hPad = tight ? 8.0 : 14.0;
+    final gap = tight ? 6.0 : 10.0;
+    final lostW = lost ? 20.0 : 0.0;
+    final inner = box.maxWidth - 2 * hPad - lostW;
+    final text = label.toUpperCase();
+    final style = Ind.tag(size: tight ? 10 : 11);
+    final lostIcon = Padding(padding: const EdgeInsets.only(left: 6), child: Icon(Icons.wifi_off_rounded, size: 14, color: Ind.warn));
+
+    // 1. Ao lado: uma linha se couber no espaço; senão a menor largura em duas.
+    final budget = inner * 0.4;
+    final one = TextFit.width(text, style, scaler: scaler);
+    final lines = one <= budget || tight ? 1 : 2;
+    final need = lines == 1 ? one : TextFit.widthFor(text, style, 2, scaler: scaler);
+    final bodyMin = notice ? 0.0 : minBodyWidth;
+    if (need <= budget && inner - need - gap >= bodyMin) {
+      return _panel(
+        borderColor: borderColor,
+        width: bw,
+        padding: EdgeInsets.symmetric(horizontal: hPad),
+        child: Row(children: [
+          SizedBox(width: need + 1, child: Text(text, maxLines: lines, style: style)),
+          SizedBox(width: gap),
+          Expanded(child: content),
+          if (lost) lostIcon,
+        ]),
+      );
+    }
+
+    // 2. Em cima: rótulo numa linha com a largura toda, corpo embaixo.
+    if (h >= 36) {
+      final (s, _, ok) = TextFit.arrange(text, style, inner, maxLines: 1, minScale: 0.7, scaler: scaler);
+      return _panel(
+        borderColor: borderColor,
+        width: bw,
+        padding: EdgeInsets.fromLTRB(hPad, 5, hPad, 5),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: Text(text, maxLines: 1, overflow: ok ? TextOverflow.clip : TextOverflow.ellipsis, style: s)),
+            if (lost) lostIcon,
+          ]),
+          const SizedBox(height: 2),
+          Expanded(child: content),
+        ]),
+      );
+    }
+
+    // 3. Grade fina: ao lado, com o rótulo encolhido para caber.
+    final w = math.min(one, inner * 0.45);
+    final (s, _, ok) = TextFit.arrange(text, style, w, maxLines: 1, scaler: scaler);
+    return _panel(
+      borderColor: borderColor,
+      width: bw,
+      padding: EdgeInsets.symmetric(horizontal: hPad),
+      child: Row(children: [
+        SizedBox(width: w + 1, child: Text(text, maxLines: 1, overflow: ok ? TextOverflow.clip : TextOverflow.ellipsis, style: s)),
+        SizedBox(width: gap),
+        Expanded(child: content),
+        if (lost) lostIcon,
+      ]),
+    );
+  }
 
   /// Cartão com o acabamento do sistema visual: camada, borda de 1 px,
   /// sombra em duas camadas e brilho no topo ([CardEdge]). A borda de
@@ -251,7 +319,18 @@ class HmiFrame extends StatelessWidget {
         ),
       );
 
-  Widget _stacked(Color? borderColor, double bw, bool lost, bool broken, bool missing, TagReading r, Widget body) {
+  /// Rótulo em cima, corpo embaixo (elemento de duas linhas de grade ou
+  /// mais). Rótulo longo ("TEMPERATURA DO MOTOR" num 3×2 de 320 dp) encolhe
+  /// um pouco ou vai para duas linhas antes de pensar em "…".
+  Widget _stacked(BuildContext context, BoxConstraints box, Color? borderColor, double bw, bool lost, bool broken, Widget content) {
+    final icons = (lost ? 14.0 : 0.0) + (broken ? 14.0 : 0.0);
+    final width = box.maxWidth - padding.horizontal - icons;
+    final text = label.toUpperCase();
+    // Duas linhas só quando sobra altura para o corpo (~40 dp).
+    final room = box.maxHeight - padding.vertical;
+    final (style, lines, ok) = label.isEmpty
+        ? (Ind.tag(size: 11), 1, true)
+        : TextFit.arrange(text, Ind.tag(size: 11), width, maxLines: room >= 58 ? 2 : 1, scaler: MediaQuery.textScalerOf(context));
     return _panel(
       borderColor: borderColor,
       width: bw,
@@ -263,19 +342,13 @@ class HmiFrame extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(label.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: Ind.tag(size: 11)),
+                  child: Text(text, maxLines: lines, overflow: ok ? TextOverflow.clip : TextOverflow.ellipsis, style: style),
                 ),
                 if (lost) Tooltip(message: 'Sem comunicação — mostrando o último valor', child: Icon(Icons.wifi_off_rounded, size: 14, color: Ind.warn)),
                 if (broken) Icon(Icons.error_outline_rounded, size: 14, color: Ind.alarm),
               ],
             ),
-          Expanded(
-            child: missing
-                ? _missingNotice()
-                : broken
-                    ? _Notice(icon: Icons.report_gmailerrorred_rounded, text: r.message, color: Ind.alarm)
-                    : body,
-          ),
+          Expanded(child: content),
         ],
       ),
     );

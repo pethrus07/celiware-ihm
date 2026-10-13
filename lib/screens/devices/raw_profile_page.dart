@@ -310,10 +310,8 @@ class _RawProfilePageState extends State<RawProfilePage> {
     );
   }
 
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(top: Ind.space, bottom: 8),
-        child: Text(text, style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
-      );
+  // O cabeçalho de seção do app, como "Como a mensagem chega".
+  Widget _label(String text) => SectionHeader(text, padding: const EdgeInsets.fromLTRB(0, Ind.space, 0, 10));
 
   Widget _hint(String text) => Padding(
         padding: const EdgeInsets.only(top: 6),

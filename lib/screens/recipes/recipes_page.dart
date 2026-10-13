@@ -219,7 +219,7 @@ class _NewRecipeDialogState extends State<_NewRecipeDialog> {
         ),
         if (machines.length > 1) ...[
           const SizedBox(height: Ind.space),
-          Text('Ler de', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+          const SectionHeader('Ler de', padding: EdgeInsets.zero),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final m in machines)

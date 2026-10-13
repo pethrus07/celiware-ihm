@@ -91,7 +91,7 @@ class S7DeviceOptions extends StatelessWidget {
       Text('Para CLP Siemens com rede: S7-300, 400, 1200 e 1500. No 1200/1500, habilite PUT/GET no TIA Portal.',
           style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
       const SizedBox(height: Ind.space),
-      Text('Família do CLP', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+      const SectionHeader('Família do CLP', padding: EdgeInsets.zero),
       const SizedBox(height: 8),
       Wrap(spacing: 8, runSpacing: 8, children: [
         for (final f in S7Family.values)

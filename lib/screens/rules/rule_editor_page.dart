@@ -20,8 +20,6 @@ import '../../widgets/hmi/live_tags.dart';
 import '../tags/calc_expression_field.dart';
 import 'rules_page.dart';
 
-enum _Leave { save, discard, keep }
-
 /// Cadastro de regra: **Quando** (a condição, escrita como uma conta, com o
 /// estado dela ao vivo), **por quanto tempo**, **então** gravar o quê e onde,
 /// e **como agir** — perguntar antes (padrão) ou gravar sozinha, só para
@@ -225,31 +223,14 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
       Navigator.pop(context);
       return;
     }
-    final choice = await showDialog<_Leave>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        key: const ValueKey('descartar-alteracoes'),
-        title: const Text('Descartar alterações?'),
-        content: const Text('O que foi mudado nesta regra ainda não foi salvo.', style: TextStyle(height: 1.4)),
-        actions: [
-          TextButton(key: const ValueKey('continuar-editando'), onPressed: () => Navigator.pop(ctx, _Leave.keep), child: const Text('Continuar editando')),
-          TextButton(
-            key: const ValueKey('descartar'),
-            style: TextButton.styleFrom(foregroundColor: Ind.textFor(Ind.alarm)),
-            onPressed: () => Navigator.pop(ctx, _Leave.discard),
-            child: const Text('Descartar'),
-          ),
-          FilledButton(key: const ValueKey('salvar-e-sair'), onPressed: () => Navigator.pop(ctx, _Leave.save), child: const Text('Salvar')),
-        ],
-      ),
-    );
+    final choice = await confirmDiscard(context, body: 'O que foi mudado nesta regra ainda não foi salvo.');
     if (!mounted) return;
     switch (choice) {
-      case _Leave.save:
+      case LeaveChoice.save:
         _save();
-      case _Leave.discard:
+      case LeaveChoice.discard:
         Navigator.pop(context);
-      case _Leave.keep || null:
+      case LeaveChoice.keep:
         break;
     }
   }

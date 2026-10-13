@@ -107,9 +107,10 @@ void main() {
     await live(tester, 900);
   }
 
-  /// O texto está na tela e inteiro (sem "…")?
+  /// O texto está na tela e inteiro (sem "…")? Cabeçalho de grupo de opções
+  /// é o SectionHeader do app, em caixa alta.
   void whole(WidgetTester tester, String text) {
-    final f = find.text(text);
+    final f = find.text(text).evaluate().isEmpty ? find.text(text.toUpperCase()) : find.text(text);
     expect(f, findsOneWidget, reason: text);
     expect(tester.renderObject<RenderParagraph>(f).didExceedMaxLines, isFalse, reason: '"$text" cortado com …');
   }

@@ -148,12 +148,24 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
           appBar: AppBar(
             // Topo com o mínimo: nome, ajuda, concluir. As regras da tela
             // descem para a barra de baixo, junto das outras ferramentas.
-            title: Text(screen.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            // O nome da tela inteiro (uma linha, ou duas menores) e o Concluir
+            // na altura de botão da barra (40 dp de desenho, 48 de toque):
+            // no celular, "Cortadora — operação" virava "Cortadora — o…".
+            title: AdaptiveTitle(screen.name),
             actions: [
               const HelpButton(),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: FilledButton(key: _doneKey, onPressed: () => _done(screen), child: const Text('Concluir')),
+                child: FilledButton(
+                  key: _doneKey,
+                  onPressed: () => _done(screen),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(64, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    tapTargetSize: MaterialTapTargetSize.padded,
+                  ),
+                  child: const Text('Concluir'),
+                ),
               ),
             ],
           ),
@@ -298,7 +310,7 @@ class _ScreenSettingsSheet extends StatelessWidget {
             const SizedBox(height: 16),
             // Grade fina: mais variáveis por tela e encaixe mais preciso. A troca
             // não mexe em nada na tela (ver HmiScreen.withColumns).
-            Text('Grade', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+            const SectionHeader('Grade', padding: EdgeInsets.zero),
             const SizedBox(height: 8),
             SegmentedButton<int>(
               key: const ValueKey('grade-da-tela'),

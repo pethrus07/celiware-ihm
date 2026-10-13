@@ -7,6 +7,7 @@ import '../../models/tag.dart';
 import '../../services/alarms/alarm_engine.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../widgets/alarms/alarm_widgets.dart';
+import '../../widgets/common/common.dart';
 
 /// Linha "Alarmes" do cadastro de variável: resumo do que está valendo e
 /// toque para editar. Uma linha só — o cadastro continua enxuto.
@@ -202,7 +203,7 @@ class _RuleCard extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Divider(color: Ind.line),
               const SizedBox(height: 12),
-              Text('QUANDO', style: Ind.tag(size: 11)),
+              const SectionHeader('Quando', padding: EdgeInsets.zero),
               const SizedBox(height: 8),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final k in analog ? const [AlarmKind.above, AlarmKind.below] : const [AlarmKind.on, AlarmKind.off])
@@ -223,7 +224,7 @@ class _RuleCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 16),
-              Text('PRIORIDADE', style: Ind.tag(size: 11)),
+              const SectionHeader('Prioridade', padding: EdgeInsets.zero),
               const SizedBox(height: 8),
               Row(children: [
                 for (final p in AlarmPriority.values) ...[

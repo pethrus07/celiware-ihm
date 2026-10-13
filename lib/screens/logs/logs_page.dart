@@ -302,7 +302,7 @@ class _LogGroupSheetState extends State<LogGroupSheet> {
                         onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: Ind.space),
-                      Text('Gravar ao menos a cada', style: TextStyle(color: Ind.textDim, fontWeight: FontWeight.w600)),
+                      const SectionHeader('Gravar ao menos a cada', padding: EdgeInsets.zero),
                       const SizedBox(height: 8),
                       Wrap(spacing: 8, runSpacing: 8, children: [
                         for (final s in LogGroup.maxGapChoices)
@@ -368,8 +368,5 @@ class _LogGroupSheetState extends State<LogGroupSheet> {
     ].join(' · ');
   }
 
-  static Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(text.toUpperCase(), style: Ind.tag(size: 11)),
-      );
+  static Widget _label(String text) => SectionHeader(text, padding: const EdgeInsets.only(bottom: 10));
 }

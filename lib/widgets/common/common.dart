@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,7 +44,11 @@ class EmptyState extends StatelessWidget {
   }
 }
 
-/// Título de seção em placa (caixa alta condensada).
+/// Título de seção em placa (caixa alta condensada) — o **único** cabeçalho
+/// de seção do app: página, formulário, folha e grupo de opções ("Ordem dos
+/// bytes", "Entrega (QoS)", "Quando"). Dois estilos no mesmo formulário
+/// faziam o leitor procurar uma hierarquia que não existe. O respiro vem
+/// por [padding]; a letra, nunca.
 class SectionHeader extends StatelessWidget {
   const SectionHeader(this.text, {super.key, this.trailing, this.padding = const EdgeInsets.fromLTRB(Ind.page, 28, Ind.page, 12)});
   final String text;
@@ -276,31 +282,97 @@ class StepperField extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        StepButton(icon: Icons.remove_rounded, onTap: () => _bump(-1)),
+        StepButton(icon: Icons.remove_rounded, onTap: () => _bump(-1), tooltip: 'Diminuir'),
         const SizedBox(width: 6),
-        StepButton(icon: Icons.add_rounded, onTap: () => _bump(1)),
+        StepButton(icon: Icons.add_rounded, onTap: () => _bump(1), tooltip: 'Aumentar'),
       ],
     );
   }
 }
 
-/// Botão − / + ao lado de um campo numérico (mesma altura do campo).
+/// O botão − / + do app — e das setas de mover —, um só desenho em todo
+/// lugar: quadrado de cantos arredondados com fundo, da altura do campo
+/// ([size] = 56 × 58). Fundo em vez de contorno: combina com o campo sem
+/// borda ao lado. Antes havia também o círculo de contorno (casas decimais,
+/// largura/altura do elemento), e os dois apareciam no mesmo formulário.
+///
+/// [onTap] nulo = desabilitado (chegou no limite).
 class StepButton extends StatelessWidget {
-  const StepButton({super.key, required this.icon, required this.onTap});
+  const StepButton({super.key, required this.icon, required this.onTap, this.tooltip, this.size = const Size(56, 58)});
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final String? tooltip;
+  final Size size;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 56,
-        height: 58,
-        // Fundo em vez de contorno: combina com o campo sem borda ao lado.
-        child: FilledButton.tonal(
-          onPressed: onTap,
-          style: FilledButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: Ind.surfaceHigh, foregroundColor: Ind.text),
-          child: Icon(icon),
+  Widget build(BuildContext context) {
+    final button = SizedBox.fromSize(
+      size: size,
+      child: FilledButton.tonal(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(Ind.minTouch, Ind.minTouch),
+          backgroundColor: Ind.surfaceHigh,
+          foregroundColor: Ind.text,
+          // Desabilitado (chegou no limite) mantém a forma; só o ícone apaga.
+          disabledBackgroundColor: Ind.surfaceHigh.withValues(alpha: 0.6),
+          disabledForegroundColor: Ind.textMuted.withValues(alpha: 0.5),
         ),
-      );
+        child: Icon(icon),
+      ),
+    );
+    return tooltip == null ? button : Tooltip(message: tooltip, child: button);
+  }
+}
+
+/// Contador "rótulo · valor − +" (casas decimais, largura e altura do
+/// elemento), com o mesmo [StepButton] do campo numérico — os dois convivem
+/// no mesmo formulário e agora se leem como um controle só, com o − e o +
+/// na mesma coluna do [StepperField].
+///
+/// [onDecrease]/[onIncrease] nulos desabilitam o lado que chegou no limite.
+/// Chaves: `$keyPrefix-menos`, `$keyPrefix-mais` e [valueKey] no número.
+class StepperCounter extends StatelessWidget {
+  const StepperCounter({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onDecrease,
+    required this.onIncrease,
+    this.caption,
+    this.keyPrefix,
+    this.valueKey,
+  });
+
+  final String label;
+  final String? caption;
+  final int value;
+  final VoidCallback? onDecrease;
+  final VoidCallback? onIncrease;
+  final String? keyPrefix;
+  final Key? valueKey;
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: TextStyle(color: Ind.text, fontSize: 16)),
+            if (caption != null) ...[
+              const SizedBox(height: 2),
+              Text(caption!, style: TextStyle(color: Ind.textMuted, fontSize: 12.5)),
+            ],
+          ]),
+        ),
+        // O número antes dos botões, e os botões com o mesmo respiro do
+        // campo numérico: num formulário, o − e o + de todos caem na mesma
+        // coluna.
+        SizedBox(width: 48, child: Text('$value', key: valueKey, textAlign: TextAlign.center, style: Ind.number(20))),
+        const SizedBox(width: 6),
+        StepButton(key: keyPrefix == null ? null : ValueKey('$keyPrefix-menos'), icon: Icons.remove_rounded, onTap: onDecrease, tooltip: 'Diminuir'),
+        const SizedBox(width: 6),
+        StepButton(key: keyPrefix == null ? null : ValueKey('$keyPrefix-mais'), icon: Icons.add_rounded, onTap: onIncrease, tooltip: 'Aumentar'),
+      ]);
 }
 
 /// Sugestão que se aplica com um toque ("Parece a notação de manual…",
@@ -329,6 +401,301 @@ class SuggestionTile extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// Medidas de texto com a letra de verdade, para escolher o arranjo (uma ou
+/// duas linhas, um pouco menor, em cima ou ao lado) **antes** de cortar com
+/// "…". Palavra nunca quebra no meio: a mais longa tem que caber inteira.
+abstract final class TextFit {
+  static final Map<String, double> _cache = {};
+
+  static TextPainter _painter(String text, TextStyle style, TextScaler scaler, int? maxLines) =>
+      TextPainter(text: TextSpan(text: text, style: style), textDirection: TextDirection.ltr, textScaler: scaler, maxLines: maxLines);
+
+  static String _key(String what, String text, TextStyle style, TextScaler scaler) =>
+      '$what|$text|${style.fontFamily}|${style.fontWeight?.value}|${style.fontSize}|${style.letterSpacing}|${style.height}|${scaler.scale(100)}';
+
+  static double _remember(String key, double Function() compute) {
+    final hit = _cache[key];
+    if (hit != null) return hit;
+    if (_cache.length > 512) _cache.clear();
+    return _cache[key] = compute();
+  }
+
+  /// Largura do texto numa linha só.
+  static double width(String text, TextStyle style, {TextScaler scaler = TextScaler.noScaling}) =>
+      _remember(_key('w', text, style, scaler), () {
+        final p = _painter(text, style, scaler, null)..layout();
+        final w = p.width;
+        p.dispose();
+        return w;
+      });
+
+  /// Largura da palavra mais longa (o mínimo para nada quebrar no meio).
+  static double longestWord(String text, TextStyle style, {TextScaler scaler = TextScaler.noScaling}) {
+    var w = 0.0;
+    for (final word in text.split(RegExp(r'\s+'))) {
+      if (word.isNotEmpty) w = math.max(w, width(word, style, scaler: scaler));
+    }
+    return w;
+  }
+
+  /// Cabe em [width] com no máximo [maxLines] linhas, sem quebrar palavra?
+  static bool fits(String text, TextStyle style, double width, {int maxLines = 1, TextScaler scaler = TextScaler.noScaling}) {
+    if (width <= 0) return false;
+    if (longestWord(text, style, scaler: scaler) > width + 0.01) return false;
+    // Guardado: o elemento da tela redesenha a cada leitura nova e o rótulo
+    // (e a largura dele) quase nunca muda.
+    return _remember(_key('f$maxLines@${width.toStringAsFixed(1)}', text, style, scaler), () {
+          final p = _painter(text, style, scaler, maxLines)..layout(maxWidth: width);
+          final ok = !p.didExceedMaxLines;
+          p.dispose();
+          return ok ? 1 : 0;
+        }) ==
+        1;
+  }
+
+  /// Menor largura em que o texto cabe em [lines] linhas sem quebrar
+  /// palavra (o rótulo ocupa só o que precisa e o resto fica para o valor).
+  static double widthFor(String text, TextStyle style, int lines, {TextScaler scaler = TextScaler.noScaling}) {
+    final full = width(text, style, scaler: scaler);
+    if (lines <= 1) return full;
+    return _remember(_key('l$lines', text, style, scaler), () {
+      var lo = math.max(longestWord(text, style, scaler: scaler), full / lines), hi = full;
+      if (fits(text, style, lo, maxLines: lines, scaler: scaler)) return lo.ceilToDouble();
+      for (var i = 0; i < 14 && hi - lo > 0.5; i++) {
+        final mid = (lo + hi) / 2;
+        if (fits(text, style, mid, maxLines: lines, scaler: scaler)) {
+          hi = mid;
+        } else {
+          lo = mid;
+        }
+      }
+      return hi.ceilToDouble();
+    });
+  }
+
+  /// O mesmo estilo em [scale] do tamanho (o espaçamento entre letras acompanha).
+  static TextStyle scaled(TextStyle style, double scale) =>
+      style.copyWith(fontSize: (style.fontSize ?? 14) * scale, letterSpacing: style.letterSpacing == null ? null : style.letterSpacing! * scale);
+
+  /// Arranjo de um rótulo em [width]: no tamanho de [style] numa linha; senão
+  /// um pouco menor (até 85%) numa linha; senão em duas linhas ([maxLines]),
+  /// encolhendo até [minScale]. Devolve o estilo, as linhas e se coube —
+  /// `false` é o último recurso (o chamador corta com "…").
+  static (TextStyle, int, bool) arrange(String text, TextStyle style, double width,
+      {int maxLines = 2, double minScale = 0.75, TextScaler scaler = TextScaler.noScaling}) {
+    if (fits(text, style, width, scaler: scaler)) return (style, 1, true);
+    final steps = [for (var s = 0.95; s >= minScale - 1e-9; s -= 0.05) s];
+    for (final s in steps.where((s) => s >= 0.85 - 1e-9)) {
+      final t = scaled(style, s);
+      if (fits(text, t, width, scaler: scaler)) return (t, 1, true);
+    }
+    for (var lines = 2; lines <= maxLines; lines++) {
+      for (final s in [1.0, ...steps]) {
+        final t = scaled(style, s);
+        if (fits(text, t, width, maxLines: lines, scaler: scaler)) return (t, lines, true);
+      }
+    }
+    if (maxLines == 1) {
+      for (final s in steps.where((s) => s < 0.85 - 1e-9)) {
+        final t = scaled(style, s);
+        if (fits(text, t, width, scaler: scaler)) return (t, 1, true);
+      }
+    }
+    return (scaled(style, minScale), maxLines, false);
+  }
+}
+
+/// Peso de um botão de [DecisionDialog]: define cor, estilo e lugar.
+enum DialogActionKind {
+  /// Fecha sem fazer nada ("Continuar editando", "Cancelar").
+  dismiss,
+
+  /// Perde algo ("Descartar", "Apagar") — texto em vermelho.
+  destructive,
+
+  /// A ação recomendada ("Salvar") — o único botão preenchido.
+  primary,
+}
+
+/// Um botão de [DecisionDialog].
+class DialogAction<T> {
+  const DialogAction({required this.label, required this.value, this.kind = DialogActionKind.dismiss, this.key});
+  final String label;
+  final T value;
+  final DialogActionKind kind;
+  final Key? key;
+}
+
+/// Pergunta com até três saídas, no padrão do Material 3: botões de texto e
+/// um só preenchido **numa linha alinhada à direita** — fechar · destrutiva ·
+/// principal — quando cabem; quando não cabem (celular), **empilhados com a
+/// largura toda**, a principal em cima e a de fechar embaixo. Assim nunca
+/// ficam em escada, cada um com uma largura e uma borda (o "Descartar
+/// alterações?" do celular).
+class DecisionDialog<T> extends StatelessWidget {
+  const DecisionDialog({super.key, required this.title, required this.body, required this.actions});
+  final String title;
+  final String body;
+  final List<DialogAction<T>> actions;
+
+  /// Largura máxima do diálogo (Material 3).
+  static const double maxWidth = 560;
+  static const double _gap = 8;
+
+  static TextStyle _textStyle(ThemeData t, DialogActionKind kind) {
+    final base = t.textTheme.labelLarge ?? const TextStyle(fontSize: 14);
+    final own = (kind == DialogActionKind.primary ? t.filledButtonTheme.style : t.textButtonTheme.style)?.textStyle?.resolve(const <WidgetState>{});
+    return base.merge(own);
+  }
+
+  /// Largura de um botão: texto + o respiro lateral do Material (24 no de
+  /// texto, o do tema no preenchido), nunca abaixo do mínimo de toque.
+  static double _buttonWidth(BuildContext context, DialogAction<Object?> a) {
+    final t = Theme.of(context);
+    final w = TextFit.width(a.label, _textStyle(t, a.kind), scaler: MediaQuery.textScalerOf(context));
+    if (a.kind == DialogActionKind.primary) {
+      final pad = t.filledButtonTheme.style?.padding?.resolve(const <WidgetState>{})?.horizontal ?? 48;
+      return math.max(64, w + pad);
+    }
+    return math.max(Ind.minTouch, w + 24);
+  }
+
+  /// Os botões cabem lado a lado em [width]?
+  static bool fitsInRow(BuildContext context, List<DialogAction<Object?>> actions, double width) {
+    var total = _gap * (actions.length - 1);
+    for (final a in actions) {
+      total += _buttonWidth(context, a) + 2; // folga de arredondamento
+    }
+    return total <= width;
+  }
+
+  Widget _button(DialogAction<T> a, BuildContext context, {required bool stretch}) {
+    void tap() => Navigator.pop(context, a.value);
+    final label = Text(a.label, textAlign: TextAlign.center);
+    final Widget b = switch (a.kind) {
+      DialogActionKind.primary => FilledButton(key: a.key, onPressed: tap, child: label),
+      DialogActionKind.destructive => TextButton(key: a.key, style: TextButton.styleFrom(foregroundColor: Ind.textFor(Ind.alarm)), onPressed: tap, child: label),
+      DialogActionKind.dismiss => TextButton(key: a.key, onPressed: tap, child: label),
+    };
+    return stretch ? SizedBox(width: double.infinity, child: b) : b;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dt = Theme.of(context).dialogTheme;
+    // Ordem fixa pelo peso, não pela lista: na linha a principal fica na
+    // ponta direita; empilhado, em cima.
+    final inRow = [
+      for (final k in DialogActionKind.values) ...actions.where((a) => a.kind == k),
+    ];
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: maxWidth),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(title, style: dt.titleTextStyle),
+              const SizedBox(height: 14),
+              // Letra grande no aparelho: o texto rola, os botões ficam.
+              Flexible(child: SingleChildScrollView(child: Text(body, style: dt.contentTextStyle))),
+              const SizedBox(height: 22),
+              LayoutBuilder(
+                builder: (context, box) => fitsInRow(context, inRow, box.maxWidth)
+                    ? Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                        for (final (i, a) in inRow.indexed) ...[
+                          if (i > 0) const SizedBox(width: _gap),
+                          _button(a, context, stretch: false),
+                        ],
+                      ])
+                    : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        for (final (i, a) in inRow.reversed.indexed) ...[
+                          if (i > 0) const SizedBox(height: 6),
+                          _button(a, context, stretch: true),
+                        ],
+                      ]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Resposta do [confirmDiscard].
+enum LeaveChoice {
+  /// Salvar e sair.
+  save,
+
+  /// Sair jogando fora o que mudou.
+  discard,
+
+  /// Ficar no formulário.
+  keep,
+}
+
+/// "Descartar alterações?" ao sair de um formulário com mudança não salva —
+/// a mesma pergunta, com os mesmos três botões no mesmo lugar, em todo
+/// cadastro (variável, calculada, câmera, regra, equipamento). [body] diz o
+/// que se perde ("O que foi mudado nesta câmera ainda não foi salvo.").
+/// Fechar o diálogo por fora é ficar.
+Future<LeaveChoice> confirmDiscard(BuildContext context, {required String body}) async {
+  final r = await showDialog<LeaveChoice>(
+    context: context,
+    builder: (_) => DecisionDialog<LeaveChoice>(
+      key: const ValueKey('descartar-alteracoes'),
+      title: 'Descartar alterações?',
+      body: body,
+      actions: const [
+        DialogAction(key: ValueKey('continuar-editando'), label: 'Continuar editando', value: LeaveChoice.keep),
+        DialogAction(key: ValueKey('descartar'), label: 'Descartar', value: LeaveChoice.discard, kind: DialogActionKind.destructive),
+        DialogAction(key: ValueKey('salvar-e-sair'), label: 'Salvar', value: LeaveChoice.save, kind: DialogActionKind.primary),
+      ],
+    ),
+  );
+  return r ?? LeaveChoice.keep;
+}
+
+/// Título da barra de cima que mostra o nome inteiro: no tamanho do tema
+/// numa linha quando cabe; senão numa linha um pouco menor (até
+/// [twoLineSize]); senão em duas linhas (de [twoLineSize] até [minSize]). Só
+/// um nome que nem assim cabe termina em "…" — "Cortadora — o…" no editor do
+/// celular escondia justamente qual tela se está montando.
+class AdaptiveTitle extends StatelessWidget {
+  const AdaptiveTitle(this.text, {super.key, this.twoLineSize = 18, this.minSize = 15});
+  final String text;
+  final double twoLineSize;
+  final double minSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = DefaultTextStyle.of(context).style;
+    final scaler = MediaQuery.textScalerOf(context);
+    return LayoutBuilder(builder: (context, box) {
+      final w = box.maxWidth;
+      if (!w.isFinite || TextFit.fits(text, base, w, scaler: scaler)) {
+        return Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
+      }
+      for (var size = (base.fontSize ?? 22) - 1; size >= twoLineSize; size -= 1) {
+        final s = base.copyWith(fontSize: size);
+        if (TextFit.fits(text, s, w, scaler: scaler)) return Text(text, style: s, maxLines: 1, overflow: TextOverflow.ellipsis);
+      }
+      var style = base.copyWith(fontSize: minSize, height: 1.1);
+      for (var size = twoLineSize; size >= minSize; size -= 1) {
+        final s = base.copyWith(fontSize: size, height: 1.1);
+        if (TextFit.fits(text, s, w, maxLines: 2, scaler: scaler)) {
+          style = s;
+          break;
+        }
+      }
+      return Text(text, style: style, maxLines: 2, softWrap: true, overflow: TextOverflow.ellipsis);
+    });
+  }
 }
 
 /// Confirmação de ação destrutiva, com o que vai ser perdido escrito.

@@ -216,11 +216,19 @@ número de usuário, logo ou depoimento que não exista.
     sem JavaScript; respeita `prefers-reduced-motion` (FlowFuse Dashboard,
     Home Assistant). Caminho forte, depois: a máquina de demonstração do
     próprio app em build web, carregada só no toque.
+    **Feito (13/10)** em `site/js/demo.js` + `site/css/demo.css`: réplica da "Cortadora —
+    operação" com o comportamento do `demo_process.dart` (tempo acelerado),
+    alarme sozinho acima de 75 °C e "Simular alarme" (superaquece), Reconhecer
+    na faixa, Reset abaixo de 80 °C; Lighthouse do início 99/100/100/100.
 11. **"Veja funcionando":** trechos mudos de 6–12 s do vídeo de apresentação
     em loop dentro do celular (ligar e confirmar; alarme chegando e
     reconhecido; tela sendo montada), carregados só quando aparecem, e
     "Vídeo completo · 3 min" (Arc, Blynk; NN/g 2014). Depende do Pedro
     aprovar o vídeo.
+    **Feito (13/10):** três loops em Recursos (`site/video/`, 106–303 KB cada,
+    `tool/video/trechos_site.py`); o vídeo não mostra o operador reconhecendo
+    o alarme (isso fica no herói). O vídeo completo **ficou como marcador**
+    `#VIDEO-COMPLETO` no herói, até subir no YouTube (`site/README.md`).
 12. **Compatibilidade honesta:** tabela por protocolo e por perfil de marca
     com três estados — conferido em equipamento real · testado em simulador ·
     em breve — e "Seu CLP não está aqui? Fale com a gente" (TagoIO, Datacake;

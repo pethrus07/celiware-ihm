@@ -10,7 +10,7 @@
 //   • título, descrição, canonical, Open Graph e lang="pt-BR";
 //   • nenhum erro no console nem recurso faltando.
 // Os marcadores que o dono ainda vai preencher (#LOJA-…, EMAIL_CONTATO,
-// #WHATSAPP) são listados como aviso, não como falha.
+// #WHATSAPP, #VIDEO-COMPLETO) são listados como aviso, não como falha.
 //
 // O site é servido por HTTP, como na Cloudflare: por file:// o Chrome bloqueia
 // as fontes (CORS) e os caminhos de raiz da 404 ("/favicon.svg") não resolvem —
@@ -38,7 +38,7 @@ const vistas = [
   { nome: '390', width: 390, height: 844, celular: true },
   { nome: '1280', width: 1280, height: 800, celular: false },
 ];
-const MARCADORES = /#LOJA-[A-Z0-9-]+|EMAIL_CONTATO|#WHATSAPP/g;
+const MARCADORES = /#LOJA-[A-Z0-9-]+|EMAIL_CONTATO|#WHATSAPP|#VIDEO-COMPLETO/g;
 
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript',
@@ -174,7 +174,7 @@ const existe = (arquivo) => fs.existsSync(path.join(SITE, arquivo));
             if (!m.meta.og) falhar(p, 'sem og:title');
           }
           for (const href of new Set(m.links)) {
-            if (/^(https?:|mailto:|tel:)/.test(href) || href.startsWith('#LOJA') || href === '#WHATSAPP') continue;
+            if (/^(https?:|mailto:|tel:)/.test(href) || href.startsWith('#LOJA') || href === '#WHATSAPP' || href === '#VIDEO-COMPLETO') continue;
             const [bruto, ancora] = href.replace(/^\//, '').split('#');
             const arquivo = bruto ? resolver(bruto) : '';
             if (arquivo && !existe(arquivo)) { falhar(p, `link para página que não existe: ${href}`); continue; }

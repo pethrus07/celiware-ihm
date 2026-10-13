@@ -15,6 +15,8 @@
 <link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold-Latin1.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/site.css">
 <script src="js/site.js" defer></script>
+<link rel="stylesheet" href="css/demo.css">
+<script src="js/demo.js" defer></script>
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="Ware IoT">
@@ -81,7 +83,14 @@
           </ul>
         </div>
         <div class="bloco__midia bloco__midia--dupla">
-          <div class="celular"><img src="img/operacao.webp" width="540" height="1200" loading="lazy" alt="Tela de operação: status em ciclo, velocidade, botões Liga e Reset, produção, medidor do motor e lâmpadas de porta, faca e papel."></div>
+          <!-- Trecho de vídeo em loop (js/demo.js toca quando aparece; ver README.md, "Veja funcionando"). -->
+          <div class="celular laco" data-titulo="ligar a máquina">
+            <video muted loop playsinline preload="none" controls width="432" height="960" poster="video/ligar.webp"
+              aria-label="Trecho do vídeo, sem som: o operador toca em Liga e confirma; o botão acende quando a máquina confirma, o status vai para Em ciclo e a velocidade sobe até 80 m/min.">
+              <source src="video/ligar.webm" type="video/webm">
+              <source src="video/ligar.mp4" type="video/mp4">
+            </video>
+          </div>
           <div class="celular"><img src="img/graficos.webp" width="540" height="1200" loading="lazy" alt="Mesma tela mais abaixo: barra de tensão do papel, tendência dos últimos 2 minutos e produção por hora."></div>
         </div>
       </article>
@@ -104,7 +113,13 @@
           <p class="dim">Os alarmes são vigiados com o app aberto.</p>
         </div>
         <div class="bloco__midia bloco__midia--dupla">
-          <div class="celular"><img src="img/alarme-na-tela.webp" width="540" height="1200" loading="lazy" alt="Tela de operação em alarme: faixa vermelha no topo com Motor superaquecido, prioridade 1, e marcas de alarme nos elementos da tela."></div>
+          <!-- Trecho de vídeo em loop (js/demo.js toca quando aparece; ver README.md, "Veja funcionando"). -->
+          <div class="celular laco" data-titulo="alarme chegando">
+            <video muted loop playsinline preload="none" controls width="432" height="960" poster="video/alarme.webp"
+              aria-label="Trecho do vídeo, sem som: a porta da máquina abre, a faixa de alarme chega no topo com Porta aberta, prioridade 1, a máquina para e o Liga fica aguardando; depois a porta fecha e o alarme volta ao normal.">
+              <source src="video/alarme.mp4" type="video/mp4">
+            </video>
+          </div>
           <div class="celular"><img src="img/alarmes.webp" width="540" height="1200" loading="lazy" alt="Lista de alarmes ativos: Motor superaquecido (alta), Máquina parada (média) e Motor esquentando (baixa), cada um com Reconhecer."></div>
         </div>
       </article>
@@ -122,7 +137,14 @@
           </ul>
         </div>
         <div class="bloco__midia bloco__midia--dupla">
-          <div class="celular"><img src="img/editor.webp" width="540" height="1200" loading="lazy" alt="Editor em grade, com o botão Liga selecionado e a barra Configurar, duplicar, tirar e acrescentar."></div>
+          <!-- Trecho de vídeo em loop (js/demo.js toca quando aparece; ver README.md, "Veja funcionando"). -->
+          <div class="celular laco" data-titulo="montando a tela">
+            <video muted loop playsinline preload="none" controls width="432" height="960" poster="video/montar.webp"
+              aria-label="Trecho do vídeo, sem som: uma tela nova sendo montada no editor; uma lâmpada e um botão são escolhidos, ligados às variáveis da máquina e já funcionam.">
+              <source src="video/montar.webm" type="video/webm">
+              <source src="video/montar.mp4" type="video/mp4">
+            </video>
+          </div>
           <div class="celular"><img src="img/configurar-elemento.webp" width="540" height="1200" loading="lazy" alt="Configuração do botão: prévia, variável Liga máquina, rótulo e os sete modos de agir, de Liga/desliga a Abrir câmera."></div>
         </div>
       </article>

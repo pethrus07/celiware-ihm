@@ -15,6 +15,8 @@
 <link rel="preload" href="fonts/IBMPlexSansCondensed-SemiBold-Latin1.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/site.css">
 <script src="js/site.js" defer></script>
+<link rel="stylesheet" href="css/demo.css">
+<script src="js/demo.js" defer></script>
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:site_name" content="Ware IoT">
@@ -135,13 +137,18 @@
         </div>
       </div>
       <div class="heroi__midia">
-        <div class="celular celular--atras" aria-hidden="true"><img src="img/alarme-na-tela.webp" width="540" height="1200" alt=""></div>
-        <div class="celular celular--frente">
-          <img src="img/operacao.webp" width="540" height="1200" fetchpriority="high"
-             alt="Tela de operação no Ware IoT: máquina em ciclo a 80 m/min, botões Liga e Reset, contador de produção e medidor de temperatura do motor.">
+        <div class="heroi__aparelhos">
+          <div class="celular celular--atras" aria-hidden="true"><img src="img/alarme-na-tela.webp" width="540" height="1200" alt=""></div>
+          <!-- Com JavaScript, js/demo.js troca o print por uma tela de operação viva (simulação). -->
+          <div class="celular celular--frente" data-demo>
+            <img src="img/operacao.webp" width="540" height="1200" fetchpriority="high"
+               alt="Tela de operação no Ware IoT: máquina em ciclo a 80 m/min, botões Liga e Reset, contador de produção e medidor de temperatura do motor.">
+          </div>
+          <span class="chip chip--ok" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#2FBF71"/><circle cx="12" cy="12" r="10" fill="none" stroke="#2FBF71" stroke-opacity=".35" stroke-width="2"/></svg>Lendo o CLP ao vivo</span>
+          <span class="chip chip--alarme" aria-hidden="true"><svg viewBox="0 0 30 30"><path fill="#F2555A" d="M15 1 29 15 15 29 1 15z"/><text x="15" y="19.5" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">1</text></svg>Alarme na hora</span>
         </div>
-        <span class="chip chip--ok" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#2FBF71"/><circle cx="12" cy="12" r="10" fill="none" stroke="#2FBF71" stroke-opacity=".35" stroke-width="2"/></svg>Lendo o CLP ao vivo</span>
-        <span class="chip chip--alarme" aria-hidden="true"><svg viewBox="0 0 30 30"><path fill="#F2555A" d="M15 1 29 15 15 29 1 15z"/><text x="15" y="19.5" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">1</text></svg>Alarme na hora</span>
+        <!-- #VIDEO-COMPLETO: link do vídeo de apresentação (3 min), a trocar quando estiver no YouTube (ver README.md). -->
+        <p class="heroi__video"><a class="link-seta" href="#VIDEO-COMPLETO">Vídeo completo · 3 min</a></p>
       </div>
     </div>
   </section>

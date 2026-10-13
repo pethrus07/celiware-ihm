@@ -378,7 +378,8 @@ abstract final class TagBatchBuilder {
   static List<BatchItem> _items(Project project, String deviceId, List<Tag> tags) {
     final existing = <String, Tag>{};
     for (final t in project.tags) {
-      if (t.deviceId == deviceId) existing.putIfAbsent(_slot(t), () => t);
+      // Endereço a configurar não ocupa memória nenhuma (o HR 0 dela é só o padrão).
+      if (t.deviceId == deviceId && !t.addressPending) existing.putIfAbsent(_slot(t), () => t);
     }
     return [for (final t in tags) BatchItem(t, existing: existing[_slot(t)])];
   }

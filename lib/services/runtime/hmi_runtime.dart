@@ -171,6 +171,13 @@ class HmiRuntime {
         store.publish(id, const TagReading(quality: TagQuality.configError, message: 'equipamento apagado'));
         continue;
       }
+      // Variável de modelo sem endereço: área e endereço são só o padrão —
+      // ler o HR 0 no lugar dela mostraria um número qualquer como se fosse
+      // o dado.
+      if (tag.addressPending) {
+        store.publish(id, const TagReading(quality: TagQuality.configError, message: pendingMessage));
+        continue;
+      }
       byDevice.putIfAbsent(tag.deviceId, () => []).add(tag);
     }
 
@@ -193,15 +200,23 @@ class HmiRuntime {
 
   // ── Escrita ──────────────────────────────────────────────────────────────────
 
+  /// Motivo publicado para a variável com o endereço a configurar.
+  static const pendingMessage = 'endereço a configurar';
+
   Future<void> write(String tagId, Object value) async {
     final tag = _project.tag(tagId);
     if (tag == null) throw const TagValueError('Variável não encontrada');
+    // Sem endereço, gravar cairia no endereço 0 — o comando iria para outra
+    // memória do equipamento.
+    if (tag.addressPending) throw TagValueError('"${tag.name}" ainda está com o endereço a configurar (em Variáveis).');
     final session = _sessionFor(tag);
     await session.write(tag, value);
   }
 
   /// Botão de pulso apertado: grava 1.
   Future<void> press(String tagId) async {
+    // Sem endereço não grava nada — e não fica nada para soltar depois.
+    if (_project.tag(tagId)?.addressPending ?? false) return write(tagId, true);
     _pressed.add(tagId);
     _pendingRelease.remove(tagId);
     await write(tagId, true);
@@ -210,6 +225,10 @@ class HmiRuntime {
   /// Botão de pulso solto: grava 0 (e insiste se falhar).
   Future<void> release(String tagId) async {
     _pressed.remove(tagId);
+    if (_project.tag(tagId)?.addressPending ?? false) {
+      _pendingRelease.remove(tagId);
+      return;
+    }
     try {
       await write(tagId, false);
       _pendingRelease.remove(tagId);
@@ -242,6 +261,7 @@ class HmiRuntime {
   /// painel "lendo agora" do cadastro de variável. A demonstração precisa do
   /// processo rodando para os valores se mexerem.
   Future<Object> readNow(Tag tag) async {
+    if (tag.addressPending) throw TagValueError('"${tag.name}" ainda está com o endereço a configurar (em Variáveis).');
     final session = _sessionFor(tag);
     if (session.device.isDemo) DemoRegistry.forDevice(session.device.id).start();
     return session.readOnce(tag);

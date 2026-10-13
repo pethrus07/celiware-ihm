@@ -1,7 +1,8 @@
 # Site do Ware IoT
 
-Site do produto: HTML e CSS estáticos, sem framework, sem build e sem
-JavaScript. Mobile primeiro, tema claro e escuro pelo sistema, com as cores e a
+Site do produto: HTML e CSS estáticos, sem framework e sem build; JavaScript
+só como camada extra (o site funciona sem ele — ver "Herói vivo e 'Veja
+funcionando'"). Mobile primeiro, tema claro e escuro pelo sistema, com as cores e a
 fonte do app (`docs/ARQUITETURA.md` §8). Requisitos: `docs/REQUISITOS-ETAPA4.md` §6.
 
 | Página | Arquivo | Endereço |
@@ -40,6 +41,7 @@ botões "Ver na loja" e o e-mail não levam a lugar nenhum.
 | `EMAIL_CONTATO` | e-mail público (o mesmo cadastrado na Play) | privacidade, contato |
 | `#WHATSAPP` | `https://wa.me/55` + DDD + número (opcional) | contato; sem WhatsApp, apague o bloco marcado no HTML |
 | `https://ware-iot.pages.dev` | domínio definitivo, sem barra no fim | canonical, Open Graph, JSON-LD, `sitemap.xml`, `robots.txt` |
+| `#VIDEO-COMPLETO` | link do vídeo de apresentação completo (3 min) no YouTube | herói do início ("Vídeo completo · 3 min") |
 
 O link da Google Play já é o definitivo
 (`https://play.google.com/store/apps/details?id=com.celiware.ihm`); passa a
@@ -72,6 +74,7 @@ $troca = [ordered]@{
   '#LOJA-REPETIDOR'            = 'https://LOJA/products/REPETIDOR'
   'EMAIL_CONTATO'              = 'contato@DOMINIO'
   '#WHATSAPP'                  = 'https://wa.me/55DDDNUMERO'
+  '#VIDEO-COMPLETO'            = 'https://www.youtube.com/watch?v=VIDEO'
   'https://ware-iot.pages.dev' = 'https://DOMINIO'
 }
 Get-ChildItem site -Recurse -Include *.html, *.xml, *.txt | ForEach-Object {
@@ -84,11 +87,59 @@ Get-ChildItem site -Recurse -Include *.html, *.xml, *.txt | ForEach-Object {
 Conferir se sobrou algum:
 
 ```powershell
-Select-String -Path site\*.html, site\*.xml, site\*.txt -Pattern '#LOJA-|EMAIL_CONTATO|#WHATSAPP|ware-iot\.pages\.dev'
+Select-String -Path site\*.html, site\*.xml, site\*.txt -Pattern '#LOJA-|EMAIL_CONTATO|#WHATSAPP|#VIDEO-COMPLETO|ware-iot\.pages\.dev'
 ```
 
 (Os comentários no topo de cada página citam os marcadores; tudo bem se
 aparecerem só ali.)
+
+## Herói vivo e "Veja funcionando" (13/10/2026)
+
+O único JavaScript desta parte é `js/demo.js` (com `css/demo.css`, ligado no
+`<head>` do início e de Recursos). Sem JavaScript, tudo continua: o print no
+herói e os vídeos com os controles do navegador.
+
+**Herói interativo (início).** O `demo.js` troca o print `img/operacao.webp`
+(que fica no HTML como reserva) por uma réplica em HTML da tela "Cortadora —
+operação" da máquina de demonstração, com as cores do tema escuro do app e as
+medidas do próprio print (1em = 10 px do print; a tela escala com o celular por
+container query). O comportamento segue `lib/services/demo/demo_process.dart`,
+com o tempo acelerado: LIGA fica **aguardando** (borda e ampulheta) ~0,6 s e
+acende quando a máquina confirma (EM CICLO); a velocidade sobe em rampa até 80
+m/min, a produção conta, o motor esquenta com a velocidade. Acima de 75 °C
+chega sozinho o alarme "Motor esquentando" (prioridade 3, quadrado); o botão
+**Simular alarme**, abaixo do celular, superaquece o motor: "Motor
+superaquecido" (prioridade 1, losango), a máquina para, o LIGA fica aguardando
+e, depois de 5 s, **SEM RETORNO**; "Máquina parada: dê Reset" (prioridade 2,
+triângulo). Cada alarme chega na faixa do topo com forma e número e o
+visitante toca **Reconhecer**; o RESET só limpa abaixo de 80 °C e a máquina
+volta. Etiqueta abaixo do celular: "Simulação — no app, os valores vêm do
+CLP". Acessível: LIGA, RESET, Reconhecer e Simular alarme são `<button>` com
+nome e foco visível, todos com 48 px ou mais (LIGA/RESET ~76 px em 360 px de
+tela); as mudanças de estado são anunciadas numa região `aria-live`. Com
+`prefers-reduced-motion`, nada pisca nem anima e os valores mudam em degraus de
+1 s. A simulação para quando sai da tela ou a aba fica escondida.
+
+**Trechos de vídeo (Recursos).** Três loops mudos, só a tela do celular
+recortada do vídeo de apresentação, um em cada bloco (no lugar de um dos dois
+prints): `video/ligar` (Operar, 10 s: toca em LIGA, confirma, acende),
+`video/alarme` (Alarmes, 10,5 s: a porta abre, a faixa "Porta aberta"
+chega e volta ao normal — o vídeo não mostra ninguém tocando em Reconhecer; o
+reconhecer está no herói) e `video/montar` (Monte a tela, 11,4 s, 1,4×: lâmpada
+e botão escolhidos e já funcionando). `preload="none"` + capa WebP; tocam
+quando aparecem (IntersectionObserver) e param quando saem; botão de
+pausa/tocar de 48 px; com `prefers-reduced-motion` não tocam sozinhos. WebM só
+onde ficou menor que o MP4 (ligar e montar). Pesos: ligar 159 KB (MP4) / 138 KB
+(WebM), alarme 106 KB, montar 303 KB / 222 KB; capas 11–18 KB. Para refazer:
+`python tool/video/trechos_site.py` (lê `tool/video/saida/ware-iot-apresentacao.mp4`,
+que fica fora do git). O vídeo completo (12 MB) não vai para o site: o link
+"Vídeo completo · 3 min" usa o marcador `#VIDEO-COMPLETO` (tabela acima), para
+o YouTube.
+
+**Medido (13/10, Lighthouse 12.8 celular, servidor local):** início 99 / 100 /
+100 / 100 (LCP 2,0 s, CLS 0, TBT 10 ms, 234 KB); Recursos 100 / 100 / 100 / 100
+(LCP 1,9 s, CLS 0, 256 KB — os vídeos só baixam quando aparecem).
+`demo.js` 19 KB (6,7 KB com gzip), `demo.css` 20 KB (5,6 KB com gzip).
 
 ## Publicar no Cloudflare Pages
 

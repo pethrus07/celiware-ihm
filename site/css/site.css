@@ -444,20 +444,21 @@ button.botao { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
 .aparelho-iphone .chamada__iphone { display: block; }
 .aparelho-iphone .selo-play { display: none; }
 
-.qr { display: none; }
+/* O cartão vale em qualquer largura: computador com janela estreita também o mostra */
+.qr {
+  display: none;
+  align-items: center;
+  gap: 16px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 24px;
+  padding: 12px 20px 12px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
 @media (min-width: 760px) {
-  .qr {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    width: fit-content;
-    max-width: 100%;
-    margin-top: 24px;
-    padding: 12px 20px 12px 12px;
-    border-radius: var(--radius);
-    background: var(--surface);
-    border: 1px solid var(--border);
-  }
+  .qr { display: flex; }
 }
 .aparelho-pc .qr { display: flex; }
 .aparelho-android .qr,

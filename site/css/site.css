@@ -69,7 +69,7 @@
   --max: 1080px;
   --space: 16px;
   --space-l: 28px;
-  --section: clamp(56px, 9vw, 112px);
+  --section: clamp(48px, 6vw, 80px);
   --radius: 16px;
   --radius-in: 10px;
 }
@@ -501,8 +501,16 @@ button.botao { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
   -webkit-text-fill-color: transparent;
 }
 
+/* No computador o herói cabe numa tela: pouco respiro em cima (o cabeçalho
+   já dá 72 px) e o celular medido pela altura da janela (abaixo). */
 @media (min-width: 760px) {
-  .heroi { grid-template-columns: 1.1fr 0.9fr; }
+  .heroi {
+    grid-template-columns: 1.1fr 0.9fr;
+    align-items: start;
+    padding-block: clamp(8px, 2vw, 24px) clamp(48px, 6vw, 80px);
+  }
+  /* Texto começa junto do topo do celular, não centrado nele */
+  .heroi > :first-child { padding-top: clamp(16px, 4svh, 48px); }
 }
 
 /* Celular em CSS: moldura metálica + print real + brilho verde-água */
@@ -523,18 +531,30 @@ button.botao { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
 .celular--p img { border-radius: 30px; }
 
 /* Herói: o print grande na frente, um segundo atrás e dois selos soltos */
+/* Embaixo do celular, numa linha só: "Simular alarme" e "Vídeo completo"
+   (a etiqueta da simulação ocupa a linha de cima). */
 .heroi__midia {
   position: relative;
-  display: grid;
-  place-items: center;
-  padding-block: 8px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 20px;
+  padding-top: 8px;
 }
-.heroi__midia .celular--frente { position: relative; z-index: 2; width: min(80vw, 340px); }
+.heroi__midia { --cel: min(80vw, 340px); }
+/* O quadro tem a largura do celular da frente: o de trás e os selos se
+   posicionam em relação a ele, qualquer que seja o tamanho. */
+.heroi__aparelhos + .heroi__video { flex-basis: 100%; text-align: center; }
+.heroi__midia .celular--frente { position: relative; z-index: 2; width: 100%; }
 .celular--atras,
 .chip { display: none; }
 
+/* Altura do celular = 2,22 × a largura + moldura. O que vai acima e abaixo
+   dele (cabeçalho, respiro, etiqueta e a linha de controles) soma ~232 px:
+   o que sobra da janela vira celular, entre 240 e 340 px de largura. */
 @media (min-width: 760px) {
-  .heroi__midia .celular--frente { width: min(100%, 340px); }
+  .heroi__midia { --cel: min(clamp(240px, (100svh - 232px) * 0.45, 340px), (100vw - 120px) * 0.45); }
 }
 @media (min-width: 960px) {
   .celular--atras {
@@ -882,10 +902,10 @@ button.botao { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
 }
 
 /* ── Páginas internas ─────────────────────────────────────────────────── */
-.cabeca { padding-block: clamp(32px, 6vw, 72px) clamp(40px, 6vw, 72px); }
+.cabeca { padding-block: clamp(24px, 3vw, 40px) clamp(40px, 5vw, 64px); }
 .cabeca h1 { font-size: clamp(2.1rem, 1.6rem + 2.6vw, 3.25rem); max-width: 14em; }
 /* Logo abaixo do palco, a primeira seção não precisa de respiro extra em cima */
-.palco--cabeca + .secao--alto { padding-top: clamp(40px, 6vw, 72px); }
+.palco--cabeca + .secao--alto { padding-top: clamp(40px, 5vw, 64px); }
 
 .atalhos {
   display: flex;

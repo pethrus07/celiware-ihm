@@ -376,19 +376,10 @@
 }
 
 /* Etiqueta e controle "Simular alarme", abaixo do celular */
-.dm-controles {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px 16px;
-  max-width: 340px;
-  margin-top: 18px;
-  text-align: center;
-}
-.dm-etiqueta { flex-basis: 100%; margin: 0; font-size: 0.875rem; line-height: 1.4; color: var(--text-dim); }
+/* Os filhos entram direto no .heroi__midia (flex): o botão fica na mesma
+   linha do "Vídeo completo". */
+.dm-controles { display: contents; }
+.dm-etiqueta { flex-basis: 100%; margin: 12px 0 0; font-size: 0.875rem; line-height: 1.4; color: var(--text-dim); text-align: center; }
 .dm-simular {
   min-height: 48px;
   padding: 0 20px;
@@ -479,7 +470,9 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 100%;
+  flex: none;
+  width: var(--cel, 100%);
+  max-width: 100%;
 }
 /* Com a demo, os selos saem de cima do que muda e do que se toca: "Lendo o
    CLP" vai para o pé do celular (o gráfico cortado) e "Alarme na hora" para a

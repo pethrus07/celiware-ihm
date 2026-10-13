@@ -167,7 +167,9 @@ class HistoryPainter extends CustomPainter {
     final tp = TextPainter(textDirection: TextDirection.ltr);
     final span = toMs - fromMs;
     for (final (frac, align) in const [(0.0, 0.0), (0.5, 0.5), (1.0, 1.0)]) {
-      tp.text = TextSpan(text: axisTime(fromMs + (span * frac).round(), span), style: TextStyle(fontSize: 10, color: Ind.textMuted));
+      // Mesma letra dos números do eixo (sem família, o pintor caía na letra
+      // do sistema e a régua de baixo destoava da do lado).
+      tp.text = TextSpan(text: axisTime(fromMs + (span * frac).round(), span), style: TextStyle(fontFamily: Ind.mono, fontSize: 10, color: Ind.textMuted));
       tp.layout();
       tp.paint(canvas, Offset(plot.left + plot.width * frac - tp.width * align, plot.bottom + 4));
     }

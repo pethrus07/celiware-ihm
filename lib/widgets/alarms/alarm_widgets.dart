@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/app_scope.dart';
@@ -10,7 +9,10 @@ import '../../core/theme/app_theme.dart';
 import '../../models/alarm.dart';
 import '../../screens/alarms_page.dart';
 import '../../services/alarms/alarm_engine.dart';
+import '../../services/rules/rule_engine.dart';
+import '../rules/rule_proposal_host.dart';
 import 'silence_button.dart';
+import 'top_band.dart';
 
 /// Cor reservada de cada prioridade (ISA-18.2 §11.4.3): vermelho, laranja,
 /// amarelo — em ordem de urgência, e só alarme usa laranja.
@@ -119,18 +121,33 @@ class _ShapePainter extends CustomPainter {
   bool shouldRepaint(_ShapePainter o) => o.priority != priority || o.filled != filled || o.rev != rev;
 }
 
-/// Faixa fixa no topo do app, acima de todas as telas, enquanto houver
-/// alarme ativo ou esperando reconhecimento. Mostra o mais grave; toque abre
-/// a lista. Vibra quando um alarme novo entra (no chão de fábrica o som não
-/// funciona — ISA-18.2 §11.3.4 pede indicação visual sempre à vista).
+/// Faixa de atenção no topo do app, acima de todas as telas e **sempre no
+/// mesmo lugar** (ISA-101: a área de alarme é fixa em toda tela). Mostra,
+/// nesta ordem:
+///   1. o alarme mais grave **não reconhecido** (ISA-18.2 §11.3.4: alarme só
+///      na tela que ninguém está olhando não é alarme);
+///   2. a pergunta de uma regra (LG-6): "Parar a prensa?";
+///   3. o alarme já reconhecido que continua ativo, discreto;
+///   4. "Sem alarmes", quieta.
+/// O que fica atrás vira marca na própria faixa: a pergunta esperando atrás
+/// de um alarme novo, o alarme reconhecido atrás da pergunta.
+///
+/// **O espaço é reservado o tempo todo**, com altura fixa ([TopBand]): o que
+/// entra ou sai troca o que está dentro da faixa, nunca a posição das telas.
+/// Antes a faixa só ocupava espaço com alarme: quando ele chegava, a tela
+/// descia ~70 dp e o toque seguinte (Liga, Confirmar, Salvar) caía em outro
+/// lugar — o "pulo da tela" do QA. A outra saída, faixa por cima sem
+/// reservar, não desloca nada, mas cobre a barra de título (voltar, editar,
+/// ajuda) justo quando há alarme. Reservar custa 56 dp em pé (48 deitado) em
+/// toda tela; em troca, nenhum alvo de toque muda de lugar nem fica coberto
+/// por causa de um alarme ou de uma pergunta — com ou sem diálogo aberto.
+///
+/// Toque abre a lista de alarmes (ou a pergunta). Vibra quando um alarme novo
+/// entra (no chão de fábrica o som não funciona).
 class AlarmBannerHost extends StatefulWidget {
   const AlarmBannerHost({super.key, required this.navigator, required this.child});
   final GlobalKey<NavigatorState> navigator;
   final Widget child;
-
-  /// Vai em `MaterialApp.navigatorObservers`: sabe quando a página de
-  /// alarmes está no topo (a faixa se esconde lá).
-  static final observer = AlarmsRouteObserver();
 
   @override
   State<AlarmBannerHost> createState() => _AlarmBannerHostState();
@@ -139,17 +156,8 @@ class AlarmBannerHost extends StatefulWidget {
 class _AlarmBannerHostState extends State<AlarmBannerHost> {
   AlarmEngine? _engine;
 
-  /// A faixa ocupa espaço no layout (as telas começam abaixo dela)?
-  ///
-  /// Muda junto com a faixa, **menos** com um diálogo, folha ou menu aberto:
-  /// encolher ou esticar as telas nessa hora recentraliza o diálogo, e o
-  /// toque mirado no "Confirmar" caía no vazio (o "pulo da tela" do QA).
-  /// Com o diálogo aberto, a faixa que chega aparece por cima, sem empurrar
-  /// nada, e a que sai deixa o espaço vazio até ele fechar.
-  bool _reserved = false;
-
-  /// Altura da última faixa no layout: o espaço guardado depois que ela sai.
-  double _lastHeight = 0;
+  /// A pergunta já está aberta (dois toques seguidos não abrem duas).
+  bool _asking = false;
 
   @override
   void didChangeDependencies() {
@@ -164,8 +172,6 @@ class _AlarmBannerHostState extends State<AlarmBannerHost> {
   @override
   void dispose() {
     _engine?.newAlarm.removeListener(_buzz);
-    // O Navigator some sem avisar o observador: zera para o próximo app/teste.
-    AlarmBannerHost.observer.reset();
     super.dispose();
   }
 
@@ -186,124 +192,77 @@ class _AlarmBannerHostState extends State<AlarmBannerHost> {
     if (!onPage) nav.push(AlarmsPage.route());
   }
 
+  Future<void> _ask(RuleEngine rules) async {
+    final nav = widget.navigator.currentState;
+    final p = rules.proposals.firstOrNull;
+    if (nav == null || p == null || _asking) return;
+    _asking = true;
+    try {
+      await RuleProposalDialog.open(nav, rules: rules, proposal: p);
+    } finally {
+      _asking = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final engine = AppScope.of(context).alarms;
-    final observer = AlarmBannerHost.observer;
+    final scope = AppScope.of(context);
+    final engine = scope.alarms;
+    final rules = scope.rules;
     return ListenableBuilder(
-      listenable: Listenable.merge([engine, observer.onAlarmsPage, observer.popupOnTop]),
+      listenable: Listenable.merge([engine, ?rules]),
       builder: (context, _) {
         final list = engine.entries;
-        // Na própria página de alarmes a faixa só repetiria o que está na tela.
-        final show = list.isNotEmpty && !observer.onAlarmsPage.value;
-        Widget? banner;
-        if (show) {
+        final proposals = rules?.proposals ?? const <RuleProposal>[];
+        final Widget band;
+        if (list.isNotEmpty && (engine.unackCount > 0 || proposals.isEmpty)) {
           // Na faixa vai o que PEDE AÇÃO: o não reconhecido mais grave; só
           // depois o mais grave já reconhecido.
           final top = list.firstWhere((e) => e.phase.unacked, orElse: () => list.first);
-          banner = _Banner(top: top, count: list.length, unack: engine.unackCount, onTap: _open);
-        }
-        final popup = observer.popupOnTop.value;
-        if (!popup) _reserved = show;
-        final Widget slot;
-        if (!_reserved) {
-          slot = const SizedBox.shrink();
-        } else if (!popup) {
-          slot = _Measured(onHeight: (h) => _lastHeight = h, child: banner!);
-        } else {
-          // Diálogo aberto: o espaço fica com a altura de antes dele. A faixa
-          // pode mudar (reconhecida, outro alarme) ou sair sem mexer em nada
-          // abaixo; o espaço vazio some quando o diálogo fecha.
-          slot = SizedBox(
-            height: _lastHeight,
-            child: banner == null
-                ? ColoredBox(color: Ind.bg)
-                : ClipRect(child: OverflowBox(alignment: Alignment.topCenter, minHeight: 0, maxHeight: double.infinity, child: banner)),
+          band = _Banner(
+            top: top,
+            count: list.length,
+            unack: engine.unackCount,
+            onTap: _open,
+            waiting: proposals.length,
+            onAsk: rules == null ? null : () => _ask(rules),
           );
+        } else if (proposals.isNotEmpty) {
+          band = RuleProposalBand(
+            key: const ValueKey('proposta-regra'),
+            proposal: proposals.first,
+            more: proposals.length - 1,
+            onTap: () => _ask(rules!),
+            // Alarme reconhecido e ainda ativo: continua à vista (ISA-18.2),
+            // como marca ao lado da pergunta.
+            behind: list.isEmpty ? null : ElementAlarmBadge(entry: list.first),
+          );
+        } else {
+          band = _Quiet(onTap: _open);
         }
-        // Estrutura fixa (pilha → coluna → telas): a faixa entrar ou sair
-        // nunca recria as telas de baixo.
-        return Stack(fit: StackFit.expand, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            slot,
-            // A faixa já ocupou a área da barra de status: as telas abaixo
-            // não podem reservá-la de novo.
-            Expanded(child: MediaQuery.removePadding(context: context, removeTop: _reserved, child: widget.child)),
-          ]),
-          if (!_reserved && banner != null) Positioned(top: 0, left: 0, right: 0, child: banner),
+        // Estrutura fixa (coluna → faixa + telas): a faixa trocar de conteúdo
+        // nunca recria nem move as telas de baixo.
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SizedBox(height: TopBand.slotOf(context), child: band),
+          // A faixa já ocupou a área da barra de status: as telas abaixo
+          // não podem reservá-la de novo.
+          Expanded(child: MediaQuery.removePadding(context: context, removeTop: true, child: widget.child)),
         ]);
       },
     );
   }
 }
 
-/// Anota a altura do filho a cada layout (sem reconstruir nada).
-class _Measured extends SingleChildRenderObjectWidget {
-  const _Measured({required this.onHeight, required super.child});
-  final ValueChanged<double> onHeight;
-
-  @override
-  RenderObject createRenderObject(BuildContext context) => _RenderMeasured(onHeight);
-
-  @override
-  void updateRenderObject(BuildContext context, _RenderMeasured renderObject) => renderObject.onHeight = onHeight;
-}
-
-class _RenderMeasured extends RenderProxyBox {
-  _RenderMeasured(this.onHeight);
-  ValueChanged<double> onHeight;
-
-  @override
-  void performLayout() {
-    super.performLayout();
-    onHeight(size.height);
-  }
-}
-
-/// Observa a pilha de telas para saber se a página de alarmes está no topo
-/// e se há um diálogo, folha ou menu aberto (rota "popup") por cima.
-class AlarmsRouteObserver extends NavigatorObserver {
-  final ValueNotifier<bool> onAlarmsPage = ValueNotifier(false);
-  final ValueNotifier<bool> popupOnTop = ValueNotifier(false);
-
-  bool _alarms = false;
-  bool _popup = false;
-
-  /// Sem Navigator (app desmontado): volta ao começo.
-  void reset() {
-    _alarms = _popup = false;
-    onAlarmsPage.value = false;
-    popupOnTop.value = false;
-  }
-
-  void _top(Route<dynamic>? r) {
-    _alarms = r?.settings.name == AlarmsPage.routeName;
-    _popup = r is PopupRoute;
-    // Adiado: a troca de rota acontece no meio de um build. Vale sempre a
-    // última troca — folha que fecha e diálogo que abre em seguida (o
-    // teclado do Ajuste → "Confirmar") caem antes da primeira atualização.
-    scheduleMicrotask(() {
-      onAlarmsPage.value = _alarms;
-      popupOnTop.value = _popup;
-    });
-  }
-
-  @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _top(route);
-  @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _top(previousRoute);
-  @override
-  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) => _top(previousRoute);
-  @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) => _top(newRoute);
-}
-
 class _Banner extends StatelessWidget {
-  const _Banner({required this.top, required this.count, required this.unack, required this.onTap});
+  const _Banner({required this.top, required this.count, required this.unack, required this.onTap, this.waiting = 0, this.onAsk});
   final AlarmEntry top;
   final int count;
   final int unack;
   final VoidCallback onTap;
+
+  /// Perguntas de regra esperando atrás deste alarme.
+  final int waiting;
+  final VoidCallback? onAsk;
 
   @override
   Widget build(BuildContext context) {
@@ -315,62 +274,76 @@ class _Banner extends StatelessWidget {
     // Sem o valor do disparo: congelado na faixa, ele desmentia o elemento
     // da tela, que mostra o valor de agora.
     final sub = '${top.phase.label} · desde ${_hhmm(top.since)}';
-    // Deitado, a altura é o recurso escasso: faixa numa linha só.
-    final compact = MediaQuery.orientationOf(context) == Orientation.landscape;
-    return Material(
+    final compact = TopBand.compact(context);
+    const h = TopBand.lineHeight;
+    return TopBand(
       key: const ValueKey('faixa-alarme'),
       color: Color.alphaBlend(c.withValues(alpha: !loud || returned ? 0.07 : (Ind.isDark ? 0.18 : 0.14)), Ind.raised),
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.withValues(alpha: loud && !returned ? 0.8 : 0.35), width: loud ? 2 : 1))),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              // Mais alta que o necessário: o alto da tela é a área mais
-              // difícil de acertar com o dedo (e o toque no alto demais cai
-              // na barra de status do Android).
-              padding: EdgeInsets.fromLTRB(16, compact ? 8 : 14, 10, compact ? 8 : 14),
-              child: Row(children: [
-                AlarmShape(priority: top.priority, size: compact ? 24 : 30, blinking: top.phase.unacked),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: compact
-                      ? Text.rich(
-                          TextSpan(children: [
-                            TextSpan(text: top.message, style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 17, color: returned ? Ind.textDim : Ind.text)),
-                            TextSpan(text: '   $sub', style: TextStyle(color: Ind.textDim, fontSize: 12.5)),
-                          ]),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      : Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                          Text(top.message,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 18, color: returned ? Ind.textDim : Ind.text)),
-                          const SizedBox(height: 2),
-                          Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textDim, fontSize: 12.5)),
-                        ]),
-                ),
-                SilenceButton(entry: top, compact: true),
-                if (count > 1)
-                  Container(
-                    margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(color: Ind.surfaceHigh, borderRadius: BorderRadius.circular(20)),
-                    child: Text('+${count - 1}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Ind.text)),
-                  ),
-                Icon(Icons.chevron_right_rounded, color: Ind.textMuted),
-              ]),
-            ),
-          ),
+      line: c.withValues(alpha: loud && !returned ? 0.8 : 0.35),
+      lineWidth: loud ? 2 : 1,
+      onTap: onTap,
+      child: Row(children: [
+        AlarmShape(priority: top.priority, size: TopBandLead.sizeOf(context), blinking: top.phase.unacked),
+        const SizedBox(width: 14),
+        Expanded(
+          child: compact
+              ? Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: top.message, style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 17, height: h, color: returned ? Ind.textDim : Ind.text)),
+                    TextSpan(text: '   $sub', style: TextStyle(color: Ind.textDim, fontSize: 12.5, height: h)),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                )
+              : Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  Text(top.message,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontFamily: Ind.condensed, fontWeight: FontWeight.w700, fontSize: 18, height: h, color: returned ? Ind.textDim : Ind.text)),
+                  const SizedBox(height: 2),
+                  Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textDim, fontSize: 12.5, height: h)),
+                ]),
         ),
-      ),
+        SilenceButton(entry: top, compact: true),
+        if (count > 1)
+          Container(
+            margin: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(color: Ind.surfaceHigh, borderRadius: BorderRadius.circular(20)),
+            child: Text('+${count - 1}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Ind.text)),
+          ),
+        if (waiting > 0 && onAsk != null) RuleProposalMarker(count: waiting, onTap: onAsk!),
+        Icon(Icons.chevron_right_rounded, color: Ind.textMuted),
+      ]),
     );
   }
 
   static String _hhmm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+}
+
+/// A faixa sem nada a mostrar: o lugar continua reservado e diz, em cinza,
+/// que está tudo quieto (ISA-101: o normal não chama atenção). Toque abre a
+/// lista de alarmes — e dela o histórico.
+class _Quiet extends StatelessWidget {
+  const _Quiet({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TopBand(
+      key: const ValueKey('faixa-quieta'),
+      color: Ind.bg,
+      onTap: onTap,
+      child: Row(children: [
+        TopBandLead(child: Icon(Icons.notifications_none_rounded, size: 20, color: Ind.textMuted)),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text('Sem alarmes', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Ind.textMuted, fontSize: 14, height: TopBand.lineHeight)),
+        ),
+        Icon(Icons.chevron_right_rounded, color: Ind.textMuted),
+      ]),
+    );
+  }
 }
 
 /// Sino no topo das telas: abre a lista de alarmes (também o histórico,

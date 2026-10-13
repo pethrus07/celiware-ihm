@@ -182,10 +182,10 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
         supportedLocales: const [Locale('pt', 'BR')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         navigatorKey: _navigator,
-        navigatorObservers: [AlarmBannerHost.observer],
-        // Faixa de alarme acima de TODAS as telas: alarme só na tela que
-        // ninguém está olhando não é alarme (ISA-18.2 §11.3.4).
-        // A pergunta de uma regra ("Parar a prensa?") também, embaixo.
+        // Faixa do topo acima de TODAS as telas, com espaço sempre
+        // reservado: alarme só na tela que ninguém está olhando não é alarme
+        // (ISA-18.2 §11.3.4). A pergunta de uma regra ("Parar a prensa?")
+        // usa a mesma faixa; o RuleProposalHost só vibra quando ela chega.
         builder: (context, child) => AlarmBannerHost(navigator: _navigator, child: RuleProposalHost(rules: _rules, child: child ?? const SizedBox())),
         home: const Shell(),
       ),

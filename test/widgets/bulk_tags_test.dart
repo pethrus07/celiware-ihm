@@ -237,7 +237,9 @@ void main() {
     await live(tester, 500);
     // Terceiros avisa que não foi validado; manual oficial diz a origem.
     expect(find.descendant(of: find.byKey(const ValueKey('perfil-inovance-h3u')), matching: find.textContaining('não validado em bancada')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const ValueKey('perfil-weg-tpw04')));
+    // Rola a folha: o inversor fica no fim da lista, ainda não montado.
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('perfil-weg-tpw04')), 200,
+        scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
     await live(tester, 300);
     expect(find.descendant(of: find.byKey(const ValueKey('perfil-weg-tpw04')), matching: find.text('Pelo manual oficial')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('perfil-weg-tpw04')));

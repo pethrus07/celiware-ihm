@@ -194,12 +194,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('tela-${DemoProject.operationScreenId}')));
     await live(tester, 900);
     final status = tester.getRect(find.byKey(const ValueKey('el-op_status')));
+    final vel = tester.getRect(find.byKey(const ValueKey('el-op_vel')));
     final screenW = tester.view.physicalSize.width / tester.view.devicePixelRatio;
-    // 3 células de no máximo 96 dp (menos o respiro): antes ocupava meia tela.
+    // 3 células com teto (menos o respiro): antes ocupava meia tela.
     expect(status.width, lessThanOrEqualTo(3 * HmiCanvas.maxCell));
-    // Centralizada: sobra espaço dos dois lados, não só à direita.
+    // Centralizada: sobra o mesmo espaço dos dois lados, não só à direita.
     expect(status.left, greaterThan(100));
-    expect(screenW - status.left, greaterThan(6 * HmiCanvas.maxCell - 20));
+    expect((status.left + vel.right) / 2, closeTo(screenW / 2, 1));
     await shutdown(tester, c);
   });
 
@@ -318,12 +319,15 @@ void main() {
     expect(find.byKey(const ValueKey('faixa-alarme')), findsOneWidget, reason: 'a faixa aparece mesmo com o diálogo aberto');
     expect(tester.getRect(confirm), before, reason: 'o diálogo não se mexe');
 
-    // Fechado o diálogo, a faixa volta a ter o espaço dela: nada da tela
-    // fica escondido debaixo.
+    // Fechado o diálogo, a tela continua onde estava (o espaço da faixa é
+    // reservado o tempo todo) e nada fica escondido debaixo dela.
+    final title = find.text('Cortadora — operação');
+    final titleRect = tester.getRect(title);
     await tester.tap(find.text('Cancelar'));
     await live(tester, 600);
     final banner = tester.getRect(find.byKey(const ValueKey('faixa-alarme')));
-    expect(tester.getRect(find.text('Cortadora — operação')).top, greaterThanOrEqualTo(banner.bottom));
+    expect(tester.getRect(title), titleRect, reason: 'a tela não desce quando o diálogo fecha');
+    expect(tester.getRect(title).top, greaterThanOrEqualTo(banner.bottom));
 
     // O contrário: faixa no topo, diálogo aberto, o alarme sai (reconhecido e
     // normalizado) — o diálogo continua onde estava.
@@ -337,7 +341,8 @@ void main() {
     expect(tester.getRect(confirm), withBanner);
     await tester.tap(find.text('Cancelar'));
     await live(tester, 600);
-    expect(tester.getRect(find.text('Cortadora — operação')).top, lessThan(banner.bottom), reason: 'sem alarme, a tela sobe de volta');
+    expect(find.byKey(const ValueKey('faixa-quieta')), findsOneWidget);
+    expect(tester.getRect(title), titleRect, reason: 'sem alarme, a tela também não sobe: o lugar da faixa fica');
     await shutdown(tester, c);
   });
 

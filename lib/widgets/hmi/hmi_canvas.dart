@@ -106,11 +106,25 @@ class HmiCanvas extends StatelessWidget {
   static const double gap = 12;
   static double gapFor(double cell) => (cell * 0.2).clamp(4.0, gap);
 
-  /// Maior célula aceita (dp) na grade normal. Sem teto, a célula cresce com a
-  /// largura: no celular deitado ou no tablet cabiam só dois elementos
-  /// gigantes na tela. 96 dp dá, num tablet, a mesma tela do celular 1,5×
-  /// maior e centralizada.
-  static const double maxCell = 96;
+  /// Maior célula aceita (dp) na grade normal: 2× a do celular em pé
+  /// ([refCell]) — o tablet em pé usa a largura inteira. Deitado, quem manda
+  /// é a altura (6 linhas à vista): a tela é montada em pé, e célula maior só
+  /// esconderia linhas.
+  static const double maxCell = 128;
+
+  /// Célula do celular em pé (até ~412 dp de largura). Até ela, o elemento é
+  /// desenhado como sempre foi. Acima (tablet, janela grande), a tela inteira
+  /// é desenhada nesta célula e **ampliada**: texto, ícone, respiro, borda e
+  /// alvo de toque crescem junto com a célula. Antes só a célula crescia — no
+  /// tablet deitado ficava rótulo de celular dentro de cartão de tablet.
+  static const double refCell = 64;
+
+  /// Ampliação máxima (o tablet em pé, visto de mais longe que o celular).
+  static const double maxZoom = 2;
+
+  /// Quanto a tela é ampliada numa célula de [cell] dp (1 = como montada).
+  /// Na grade fina a célula de referência é a metade.
+  static double zoomFor(double cell, int columns) => (cell * HmiScreen.scaleOf(columns) / refCell).clamp(1.0, maxZoom);
 
   /// Na grade fina o teto é a largura (até 1.200 dp): é a grade de quem quer
   /// muita variável, e no tablet ela usa a tela inteira (TB-5). Por isso o
@@ -130,17 +144,22 @@ class HmiCanvas extends StatelessWidget {
       child: LayoutBuilder(builder: (context, box) {
         final available = box.maxWidth - padding.horizontal;
         // Segundo teto, pela altura: celular deitado tem ~290 dp úteis, e com
-        // 96 dp por célula só apareciam duas linhas e meia. Pelo menos ~4,5
-        // linhas à vista; tablet e celular em pé nem chegam nesse limite na
-        // grade normal. Na fina ele só vale no celular deitado (TB-5).
+        // célula grande só apareciam duas linhas e meia. Pelo menos ~4,5
+        // linhas à vista no celular deitado e 6 no resto (no tablet deitado é
+        // este teto que decide o tamanho); o celular em pé nem chega nele. Na
+        // grade fina ele só vale no celular deitado (TB-5).
         final k = HmiScreen.scaleOf(screen.columns);
-        final heightCap = box.maxHeight.isFinite && (k == 1 || WindowClass.isCompactHeight(context));
-        final byHeight = heightCap ? math.max(56.0 / k, box.maxHeight / (4.5 * k)) : maxCellFor(screen.columns);
+        final compactHeight = WindowClass.isCompactHeight(context);
+        final heightCap = box.maxHeight.isFinite && (k == 1 || compactHeight);
+        final inView = compactHeight ? 4.5 : 6.0;
+        final byHeight = heightCap ? math.max(56.0 / k, box.maxHeight / (inView * k)) : maxCellFor(screen.columns);
         final cell = math.min(math.min(available / screen.columns, maxCellFor(screen.columns)), byHeight);
-        final g = gapFor(cell);
-        final width = cell * screen.columns;
+        // Desenho na célula do celular, ampliado até a célula da tela: tudo
+        // cresce na mesma proporção (no celular, zoom 1 — nada muda).
+        final zoom = zoomFor(cell, screen.columns);
+        final lc = cell / zoom;
+        final g = gapFor(lc);
         final rows = math.max(screen.rows + (editMode ? 4 : 0), editMode ? 8 : 1);
-        final height = rows * cell;
 
         return _GridScroll(
           cell: cell,
@@ -148,8 +167,14 @@ class HmiCanvas extends StatelessWidget {
           child: Align(
             alignment: Alignment.topCenter,
             child: SizedBox(
-            width: width,
-            height: height,
+            width: cell * screen.columns,
+            height: rows * cell,
+            child: FittedBox(
+            fit: BoxFit.fill,
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+            width: lc * screen.columns,
+            height: rows * lc,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -159,9 +184,10 @@ class HmiCanvas extends StatelessWidget {
                       behavior: HitTestBehavior.opaque,
                       onTapUp: (d) {
                         onSelect?.call(null);
-                        onEmptyCellTap?.call((d.localPosition.dx / cell).floor(), (d.localPosition.dy / cell).floor());
+                        // Posição do toque já vem na medida do desenho (lc).
+                        onEmptyCellTap?.call((d.localPosition.dx / lc).floor(), (d.localPosition.dy / lc).floor());
                       },
-                      child: CustomPaint(painter: _GridPainter(cell: cell, columns: screen.columns, rows: rows)),
+                      child: CustomPaint(painter: _GridPainter(cell: lc, columns: screen.columns, rows: rows)),
                     ),
                   ),
                 for (final e in screen.elements)
@@ -170,7 +196,7 @@ class HmiCanvas extends StatelessWidget {
                           key: ValueKey('ed-${e.id}'),
                           element: e,
                           screen: screen,
-                          cell: cell,
+                          cell: lc,
                           gap: g,
                           selected: e.id == selectedId,
                           onSelect: () => onSelect?.call(e.id),
@@ -179,15 +205,17 @@ class HmiCanvas extends StatelessWidget {
                         )
                       : Positioned(
                           key: ValueKey('el-${e.id}'),
-                          left: e.x * cell + g / 2,
-                          top: e.y * cell + g / 2,
-                          width: e.w * cell - g,
-                          height: e.h * cell - g,
+                          left: e.x * lc + g / 2,
+                          top: e.y * lc + g / 2,
+                          width: e.w * lc - g,
+                          height: e.h * lc - g,
                           // Uma camada por elemento: o valor que muda redesenha só
                           // o próprio cartão, não a tela (sombras e bordas saem de cache).
                           child: RepaintBoundary(child: KeyedSubtree(key: keyFor?.call(e), child: _Linked(element: e, onNavigate: onNavigate))),
                         ),
               ],
+            ),
+            ),
             ),
             ),
           ),

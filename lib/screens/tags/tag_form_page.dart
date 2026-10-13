@@ -866,7 +866,12 @@ class _TagFormPageState extends State<TagFormPage> {
   void _scrollTo(GlobalKey anchor, {required bool atEnd, bool retry = true}) {
     final ctx = anchor.currentContext;
     if (ctx != null && ctx.mounted) {
-      Scrollable.ensureVisible(ctx, alignment: 0.2, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+      // Duas passadas: a lista monta (e mede) os itens de cima no meio da
+      // rolagem, e o campo escorregava para baixo do Salvar. A segunda corrige
+      // o que a primeira não tinha como saber.
+      Scrollable.ensureVisible(ctx, alignment: 0.2, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic).then((_) {
+        if (mounted && ctx.mounted) Scrollable.ensureVisible(ctx, alignment: 0.2, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+      });
       return;
     }
     if (!retry || !_scroll.hasClients) return;

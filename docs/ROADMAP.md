@@ -30,9 +30,9 @@ tabela da etapa 4.
 
 Reunião de 3h com o cliente em 05/10 (ata `2026-10-05_alinhamento`
 no Atas). A lista dele chegou em 11/10: uma conversa no ChatGPT que cresceu até
-159 itens e virou uma plataforma de três aplicações (celular, servidor Windows,
-nuvem). A própria lista admite que os itens 1–16 são provisórios e que 72–86
-repetem 57–71.
+205 itens (parecia 159; o ChatGPT continuou numerando de 160 a 205) e virou uma
+plataforma de três aplicações (celular, servidor Windows, nuvem). A própria
+lista admite que os itens 1–16 são provisórios e que 72–86 repetem 57–71.
 
 - **Valor:** R$ [valor], como a etapa anterior. R$ [valor] até 20/10; R$ [valor] na
   publicação na Play Store (R$ [valor] desta + R$ [valor] guardados da etapa 3).
@@ -55,11 +55,11 @@ upgrade de R$ [valor].
 
 **Requisitos detalhados, horas e fontes:** `docs/REQUISITOS-ETAPA4.md`. **Conferência item a item da lista do cliente (205 itens):** `docs/RASTREABILIDADE-LISTA-CLIENTE.md` — os 16 itens que estavam para decidir foram decididos em 12/10 (8 feitos, 8 para depois com o motivo). (levantamento de 11/10/2026: [estimativa interna] no total, mais da metade em protocolos).
 
-| # | Item | Da lista dele / da reunião | Estado (11/10, noite) |
+| # | Item | Da lista dele / da reunião | Estado (13/10) |
 |---|---|---|---|
 | 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | **Feito (1.3.2).** Falta a prova em celular real com Wi-Fi sem internet + 4G. |
-| 1 | Publicação na Play Store | reunião | **Lado técnico pronto (12/10):** `.aab` de loja com portões (sem chave de upload não sai), alvo 36, 16 KB, privacidade no app, ficha pt-BR, gráfico de recursos, 8 capturas de celular e 5 de tablet, formulários (`docs/loja/`). Falta o que é do dono, na ordem de `PUBLICACAO.md`: decisões (identificador, grátis é definitivo), site no ar, D-U-N-S, conta de organização, chave de upload. |
-| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100), com o link "Quero aprender automação" para o Instituto (item 184) e os protocolos novos marcados como ainda sem teste em equipamento real (12/10). Visual refeito em 13/10 (palco escuro com brilho, prints maiores); próximos passos de conversão na seção "Site — conversão". Falta publicar: links da loja, e-mail e domínio (marcadores no `site/README.md`). |
+| 1 | Publicação na Play Store | reunião | **Lado técnico pronto (12/10):** `.aab` de loja com portões (sem chave de upload não sai), alvo 36, 16 KB, privacidade no app, ficha pt-BR, gráfico de recursos, 8 capturas de celular e 5 de tablet, formulários (`docs/loja/`). D-U-N-S em mãos (13/10: **[D-U-N-S]**). Falta o que é do dono, na ordem da seção "Publicação na Play Store" abaixo: domínio e site no ar, conta de organização (reunião com o cliente), chave de upload. |
+| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100), com o link "Quero aprender automação" para o Instituto (item 184) e os protocolos novos marcados como ainda sem teste em equipamento real (12/10). Visual refeito em 13/10 (palco escuro com brilho, prints maiores) e **lotes 1 e 2 de conversão feitos em 13/10** (seção "Site — conversão"; Lighthouse 95–99 / 100 / 100 / 100). Falta publicar: domínio, e-mail de contato; links da loja, WhatsApp e vídeo completo entram depois (marcadores no `site/README.md`). |
 | 3 | ~~Versão para Windows do próprio app~~ — **adiada em 11/10/2026** (decisão do Pedro) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
 | 4 | Grade maior e mais variáveis por tela | reunião | **Feito:** grade fina 6 ↔ 12 colunas, mover e redimensionar sem arrastar, Tabela de valores (até 30 variáveis), ≥ 40 variáveis numa tela de celular (GR-1 a GR-10). |
 | 5 | Correções no "editar memória" | 2, 11 · reunião | **Feito:** nada se perde calado, sugestões de sinal e CDAB, hexadecimal, bit de registrador de entrada (EM-1 a EM-12). |
@@ -95,10 +95,13 @@ várias máquinas numa tela (61).
   do cliente), banner (59), vídeos (46 — decidido em 27/09).
 - **Biometria:** reconhecimento facial (69).
 - **Idiomas:** app e site trilíngues (87, 88).
-- **Sem data, não decidido:** os itens locais de gestão (OEE, painéis por
-  perfil, turnos, metas, paradas, manutenção, peças, relatórios —
-  8, 24, 92–154). Não pedem nada externo, mas cada um é um módulo; ficam para
-  depois desta etapa.
+- **Sem data (49 itens, cada um com o motivo na rastreabilidade):** os
+  módulos locais de gestão (painéis por perfil, turnos, metas, paradas,
+  manutenção, peças, relatórios — 24, 93–154), alarme com o app fechado (92,
+  depois da 1ª publicação), HTTP (56, 169, 173 — quando houver equipamento que
+  fale HTTP), padrões WARE (163, 164 — a Celiware define), vários projetos (9)
+  e áudio gravado (10). Não pedem nada externo, mas cada um é um módulo. O
+  OEE (8) entrou: feito em 12/10.
 
 **Do lado do cliente:** ~~nome comercial~~ — **definido em 11/10/2026: Ware IoT** (app, site e tudo o mais; "WARE" já era o nome dos padrões de dados da Celiware); marca e domínio; lista do hardware
 e cadastro na Shopify; uma peça de cada para os testes; testes nas máquinas
@@ -128,23 +131,25 @@ emulador antes de seguir.
    tela (56 dp em pé, 48 deitado; "Sem alarmes" em cinza quando não há nada),
    e a pergunta de regra mora na mesma faixa. Falta a outra metade do item:
    estado da máquina, equipamento e hora da última leitura nessa linha.
-2. **Miniatura real das telas.** A lista de telas mostra um desenho genérico;
-   passar a mostrar a tela em miniatura, para reconhecer de relance.
-3. **Tablet com barra lateral e duas colunas.** Foi a pior nota do QA (4).
-   Barra de navegação lateral (NavigationRail) e lista + detalhe lado a lado
-   em Equipamentos, Variáveis e Alarmes.
+2. ~~**Miniatura real das telas.**~~ **Feito (etapa 4):** cada cartão da
+   lista de telas mostra a planta da tela, com os blocos de cada elemento.
+3. ~~**Tablet com barra lateral e duas colunas.**~~ **Feito (etapa 4, item 6):**
+   trilho a partir de 600 dp e lista + detalhe.
 4. **Comando em 3 fases visíveis.** Tocar → "enviando" → confirmado pelo
    equipamento (ou falhou, com o motivo). O botão com retorno já faz parte
-   disso; falta estender a todo comando e deixar as três fases à vista.
+   disso (aguardando → acende quando a máquina confirma → "SEM RETORNO");
+   falta estender a todo comando e deixar as três fases à vista.
 
 ## Achados do QA de 27/09 que ficaram para depois
 
 Pequenos, nenhum atrapalha a apresentação.
 
-- Gráfico de tendência com série parada em 0 desenha eixo 0 – 1 com
-  decimais (0,25 · 0,50): ruído; eixo de série constante deveria ser só "0".
-- Gráfico de barras "Produção por hora" rotula o eixo com 1…8 (posição na
-  lista), não com a hora.
+- ~~Gráfico de tendência com série parada em 0 desenha eixo 0 – 1 com
+  decimais.~~ **Feito (12/10, `d11b30c`):** série constante ganha faixa
+  redonda e nunca eixo negativo.
+- ~~Gráfico de barras "Produção por hora" rotula o eixo com 1…8.~~ **Feito
+  (12/10, `d11b30c`):** embaixo de cada barra, a hora real (ou 1…n, se a
+  lista não for por hora).
 - Alarme que voltou ao normal mostra "desde 20:07" — é a hora do disparo;
   "disparou 20:07" leria melhor.
 - Tela em operação desenha ~14 quadros/s com a máquina parada (valores e
@@ -156,9 +161,10 @@ Pequenos, nenhum atrapalha a apresentação.
 
 ## Alarmes — o que falta
 
-- **Alarme com o app fechado.** Hoje o alarme só vale com o app aberto.
-  Exige serviço em primeiro plano do Android com notificação permanente
-  (e mais bateria). Decidir com o cliente se o uso de campo pede isso.
+- **Alarme com o app fechado** (item 92 da lista). Hoje o alarme só vale com
+  o app aberto. Exige serviço em primeiro plano do Android com notificação
+  permanente (e mais bateria), e a Play pede declaração com vídeo. Decidido em
+  12/10: depois da 1ª publicação.
 - **Adiar (shelve)** um alarme com motivo e prazo, para manutenção planejada.
 - **Exportar o histórico** de alarmes (CSV) junto com o projeto.
 
@@ -166,11 +172,22 @@ Pequenos, nenhum atrapalha a apresentação.
 
 Roteiro completo em `PUBLICACAO.md`; ficha, imagens e formulários prontos em `docs/loja/`.
 
-- Conta de desenvolvedor **de organização** em nome da Celiware (pede D-U-N-S).
-- Chave de upload (credencial permanente — criar e guardar no cofre).
-- Teste interno com o cliente antes de abrir ao público. Quem tem o APK do
-  WhatsApp precisa exportar o projeto, desinstalar e instalar pela loja (a
-  assinatura muda).
+Na ordem (combinado em 13/10):
+
+1. ~~**D-U-N-S**~~ ✅ **[D-U-N-S]**, Celiware Solucoes Tecnologicas Ltda.
+2. **Domínio do site do app:** o cliente compra (sugestão `wareiot.com.br`, livre
+   em 13/10) no CNPJ da Celiware; ligar ao site e publicar (a política de
+   privacidade tem de estar no ar antes do envio). Sem domínio,
+   `ware-iot.pages.dev` serve.
+3. **Conta de desenvolvedor de organização**, numa reunião com o cliente (código
+   por SMS no celular dele, RG ou CNH do representante, cartão internacional
+   para os US$ 25, endereço igual ao da D&B). Pela conta Google da Celiware; o
+   site da organização é o que já está no ar, `www.celiwareautomacao.com.br`, e
+   o e-mail de contato fica nesse domínio.
+4. **Chave de upload** (credencial permanente — criar junto e guardar no cofre).
+5. `.aab`, ficha e formulários no Console; **teste interno** com o cliente antes
+   de abrir ao público. Quem tem o APK do WhatsApp precisa exportar o projeto,
+   desinstalar e instalar pela loja (a assinatura muda).
 
 ## Site — conversão (pesquisa de 13/10/2026)
 
@@ -253,6 +270,10 @@ número de usuário, logo ou depoimento que não exista.
 
 ## Campo e fabricantes
 
+- **Tudo da etapa 4 em equipamento real:** nada passou de simulador —
+  Siemens S7, OPC UA, MQTT (broker), Arduino/protocolo cru, cabo USB-OTG,
+  câmera IP, mapas das marcas (H3U primeiro), a voz no fone e a prova da 1.3.2
+  (Wi-Fi sem internet + 4G). Depende das peças do cliente.
 - **Teste de campo** na cortadora de rótulos do cliente (mapa Modbus já
   preparado no CLP). É o que valida a 1.x de verdade.
 - **Perfil Inovance:** tradução do nome da memória do manual para endereço
@@ -263,13 +284,13 @@ número de usuário, logo ou depoimento que não exista.
 
 ## Ideias registradas (sem data)
 
-- Variável calculada / script — só se aparecer caso que a escala linear não cobre.
+- ~~Variável calculada~~ — **feita na etapa 4** (item 11). Script continua fora (ver abaixo).
 - Texto gravável pela tela.
 - Backup e comparação de parâmetros de inversor.
-- Conversores RS-485 e CANopen; perfil Siemens.
+- CANopen. (Conversores RS-485 e Siemens S7 entraram na etapa 4, item 9.)
 - Licenciamento.
-- Identidade da Celiware no app (ficou de fora de propósito na 1.2). Em
-  05/10 ficou "Powered by Celiware" no app e na máquina (etapa 4).
+- ~~Identidade da Celiware no app~~ — **feito:** "Powered by Celiware" no
+  Sobre (etapa 4).
 
 ## Ficou de fora de propósito
 

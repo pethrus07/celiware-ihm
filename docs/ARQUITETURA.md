@@ -1312,7 +1312,7 @@ Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstra�
 
 ## 14. Próximos passos
 
-- **Etapa 3 — Play Store:** o lado técnico e a ficha estão prontos (`docs/loja/`); falta o que é do dono — D-U-N-S, conta de organização, chave de upload. Roteiro em `docs/PUBLICACAO.md`.
+- **Etapa 3 — Play Store:** o lado técnico e a ficha estão prontos (`docs/loja/`); falta o que é do dono — D-U-N-S em mãos ([D-U-N-S], 13/10); faltam domínio e site no ar, conta de organização, chave de upload. Roteiro em `docs/PUBLICACAO.md`.
 - **Perfis de fabricante:** validar em bancada (Inovance H3U/H5U primeiro, o manual da série H não foi aberto).
 - **Teste de campo:** cortadora de rótulos do cliente (mapa Modbus já preparado no CLP).
 - **OPC UA:** conferir num servidor industrial (S7-1500 com a licença, Kepware, CODESYS) e num CLP; depois Sign/SignAndEncrypt (40–60 h) e Subscription (12–20 h) — `docs/pesquisa-etapa4/7-spike-opcua.md`.

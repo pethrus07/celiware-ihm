@@ -22,6 +22,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+# O console do Windows é cp1252: o "→" e os acentos das mensagens quebravam
+# o `tablet` no meio (UnicodeEncodeError).
+sys.stdout.reconfigure(encoding="utf-8")
+
 ROOT = Path(__file__).resolve().parents[2]
 LOJA = ROOT / "docs" / "loja"
 IMG = LOJA / "imagens"

@@ -119,6 +119,9 @@ class ElementInfo {
 /// |             | tagId + images: [{value, data}] (modo byValue: uma imagem por código)                   |
 /// | table       | tagIds (até 30, na ordem das linhas), label (título; vazio = sem título),               |
 /// |             | onText, offText (texto das linhas liga/desliga)                                         |
+/// | oee         | tagIds: [disponibilidade, desempenho, qualidade, oee pronto] (vaga fixa; vazia = null), |
+/// |             | source (calc·tag), scale (percent·fraction), warn?, alarm? (% do OEE, "abaixo de"),     |
+/// |             | label (placa do OEE; vazio = "OEE") — regras em `Oee` (elements/oee_element.dart)       |
 ///
 /// Em qualquer elemento menos botão e ajuste: `goTo` = id da tela que abre ao
 /// tocar (nos dois, o toque já tem dono: gravar).
@@ -250,6 +253,23 @@ class ElementCatalog {
       minW: 2,
       minH: 2,
     ),
+    // Vizinho do medidor: os dois são "indicador com faixas".
+    ElementInfo(
+      type: ElementType.oee,
+      name: 'OEE',
+      description: 'Eficiência global da máquina.',
+      icon: Icons.space_dashboard_outlined,
+      // Quatro variáveis, cada uma num papel: a configuração tem a seção
+      // própria (como a imagem por etapa), não a escolha única do topo. O
+      // "usada em" vê as vagas pela lista `tagIds` e pede número.
+      fit: TagFit.none,
+      // Largura toda e 3 de altura: no celular de 320 dp o OEE e as três
+      // parcelas cabem lado a lado, com os nomes inteiros. Na fina, 12×6.
+      defaultW: 6,
+      defaultH: 3,
+      minW: 3,
+      minH: 3,
+    ),
     ElementInfo(
       type: ElementType.trend,
       name: 'Gráfico de tendência',
@@ -354,6 +374,10 @@ class ElementCatalog {
           'onText': 'LIGADO',
           'offText': 'DESLIGADO',
         };
+      case ElementType.oee:
+        // Uma variável solta não tem papel (disponibilidade? qualidade?):
+        // começa sem nenhuma, e a configuração pede uma por vaga.
+        return {'label': 'OEE', 'source': 'calc', 'scale': 'percent'};
       case ElementType.unknown:
         return const {};
     }

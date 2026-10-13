@@ -22,6 +22,10 @@ enum ElementType {
 
   /// Tabela de valores (GR-7): várias variáveis, uma por linha.
   table,
+
+  /// OEE (item 8 da lista do cliente): OEE, disponibilidade, desempenho e
+  /// qualidade em quatro mostradores.
+  oee,
 }
 
 extension ElementTypeMeta on ElementType {

@@ -91,7 +91,8 @@ void main() {
       expect(ElementCatalog.minSize(ElementType.table, 6), (3, 2));
       expect(ElementCatalog.minSize(ElementType.table, 12), (6, 4));
       expect(ElementCatalog.of(ElementType.table).fit, TagFit.any);
-      expect(ElementType.values.last, ElementType.table, reason: 'tipo novo entra no fim do enum');
+      // Depois dos tipos de antes dela (o OEE veio depois, também no fim).
+      expect(ElementType.table.index, greaterThan(ElementType.unknown.index), reason: 'tipo novo entra no fim do enum');
     });
 
     test('ida e volta no arquivo; grade normal ↔ fina sem mexer na tabela', () {

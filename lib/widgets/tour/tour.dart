@@ -20,7 +20,7 @@ import '../../core/theme/app_theme.dart';
 //                   [TourSpec.version] faz a trilha reaparecer para todos.
 //
 // O realce: pintura escura em tela cheia com um "buraco" (Path evenOdd) no
-// retângulo do alvo + contorno âmbar. É o equivalente Flutter da box-shadow
+// retângulo do alvo + contorno na cor de destaque. É o equivalente Flutter da box-shadow
 // gigante do HTML.
 //
 // Passo essencial sem alvo na tela (lista vazia, elemento rolado para fora)
@@ -192,7 +192,7 @@ class TourHostState extends State<TourHost> {
       final r = topLeft & target.size;
       final bounds = Offset.zero & host.size;
       // Folga de 6 px em volta do alvo, mas sem sair da tela: o "?" colado
-      // na borda tinha o contorno âmbar cortado ao meio.
+      // na borda tinha o contorno de destaque cortado ao meio.
       if (r.overlaps(bounds)) hole = r.intersect(bounds).inflate(6).intersect(bounds.deflate(3));
     }
     if (hole != _hole) setState(() => _hole = hole);

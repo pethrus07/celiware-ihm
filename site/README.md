@@ -19,6 +19,13 @@ Outros arquivos: `css/site.css` (folha única), `fonts/` (IBM Plex, licença em
 `favicon.svg`/`favicon.ico`/`apple-touch-icon.png`, `sitemap.xml`,
 `robots.txt` e `_headers` (cabeçalhos e cache no Cloudflare Pages).
 
+Ícones: `python tool/gerar_icone.py` regera `favicon.ico` e
+`apple-touch-icon.png` e acerta a cor do arco em `favicon.svg` e no logo em SVG
+de cada página — sempre o destaque do app (`accent` de
+`lib/core/theme/app_theme.dart`), junto com os ícones do Android e da loja. A
+imagem de compartilhamento (`img/compartilhar.jpg`) não tem gerador: o ícone
+dela é o `store/icone-512.png` reduzido a 56 px, colado em x 80, y 84.
+
 ## Antes de publicar: trocar os marcadores
 
 Os links que ainda não existem estão como **marcadores**. Até a troca, os

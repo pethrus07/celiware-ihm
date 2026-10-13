@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -33,19 +34,36 @@ import 'tours.dart';
 import 'voice_sheet.dart';
 
 /// Aba "Mais": projeto (exportar/importar), tutoriais e sobre.
-class MorePage extends StatelessWidget {
+class MorePage extends StatefulWidget {
   const MorePage({super.key});
+
+  @override
+  State<MorePage> createState() => _MorePageState();
+}
+
+class _MorePageState extends State<MorePage> {
+  // Alvos do tutorial do "?".
+  final _projectKey = GlobalKey();
+  final _dataKey = GlobalKey();
+  final _deviceKey = GlobalKey();
+  final _tutorialsKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
     final c = AppScope.watch(context).controller;
     final p = c.project;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mais')),
+    // "?" explica a aba; não abre sozinho, como Equipamentos.
+    return TourHost(
+      spec: Tours.mais(project: _projectKey, data: _dataKey, device: _deviceKey, tutorials: _tutorialsKey),
+      autoStart: false,
+      child: Scaffold(
+      appBar: AppBar(title: const Text('Mais'), actions: const [HelpButton()]),
       // No tablet, a coluna dos ajustes não estica até a borda (TB-3).
       body: FormWidth(child: ListView(
         padding: const EdgeInsets.only(bottom: 32),
+        // A lista é curta: monta tudo, para o tutorial achar os itens de baixo.
+        scrollCacheExtent: const ScrollCacheExtent.pixels(4000),
         children: [
           const SectionHeader('Projeto'),
           ListTile(
@@ -60,12 +78,15 @@ class MorePage extends StatelessWidget {
           ),
           // Enviar é o caso comum (o projeto vai por WhatsApp para outro
           // celular); salvar em arquivo fica para backup.
-          ListTile(
-            key: const ValueKey('enviar'),
-            leading: const Icon(Icons.share_rounded),
-            title: const Text('Enviar projeto'),
-            subtitle: const Text('WhatsApp, e-mail, Drive…'),
-            onTap: () => _share(context, p),
+          KeyedSubtree(
+            key: _projectKey,
+            child: ListTile(
+              key: const ValueKey('enviar'),
+              leading: const Icon(Icons.share_rounded),
+              title: const Text('Enviar projeto'),
+              subtitle: const Text('WhatsApp, e-mail, Drive…'),
+              onTap: () => _share(context, p),
+            ),
           ),
           ListTile(
             key: const ValueKey('exportar'),
@@ -90,12 +111,15 @@ class MorePage extends StatelessWidget {
             onTap: () => _replace(context, const Project(name: 'Meu projeto'), 'Começar um projeto vazio?'),
           ),
           const SectionHeader('Dados'),
-          ListTile(
-            key: const ValueKey('registros'),
-            leading: const Icon(Icons.timeline_rounded),
-            title: const Text('Registros'),
-            subtitle: Text(_logsSummary(p)),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LogsPage())),
+          KeyedSubtree(
+            key: _dataKey,
+            child: ListTile(
+              key: const ValueKey('registros'),
+              leading: const Icon(Icons.timeline_rounded),
+              title: const Text('Registros'),
+              subtitle: Text(_logsSummary(p)),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LogsPage())),
+            ),
           ),
           ListTile(
             key: const ValueKey('receitas'),
@@ -122,6 +146,7 @@ class MorePage extends StatelessWidget {
           ),
           const SectionHeader('Aparência'),
           Padding(
+            key: _deviceKey,
             padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 4),
             child: ValueListenableBuilder<Appearance>(
               valueListenable: AppearanceController.instance,
@@ -149,12 +174,15 @@ class MorePage extends StatelessWidget {
           const VoiceSettingsTile(),
           const SectionHeader('Tutoriais'),
           for (final (id, title, _) in Tours.catalog)
-            ListTile(
-              key: ValueKey('tutorial-$id'),
-              leading: const Icon(Icons.school_outlined),
-              title: Text(title),
-              trailing: Icon(Icons.play_circle_outline_rounded, color: Ind.accent),
-              onTap: () => _openTour(context, id),
+            KeyedSubtree(
+              key: id == Tours.catalog.first.$1 ? _tutorialsKey : null,
+              child: ListTile(
+                key: ValueKey('tutorial-$id'),
+                leading: const Icon(Icons.school_outlined),
+                title: Text(title),
+                trailing: Icon(Icons.play_circle_outline_rounded, color: Ind.accent),
+                onTap: () => _openTour(context, id),
+              ),
             ),
           ListTile(
             leading: const Icon(Icons.replay_rounded),
@@ -183,6 +211,7 @@ class MorePage extends StatelessWidget {
           ),
         ],
       )),
+      ),
     );
   }
 

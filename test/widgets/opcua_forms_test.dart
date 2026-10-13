@@ -98,11 +98,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('protocolo-opcua')));
     await tester.pumpAndSettle();
-    expect(find.text('ID do escravo'), findsNothing, reason: 'OPC UA não tem ID do escravo');
+    expect(find.text('Número na rede'), findsNothing, reason: 'OPC UA não tem ID do escravo');
     expect(find.text('Marca e modelo'), findsNothing);
     expect(find.text('OPC UA · Porta 4840 · anônimo'), findsOneWidget, reason: 'a porta padrão troca junto com o protocolo');
     expect(find.byKey(const ValueKey('opcua-seguranca')), findsOneWidget);
-    expect(find.textContaining('ainda não faz Sign nem SignAndEncrypt'), findsOneWidget);
+    expect(find.textContaining('ainda não assina nem cifra as mensagens (Sign e SignAndEncrypt)'), findsOneWidget);
     expect(find.byKey(const ValueKey('campo-senha-opcua')), findsNothing, reason: 'sem usuário, sem senha');
 
     // O endereço inteiro colado no campo do IP vira IP, porta e caminho.

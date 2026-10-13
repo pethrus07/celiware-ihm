@@ -188,7 +188,7 @@ class MqttDriver extends DeviceDriver {
       case MqttConnectReturnCode.notAuthorized:
         return MqttCommError.credentials('$where: CONNACK $rc');
       case MqttConnectReturnCode.identifierRejected:
-        return MqttCommError('$where: CONNACK $rc', 'o broker recusou o ID do cliente', refused: true);
+        return MqttCommError('$where: CONNACK $rc', 'o broker recusou o nome do app (client ID)', refused: true);
       case MqttConnectReturnCode.unacceptedProtocolVersion:
         return MqttCommError('$where: CONNACK $rc', 'o broker não aceita MQTT 3.1.1', refused: true);
       case MqttConnectReturnCode.brokerUnavailable:

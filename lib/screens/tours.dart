@@ -36,7 +36,7 @@ class Tours {
           target: nav,
           essential: true,
           title: 'O caminho',
-          body: 'Equipamento (o IP) → Variáveis (nomes das memórias) → Telas. Receitas, registros e regras ficam em Mais.',
+          body: 'Equipamento (o IP) → Variáveis (nomes das memórias) → Telas. Receitas, registros, regras e câmeras ficam em Mais.',
         ),
         TourStep(target: help, essential: true, title: 'Dúvida?', body: 'O "?" explica a tela em que você está.'),
       ]);
@@ -92,6 +92,22 @@ class Tours {
         TourStep(essential: true, title: 'Regras', body: '"Quando a condição durar um tempo, gravar um valor": uma máquina avisa a outra.'),
         TourStep(essential: true, title: 'Pergunta antes', body: 'O padrão é perguntar antes de gravar. Gravar sozinha só serve para parar.'),
         TourStep(essential: true, title: 'Não é segurança', body: 'Celular não é intertravamento: emergência e proteções continuam na máquina.'),
+      ]);
+
+  static TourSpec cameras() => const TourSpec(id: 'cameras', version: 1, title: 'Câmeras', steps: [
+        TourStep(essential: true, title: 'Câmeras', body: 'A máquina ao vivo, em tela cheia. Toque na câmera para abrir; o lápis edita.'),
+        TourStep(essential: true, title: 'Cadastrar', body: 'Em "Nova câmera", escolha a marca e digite o IP: o app monta o endereço do vídeo.'),
+        TourStep(essential: true, title: 'Na tela da máquina', body: 'Um Botão no modo "Abrir câmera" abre a câmera direto da tela de operação.'),
+        TourStep(essential: true, title: 'Senha', body: 'Fica só neste aparelho: não vai junto quando você envia o projeto.'),
+      ]);
+
+  /// A aba Mais: o que mora aqui. Como Equipamentos, só abre pelo "?".
+  static TourSpec mais({GlobalKey? project, GlobalKey? data, GlobalKey? device, GlobalKey? tutorials}) =>
+      TourSpec(id: 'mais', version: 1, title: 'Mais', steps: [
+        TourStep(target: project, essential: true, title: 'Projeto', body: 'Mande o projeto inteiro para outro celular. Quem recebe abre em "Importar projeto".'),
+        TourStep(target: data, essential: true, title: 'Dados', body: 'Registros, receitas, regras e câmeras. Cada página tem o seu "?".'),
+        TourStep(target: device, title: 'Só neste aparelho', body: 'Claro ou escuro e a voz dos alarmes valem só para este celular.'),
+        TourStep(target: tutorials, title: 'Tutoriais', body: 'Reveja qualquer tutorial quando quiser.'),
       ]);
 
   static TourSpec variaveis({GlobalKey? list, GlobalKey? add, GlobalKey? more}) =>

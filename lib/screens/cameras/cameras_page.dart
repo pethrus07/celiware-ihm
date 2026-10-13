@@ -7,6 +7,8 @@ import '../../models/project.dart';
 import '../../services/cameras/camera_vault.dart';
 import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
+import '../../widgets/tour/tour.dart';
+import '../tours.dart';
 import 'camera_form_page.dart';
 import 'camera_view_page.dart';
 
@@ -33,32 +35,37 @@ class CamerasPage extends StatelessWidget {
     final loose = project.cameras.where((c) => c.deviceId == null || project.device(c.deviceId!) == null).toList();
     if (loose.isNotEmpty) groups.add((groups.isEmpty ? '' : 'Sem máquina', loose));
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Câmeras')),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const ValueKey('nova-camera'),
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraFormPage())),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Nova câmera'),
-      ),
-      body: project.cameras.isEmpty
-          ? const EmptyState(
-              icon: Icons.videocam_outlined,
-              title: 'Nenhuma câmera',
-              body: 'Cadastre a câmera IP da máquina para ver ao vivo, em tela cheia. '
-                  'Na tela de operação, um Botão no modo "Abrir câmera" abre direto.',
-            )
-          : FormWidth(
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 110),
-                children: [
-                  for (final (title, cams) in groups) ...[
-                    if (title.isNotEmpty) SectionHeader(title) else const SizedBox(height: 12),
-                    for (final c in cams) _CameraTile(camera: c),
+    // "?" explica a página (não abre sozinho), como Registros, Receitas e Regras.
+    return TourHost(
+      spec: Tours.cameras(),
+      autoStart: false,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Câmeras'), actions: const [HelpButton()]),
+        floatingActionButton: FloatingActionButton.extended(
+          key: const ValueKey('nova-camera'),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraFormPage())),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Nova câmera'),
+        ),
+        body: project.cameras.isEmpty
+            ? const EmptyState(
+                icon: Icons.videocam_outlined,
+                title: 'Nenhuma câmera',
+                body: 'Cadastre a câmera IP da máquina para ver ao vivo, em tela cheia. '
+                    'Na tela de operação, um Botão no modo "Abrir câmera" abre direto.',
+              )
+            : FormWidth(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 110),
+                  children: [
+                    for (final (title, cams) in groups) ...[
+                      if (title.isNotEmpty) SectionHeader(title) else const SizedBox(height: 12),
+                      for (final c in cams) _CameraTile(camera: c),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
+      ),
     );
   }
 }

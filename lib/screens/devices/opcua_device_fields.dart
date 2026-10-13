@@ -51,7 +51,7 @@ class OpcUaDeviceFields {
     switch (r.message) {
       case OpcUaHint.security:
         return const [
-          'No servidor, habilite o modo de segurança None (sem criptografia) no endpoint. Esta versão ainda não faz Sign nem SignAndEncrypt.',
+          'No servidor, habilite o modo de segurança None (sem criptografia) no endereço (endpoint). Esta versão ainda não assina nem cifra as mensagens (Sign e SignAndEncrypt).',
           'No S7-1500 (TIA Portal): propriedades da CPU → OPC UA → Servidor → Segurança → Canal seguro: marque a política "No security" e carregue no CLP.',
         ];
       case OpcUaHint.user:
@@ -125,7 +125,7 @@ class _OpcUaDeviceOptionsState extends State<OpcUaDeviceOptions> {
         enableSuggestions: false,
         keyboardType: TextInputType.url,
         decoration: const InputDecoration(
-          labelText: 'Caminho do endpoint',
+          labelText: 'Caminho (endpoint)',
           hintText: 'Vazio na maioria dos CLPs',
           helperText: 'O que vem depois da porta no endereço (ex.: /OPCUA/SimulationServer).',
           helperMaxLines: 2,
@@ -163,7 +163,7 @@ class _OpcUaDeviceOptionsState extends State<OpcUaDeviceOptions> {
         ),
       ],
       const SectionHeader('Segurança', padding: EdgeInsets.fromLTRB(0, 24, 0, 6)),
-      Text('Sem criptografia (modo None). Esta versão ainda não faz Sign nem SignAndEncrypt: se o servidor exigir, habilite nele o modo None.',
+      Text('Sem criptografia (modo None). Esta versão ainda não assina nem cifra as mensagens (Sign e SignAndEncrypt): se o servidor exigir, habilite nele o modo None.',
           key: const ValueKey('opcua-seguranca'), style: TextStyle(color: Ind.textDim, height: 1.35)),
       const SizedBox(height: Ind.space),
       StepperField(label: 'Tempo de resposta (ms)', controller: widget.timeout, min: 200, max: 10000),

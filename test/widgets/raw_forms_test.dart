@@ -95,7 +95,7 @@ void main() {
     expect(find.text('Arduino / mensagem própria'), findsOneWidget, reason: 'chip com nome de leigo');
     await tester.tap(find.byKey(const ValueKey('protocolo-raw')));
     await tester.pumpAndSettle();
-    expect(find.text('ID do escravo'), findsNothing, reason: 'Modbus some quando o protocolo é cru');
+    expect(find.text('Número na rede'), findsNothing, reason: 'Modbus some quando o protocolo é cru');
     expect(find.text('Marca e modelo'), findsNothing);
     expect(find.text('Arduino · TCP · Porta 5030'), findsOneWidget, reason: 'porta de partida troca junto com o protocolo');
 

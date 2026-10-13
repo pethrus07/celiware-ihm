@@ -200,7 +200,7 @@ void main() {
     expect(find.text('O adaptador abriu. Confira, nesta ordem:'), findsOneWidget);
     expect(find.textContaining('Velocidade, bits, paridade e parada'), findsOneWidget);
     expect(find.textContaining('Os fios A e B (D+ e D−) não estão invertidos?'), findsOneWidget);
-    expect(find.textContaining('O ID do escravo'), findsOneWidget);
+    expect(find.textContaining('O número na rede (ID do escravo)'), findsOneWidget);
     await shutdown(tester, c);
   });
 
@@ -250,7 +250,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('usb-protocolo-raw')));
     await tester.pumpAndSettle();
     expect(find.text('Arduino / mensagem própria · 9600 8N1'), findsOneWidget);
-    expect(find.text('ID do escravo'), findsNothing);
+    expect(find.text('Número na rede'), findsNothing);
     expect(find.text('Descartar eco'), findsNothing);
     expect(find.text('Marca e modelo'), findsNothing);
     await tester.scrollUntilVisible(find.byKey(const ValueKey('mensagem-equipamento')), -200, scrollable: formScroll());

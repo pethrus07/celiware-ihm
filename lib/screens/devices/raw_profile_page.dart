@@ -507,7 +507,7 @@ class _RawProfilePageState extends State<RawProfilePage> {
             ..._framingOptions(),
             ..._checksumOptions(),
             _label('Jeito de tirar os campos'),
-            _chips<_Format>('formato', const [(_Format.keyValue, 'chave=valor'), (_Format.csv, 'vírgulas'), (_Format.regex, 'regex'), (_Format.binary, 'binário')],
+            _chips<_Format>('formato', const [(_Format.keyValue, 'chave=valor'), (_Format.csv, 'vírgulas'), (_Format.regex, 'expressão (regex)'), (_Format.binary, 'binário')],
                 _Format.of(_p.fields), _setFields, keyOf: (f) => f.name),
             if (_p.fields is RegexFields) ...[const SizedBox(height: Ind.space), _hint('A expressão fica à vista lá em cima.')],
             ..._commandOptions(),
@@ -528,11 +528,11 @@ class _RawProfilePageState extends State<RawProfilePage> {
             ),
             const SizedBox(height: Ind.spaceSmall),
             StepperField(
-              label: 'Mensagem de no máximo (bytes)',
+              label: 'Máximo (bytes)',
               controller: _maxBytes,
               min: 8,
               max: 65536,
-              helper: 'Passou disso sem terminar, é descartada (fim de linha errado, velocidade trocada).',
+              helper: 'Tamanho máximo da mensagem: passou disso sem terminar, é descartada (fim de linha errado, velocidade trocada).',
               onChanged: () => _set(_p.copyWith(maxFrameBytes: int.tryParse(_maxBytes.text) ?? _p.maxFrameBytes)),
             ),
           ],
@@ -599,7 +599,7 @@ class _RawProfilePageState extends State<RawProfilePage> {
   List<Widget> _checksumOptions() {
     final cs = _p.checksum;
     return [
-      _label('Checksum'),
+      _label('Conferência da mensagem (checksum)'),
       _chips<ChecksumKind>('checksum', const [(ChecksumKind.none, 'Nenhum'), (ChecksumKind.xor, 'XOR (BCC)'), (ChecksumKind.sum8, 'Soma 8 bits'), (ChecksumKind.crc16, 'CRC16')],
           cs.kind, (k) => _set(_p.copyWith(checksum: _checksum(kind: k))), keyOf: (k) => k.name),
       if (cs.enabled) ...[

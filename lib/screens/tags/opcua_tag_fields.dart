@@ -83,7 +83,8 @@ class OpcUaAddressBlock extends StatelessWidget {
         keyboardType: TextInputType.visiblePassword,
         style: Ind.number(18),
         decoration: InputDecoration(
-          labelText: 'NodeId',
+          // Rótulo do chão de fábrica, termo do manual entre parênteses.
+          labelText: 'Endereço (NodeId)',
           hintText: 'Ex.: ns=2;s=Maquina.Temperatura',
           helperText: error == null && n != null ? OpcUaTagFields.proof(n) : null,
           helperMaxLines: 2,

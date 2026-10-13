@@ -95,7 +95,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('protocolo-s7')));
     await tester.pumpAndSettle();
-    expect(find.text('ID do escravo'), findsNothing, reason: 'S7 não tem ID do escravo');
+    expect(find.text('Número na rede'), findsNothing, reason: 'S7 não tem ID do escravo');
     expect(find.text('Marca e modelo'), findsNothing, reason: 'perfil de fabricante é mapa Modbus');
     expect(find.text('S7-1200/1500 · Porta 102'), findsOneWidget, reason: 'porta padrão troca junto com o protocolo');
     expect(find.text('Rack 0, slot 1'), findsOneWidget);

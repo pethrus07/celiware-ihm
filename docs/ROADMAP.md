@@ -9,9 +9,10 @@ só a lista de trabalho.
 Tag `v1.3.2`. É a versão para apresentar e instalar
 (`celiware-ihm-1.3.2-arm64.apk`, celulares Android de 2017 para cá). A próxima já sai com o nome **Ware IoT**.
 
-**Prévia 1.4.0 (11/10, sem tag; build 10 em 12/10):** a etapa 4 construída até
-aqui, para teste interno (`ware-iot-1.4.0-previa-3-arm64.apk`, com câmeras,
-cabo USB-OTG, OPC UA e as 13 correções da rodada de QA visual). Não é entrega: a etapa 4 sai
+**Prévia 1.4.0 (11/10, sem tag; build 11 em 12/10):** a etapa 4 construída até
+aqui, para teste interno (`ware-iot-1.4.0-previa-4-arm64.apk`, com câmeras,
+cabo USB-OTG, OPC UA, as duas rodadas de QA visual, os modelos de tela, o
+elemento OEE e a procura de equipamentos na rede). Não é entrega: a etapa 4 sai
 numa entrega só, quando fechar (ver "Forma" abaixo). Estado item a item na
 tabela da etapa 4.
 
@@ -52,7 +53,7 @@ upgrade de R$ [valor].
 
 ### Entra
 
-**Requisitos detalhados, horas e fontes:** `docs/REQUISITOS-ETAPA4.md`. **Conferência item a item da lista do cliente (205 itens):** `docs/RASTREABILIDADE-LISTA-CLIENTE.md` — 16 itens dentro do app ainda para decidir. (levantamento de 11/10/2026: [estimativa interna] no total, mais da metade em protocolos).
+**Requisitos detalhados, horas e fontes:** `docs/REQUISITOS-ETAPA4.md`. **Conferência item a item da lista do cliente (205 itens):** `docs/RASTREABILIDADE-LISTA-CLIENTE.md` — os 16 itens que estavam para decidir foram decididos em 12/10 (8 feitos, 8 para depois com o motivo). (levantamento de 11/10/2026: [estimativa interna] no total, mais da metade em protocolos).
 
 | # | Item | Da lista dele / da reunião | Estado (11/10, noite) |
 |---|---|---|---|
@@ -123,9 +124,10 @@ emulador antes de seguir.
    junto o **pulo da tela** quando a faixa de alarme aparece (tudo desce
    ~70 dp e o toque seguinte cai no lugar errado — hoje amortecido porque
    todo comando pede confirmação): o espaço da faixa passa a ser reservado.
-   **Feito em 12/10 só para o diálogo:** com diálogo, folha ou menu aberto a
-   faixa entra por cima e não move nada; a tela em si ainda desce quando o
-   diálogo fecha (ou quando não há diálogo).
+   **Pulo da tela resolvido em 12/10:** o espaço da faixa é reservado em toda
+   tela (56 dp em pé, 48 deitado; "Sem alarmes" em cinza quando não há nada),
+   e a pergunta de regra mora na mesma faixa. Falta a outra metade do item:
+   estado da máquina, equipamento e hora da última leitura nessa linha.
 2. **Miniatura real das telas.** A lista de telas mostra um desenho genérico;
    passar a mostrar a tela em miniatura, para reconhecer de relance.
 3. **Tablet com barra lateral e duas colunas.** Foi a pior nota do QA (4).

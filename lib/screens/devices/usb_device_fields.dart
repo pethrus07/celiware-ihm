@@ -239,7 +239,7 @@ class _UsbAdapterSheetState extends State<UsbAdapterSheet> {
 }
 
 /// "Mais opções" do cabo USB: o que fala pelo cabo, velocidade, bits,
-/// paridade, parada e, no Modbus, ID do escravo e eco.
+/// paridade, parada e, no Modbus, número na rede (ID do escravo) e eco.
 class UsbMoreOptions extends StatelessWidget {
   const UsbMoreOptions({
     super.key,
@@ -307,11 +307,11 @@ class UsbMoreOptions extends StatelessWidget {
         const SizedBox(height: Ind.spaceLarge),
         StepperField(
           fieldKey: const ValueKey('usb-id'),
-          label: 'ID do escravo',
+          label: 'Número na rede',
           controller: unit,
           min: 1,
           max: 247,
-          helper: 'O endereço dele na linha RS-485. Vários na mesma linha: um cadastro por ID, mesmo adaptador.',
+          helper: 'ID do escravo no manual. Vários na mesma linha RS-485: um cadastro por ID, mesmo adaptador.',
           onChanged: onChanged,
         ),
         SwitchListTile(
@@ -441,7 +441,7 @@ List<String> usbProbeChecks(ProbeResult r, {required bool raw}) {
   return const [
     'Velocidade, bits, paridade e parada iguais aos do equipamento? Confira no manual dele e em "Mais opções".',
     'Os fios A e B (D+ e D−) não estão invertidos? Inverter não estraga nada: troque os dois e teste de novo.',
-    'O ID do escravo é o configurado no equipamento?',
+    'O número na rede (ID do escravo) é o configurado no equipamento?',
     'O equipamento está ligado e com o Modbus habilitado na porta serial? No RS-232, o TX de um vai no RX do outro e o GND precisa estar ligado.',
   ];
 }

@@ -430,7 +430,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                       const SizedBox(height: Ind.space),
                       StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
                       const SizedBox(height: Ind.space),
-                      StepperField(label: 'ID do escravo', controller: _unit, min: 0, max: 255, helper: 'Quase sempre 1.', onChanged: () => setState(() {})),
+                      StepperField(label: 'Número na rede', controller: _unit, min: 0, max: 255, helper: 'ID do escravo (Unit ID) no manual. Quase sempre 1.', onChanged: () => setState(() {})),
                       const SizedBox(height: Ind.space),
                       StepperField(label: 'Tempo de resposta (ms)', controller: _timeout, min: 200, max: 10000),
                       const SizedBox(height: Ind.space),
@@ -452,7 +452,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   /// usuário e senha, TLS. Aviso de queda, sinal de vida, ID e tempo são raros.
   List<Widget> _mqttOptions() => [
         const SizedBox(height: 6),
-        Text('O app assina os tópicos num broker da rede (Mosquitto, Node-RED, CLP ou ESP32 com MQTT). O IP acima é o do broker.',
+        Text('O app recebe os tópicos de um servidor MQTT da rede, o broker (Mosquitto, Node-RED, CLP ou ESP32 com MQTT). O IP acima é o do broker.',
             style: TextStyle(color: Ind.textMuted, fontSize: 13, height: 1.35)),
         const SizedBox(height: Ind.space),
         StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: 'MQTT usa 1883; com TLS, 8883.', onChanged: () => _refresh()),
@@ -493,7 +493,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
           controller: _statusTopic,
           autocorrect: false,
           decoration: const InputDecoration(
-            labelText: 'Tópico de aviso de queda (LWT)',
+            labelText: 'Tópico de queda (LWT)',
             hintText: 'Ex.: cortadora/status',
             helperText: 'Se o equipamento deixa testamento no broker, as variáveis dele ficam "sem comunicação" quando ele cai.',
             helperMaxLines: 3,
@@ -509,12 +509,12 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
           ),
         ],
         const SizedBox(height: Ind.space),
-        StepperField(label: 'Sinal de vida a cada (s)', controller: _keepAlive, min: 0, max: 65535, helper: 'Keep-alive: avisa o broker que o app está vivo e percebe Wi-Fi que caiu. 0 desliga.'),
+        StepperField(label: 'Sinal de vida (s)', controller: _keepAlive, min: 0, max: 65535, helper: 'Avisa o broker que o app está vivo (keep-alive) e percebe Wi-Fi que caiu. 0 desliga.'),
         const SizedBox(height: Ind.space),
         TextFormField(
           controller: _clientId,
           autocorrect: false,
-          decoration: const InputDecoration(labelText: 'ID do cliente', hintText: 'Automático', helperText: 'Vazio: um ID novo a cada conexão. Fixo só se o broker exigir.', helperMaxLines: 2),
+          decoration: const InputDecoration(labelText: 'Nome no broker (client ID)', hintText: 'Automático', helperText: 'Vazio: um nome novo a cada conexão. Fixo só se o broker exigir.', helperMaxLines: 2),
         ),
         const SizedBox(height: Ind.space),
         StepperField(label: 'Tempo de resposta (ms)', controller: _timeout, min: 200, max: 10000),
@@ -595,7 +595,7 @@ class _ProbeCard extends StatelessWidget {
                     if (result.hint == null) 'O celular está no mesmo Wi-Fi da máquina?',
                     'O IP está certo? (um número trocado é o erro mais comum)',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
-                    'A porta é 502? O ID é 1?',
+                    'A porta é 502? O número na rede (ID do escravo) é 1?',
                   ])
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ no modo escuro: a abertura do sistema com o ícone do app
+         (tool/gerar_icone.py) sobre o fundo do tema escuro do app
+         (IndPalette.escuro.bg), o mesmo da primeira tela. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">#0E1014</item>
+    </style>
+</resources>

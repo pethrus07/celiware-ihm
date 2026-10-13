@@ -75,13 +75,13 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'IP do equipamento'), '192.168.0.50');
     await tester.tap(find.text('Mais opções'));
     await tester.pumpAndSettle();
-    expect(find.text('ID do escravo'), findsOneWidget);
+    expect(find.text('Número na rede'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const ValueKey('protocolo-mqtt')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('protocolo-mqtt')));
     await tester.pumpAndSettle();
-    expect(find.text('ID do escravo'), findsNothing, reason: 'Modbus some quando o protocolo é MQTT');
+    expect(find.text('Número na rede'), findsNothing, reason: 'Modbus some quando o protocolo é MQTT');
     expect(find.text('Ler a cada (ms)'), findsNothing);
     expect(find.text('MQTT · Porta 1883'), findsOneWidget, reason: 'porta padrão troca junto com o protocolo');
     await tester.drag(find.byType(ListView).last, const Offset(0, 3000));

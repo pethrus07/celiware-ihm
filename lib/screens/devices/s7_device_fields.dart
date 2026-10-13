@@ -107,15 +107,15 @@ class S7DeviceOptions extends StatelessWidget {
       ]),
       if (other) ...[
         const SizedBox(height: Ind.space),
-        StepperField(fieldKey: const ValueKey('campo-rack'), label: 'Rack', controller: fields.rack, min: 0, max: 7, onChanged: onChanged),
+        StepperField(fieldKey: const ValueKey('campo-rack'), label: 'Bastidor (rack)', controller: fields.rack, min: 0, max: 7, onChanged: onChanged),
         const SizedBox(height: Ind.space),
         StepperField(
           fieldKey: const ValueKey('campo-slot'),
-          label: 'Slot',
+          label: 'Posição da CPU',
           controller: fields.slot,
           min: 0,
           max: 31,
-          helper: 'O da CPU, na configuração de hardware do TIA Portal.',
+          helper: 'O slot da CPU, na configuração de hardware do TIA Portal.',
           onChanged: onChanged,
         ),
       ] else ...[

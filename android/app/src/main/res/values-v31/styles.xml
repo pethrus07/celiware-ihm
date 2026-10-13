@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+: a abertura do app é a do sistema (SplashScreen), com o
+         ícone adaptativo do app no centro (tool/gerar_icone.py). O fundo é o
+         do tema claro do app (IndPalette.claro.bg): da abertura para a
+         primeira tela não pisca branco. -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">#E4E6EA</item>
+    </style>
+</resources>

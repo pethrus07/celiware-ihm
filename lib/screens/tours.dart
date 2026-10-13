@@ -31,7 +31,7 @@ class Tours {
           body: 'Aqui você monta as telas das suas máquinas. Já tem uma demonstração pronta para mexer à vontade.',
         ),
         TourStep(target: screens, essential: true, title: 'Suas telas', body: 'Toque numa tela para abrir e operar.'),
-        TourStep(target: add, title: 'Nova tela', body: 'Crie e monte arrastando elementos. Tudo fica salvo sozinho.'),
+        TourStep(target: add, title: 'Nova tela', body: 'Em branco ou de um modelo pronto: máquina, inversor, balança... Tudo fica salvo sozinho.'),
         TourStep(
           target: nav,
           essential: true,
@@ -56,7 +56,7 @@ class Tours {
 
   static TourSpec editor({GlobalKey? palette, GlobalKey? element, GlobalKey? config, GlobalKey? settings, GlobalKey? done}) =>
       TourSpec(id: 'editor', version: 1, title: 'Montar uma tela', steps: [
-        TourStep(target: palette, essential: true, title: 'Acrescentar', body: 'Escolha um elemento: botão, lâmpada, gráfico...'),
+        TourStep(target: palette, essential: true, title: 'Acrescentar', body: 'Escolha um elemento: botão, lâmpada, gráfico, OEE...'),
         TourStep(target: element, essential: true, title: 'Mover', body: 'Toque para selecionar, arraste para mover, puxe a bolinha para aumentar.'),
         TourStep(target: config, essential: true, title: 'Configurar', body: 'Escolha a variável, o texto e a cor.'),
         // "Regras da tela", como no botão: "Regras" sozinho agora é o de Mais
@@ -68,7 +68,7 @@ class Tours {
   static TourSpec equipamentos({GlobalKey? list, GlobalKey? add}) =>
       TourSpec(id: 'equipamentos', version: 1, title: 'Cadastrar um equipamento', steps: [
         TourStep(target: list, essential: true, title: 'Equipamentos', body: 'Cada CLP, inversor ou IHM que o app lê.'),
-        TourStep(target: add, essential: true, title: 'Cadastrar', body: 'Informe o IP e toque em Testar conexão antes de salvar.'),
+        TourStep(target: add, essential: true, title: 'Cadastrar', body: 'Informe o IP (ou toque na lupa para procurar no Wi-Fi) e toque em Testar conexão antes de salvar.'),
         const TourStep(essential: true, title: 'Mesma rede', body: 'O celular precisa estar no mesmo Wi-Fi do equipamento.'),
       ]);
 

@@ -23,6 +23,7 @@ import '../../widgets/hmi/hmi_frame.dart';
 import '../../widgets/hmi/live_tags.dart';
 import '../../widgets/hmi/write_actions.dart';
 import '../tags/tag_form_page.dart';
+import 'oee_config.dart';
 import 'table_config.dart';
 
 /// Configuração de um elemento: prévia ao vivo no topo, campos do tipo
@@ -321,6 +322,11 @@ class ElementConfigSheet extends StatelessWidget {
         ]));
       case ElementType.table:
         w.addAll(tableTextFields(project, e, set));
+      case ElementType.oee:
+        // Origem, escala, uma variável por vaga e faixas: oee_config.dart.
+        w.addAll(oeeFields(project, e, save,
+            picker: (selected, onChanged) =>
+                _TagPicker(project: project, fit: TagFit.number, selected: selected, preferDevices: screenDevices, onChanged: onChanged)));
       case ElementType.value:
       case ElementType.barChart:
       case ElementType.unknown:

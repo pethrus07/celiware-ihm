@@ -10,6 +10,7 @@ import 'element_catalog.dart';
 import 'elements/chart_elements.dart';
 import 'elements/control_elements.dart';
 import 'elements/indicator_elements.dart';
+import 'elements/oee_element.dart';
 import 'elements/static_elements.dart';
 import 'elements/table_element.dart';
 import 'hmi_frame.dart';
@@ -47,6 +48,8 @@ class HmiElementView extends StatelessWidget {
         return ImageElement(element: e);
       case ElementType.table:
         return TableElement(element: e);
+      case ElementType.oee:
+        return OeeElement(element: e);
       case ElementType.unknown:
         return UnknownElement(element: e);
     }

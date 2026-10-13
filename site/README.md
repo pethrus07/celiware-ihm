@@ -131,10 +131,18 @@ usam esse formato. A `404.html` aparece sozinha em endereços que não existem.
 
 ## Como foi feito e medido (11/10/2026)
 
-- **Prints:** `operacao`, `graficos`, `editor` e `configurar-elemento` vêm de
-  `docs/imagens/`; os demais foram capturados no emulador (Pixel 7, app 1.3.2,
-  máquina de demonstração). Redimensionados para 540×1200 e gravados em WebP
-  qualidade 78 com Pillow. Imagem de compartilhamento: 1200×630, JPEG.
+- **Prints (refeitos em 12/10/2026, build 1.4.0+11):** todos capturados no
+  emulador (perfil Pixel 7, 1080×2400, Android 16, tema escuro, relógio 24 h,
+  barra de status no modo demonstração), com a máquina de demonstração.
+  Reduzidos à metade (540×1200, Lanczos) e gravados em WebP qualidade 80 com
+  Pillow; os mesmos 540×1200 em PNG vão para `docs/imagens/`. Três novos:
+  `nova-tela-modelo` (folha "Começar de" com os modelos), `procurar-rede`
+  (achados do simulador `sim/simulador.py` rodando no PC, visto pelo emulador
+  em 10.0.2.2, portas 502 e 5020) e `oee` (tela de teste "OEE da cortadora":
+  OEE calculado no app a partir de três variáveis calculadas — disponibilidade
+  `se([Velocidade] > 0; 92,5; 0)`, desempenho `[Velocidade] × 100 ÷ 75`,
+  qualidade `98 − abs([Tensão do papel] − 62) ÷ 4` — com a máquina a 65 m/min).
+  Imagem de compartilhamento: 1200×630, JPEG (não refeita).
 - **Fontes:** IBM Plex Sans (400 e 600) e Sans Condensed (600), recortes
   Latin1 oficiais da IBM (`@ibm/plex-sans` e `@ibm/plex-sans-condensed`
   1.1.0), servidas pelo próprio site. Nenhuma requisição a terceiros.

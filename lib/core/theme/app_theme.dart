@@ -401,6 +401,7 @@ class Ind {
         iconTheme: WidgetStateProperty.resolveWith((s) =>
             IconThemeData(color: s.contains(WidgetState.selected) ? p.accent : p.textDim)),
         labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(
+            fontFamily: sans,
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: s.contains(WidgetState.selected) ? p.accent : p.textDim)),
@@ -411,8 +412,8 @@ class Ind {
         indicatorColor: p.accent.withValues(alpha: p.dark ? 0.18 : 0.14),
         selectedIconTheme: IconThemeData(color: p.accent),
         unselectedIconTheme: IconThemeData(color: p.textDim),
-        selectedLabelTextStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.accent),
-        unselectedLabelTextStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.textDim),
+        selectedLabelTextStyle: TextStyle(fontFamily: sans, fontSize: 12, fontWeight: FontWeight.w600, color: p.accent),
+        unselectedLabelTextStyle: TextStyle(fontFamily: sans, fontSize: 12, fontWeight: FontWeight.w600, color: p.textDim),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: p.accent,

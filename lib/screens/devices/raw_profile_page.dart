@@ -282,7 +282,7 @@ class _RawProfilePageState extends State<RawProfilePage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Mensagem do equipamento'),
+          title: const AdaptiveTitle('Mensagem do equipamento'),
           actions: [TextButton(key: const ValueKey('concluir-perfil'), onPressed: _finish, child: const Text('Concluir'))],
         ),
         body: Column(children: [

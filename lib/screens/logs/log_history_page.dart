@@ -246,7 +246,7 @@ class _LogHistoryPageState extends State<LogHistoryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(g.name),
+        title: AdaptiveTitle(g.name),
         actions: [
           IconButton(
             key: const ValueKey('exportar-csv'),

@@ -252,7 +252,7 @@ class _CalcTagFormPageState extends State<CalcTagFormPage> {
         tagIds: program == null ? const {} : CalcGraph.expand(project, program.inputIds),
         child: Scaffold(
           appBar: AppBar(
-            title: Text(_editing ? 'Variável calculada' : 'Nova variável calculada'),
+            title: AdaptiveTitle(_editing ? 'Variável calculada' : 'Nova variável calculada'),
             actions: [
               if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
             ],

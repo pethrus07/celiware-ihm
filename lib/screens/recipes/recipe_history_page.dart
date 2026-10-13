@@ -38,7 +38,7 @@ class _RecipeHistoryPageState extends State<RecipeHistoryPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Histórico de aplicações')),
+        appBar: AppBar(title: const AdaptiveTitle('Histórico de aplicações')),
         body: FutureBuilder<List<RecipeApplyRecord>>(
           future: _load,
           builder: (context, snap) {

@@ -162,7 +162,7 @@ class RecipeTypePage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(type.name),
+        title: AdaptiveTitle(type.name),
         actions: [
           IconButton(
             key: const ValueKey('renomear-tipo'),

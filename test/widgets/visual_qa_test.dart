@@ -186,6 +186,27 @@ void main() {
         ));
         expect(cut(tester, find.text(helper)), isFalse);
       });
+
+      testWidgets('campo com − e +: o rótulo longo encolhe e cabe inteiro, sem "…"', (tester) async {
+        // "Tempo de resposta (ms)" saía "Tempo de respos…" em 320 dp em todo
+        // "Mais opções" de equipamento.
+        const label = 'Tempo de resposta (ms)';
+        final ctrl = TextEditingController(text: '1500');
+        addTearDown(ctrl.dispose);
+        tester.view.physicalSize = phone;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(MaterialApp(
+          theme: Ind.theme,
+          home: Scaffold(body: Padding(padding: const EdgeInsets.all(20), child: StepperField(label: label, controller: ctrl))),
+        ));
+        expect(cut(tester, find.text(label)), isFalse, reason: 'terminava em "…"');
+        final text = tester.getRect(find.text(label));
+        final field = tester.getRect(find.byType(InputDecorator));
+        expect(text.left, greaterThanOrEqualTo(field.left - 0.5));
+        expect(text.right, lessThanOrEqualTo(field.right + 0.5), reason: 'o rótulo inteiro dentro do campo');
+        expect(text.height, greaterThanOrEqualTo(9), reason: 'encolhe, mas continua legível');
+      });
     });
   }
 

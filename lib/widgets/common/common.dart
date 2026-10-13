@@ -270,8 +270,10 @@ class StepperField extends StatelessWidget {
             inputFormatters: [if (min >= 0) FilteringTextInputFormatter.digitsOnly],
             style: Ind.number(20),
             // O campo divide a largura com − e +: a dica quebra em mais
-            // linhas que num campo inteiro, e não pode acabar em "…".
-            decoration: InputDecoration(labelText: label, helperText: helper, helperMaxLines: 6),
+            // linhas que num campo inteiro, e não pode acabar em "…". O
+            // rótulo encolhe para caber ("Tempo de resposta (ms)" cortava em
+            // 320 dp) — pôr em cima mudaria a altura de todo formulário.
+            decoration: InputDecoration(label: _FitLabel(label), helperText: helper, helperMaxLines: 6),
             onChanged: (_) => onChanged?.call(),
             validator: (t) {
               final v = int.tryParse(t ?? '');
@@ -286,6 +288,22 @@ class StepperField extends StatelessWidget {
         const SizedBox(width: 6),
         StepButton(icon: Icons.add_rounded, onTap: () => _bump(1), tooltip: 'Aumentar'),
       ],
+    );
+  }
+}
+
+/// Rótulo de campo que encolhe até caber numa linha, em vez de terminar em
+/// "…". O estilo (tamanho, cor, flutuando ou não) vem do próprio campo.
+class _FitLabel extends StatelessWidget {
+  const _FitLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerStart,
+      child: Text(text, maxLines: 1, softWrap: false),
     );
   }
 }

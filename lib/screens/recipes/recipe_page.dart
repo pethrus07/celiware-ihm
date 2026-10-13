@@ -303,7 +303,7 @@ class _RecipePageState extends State<RecipePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(recipe.name),
+        title: AdaptiveTitle(recipe.name),
         bottom: busy ? const PreferredSize(preferredSize: Size.fromHeight(3), child: LinearProgressIndicator(minHeight: 3)) : null,
         actions: [
           PopupMenuButton<String>(

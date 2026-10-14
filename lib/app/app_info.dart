@@ -15,5 +15,5 @@ class AppInfo {
 
   /// Política de privacidade publicada (a mesma URL vai no Play Console).
   /// Mudou o domínio do site (`site/README.md`), mude aqui também.
-  static const privacyUrl = 'https://ware-iot.pages.dev/privacidade';
+  static const privacyUrl = 'https://wareiot.com.br/privacidade';
 }

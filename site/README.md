@@ -31,6 +31,27 @@ de cada página — sempre o destaque do app (`accent` de
 imagem de compartilhamento (`img/compartilhar.jpg`) não tem gerador: o ícone
 dela é o `store/icone-512.png` reduzido a 56 px, colado em x 80, y 84.
 
+## No ar (14/10/2026)
+
+Publicado no Cloudflare, conta pessoal do Pedro, Worker `ware-iot` com os
+arquivos estáticos (ver "Publicar no Cloudflare", abaixo). Endereço provisório
+`https://ware-iot.ryzecode.workers.dev`; domínio definitivo **wareiot.com.br**
+(ligado quando o registro sair).
+
+Já trocados: domínio (`https://wareiot.com.br`), e-mail
+(`celiwareautomacao@gmail.com`) e a loja (`#LOJA-INICIO` →
+`https://www.celiwareautomacao.com.br/`, a loja Shopify da Celiware).
+
+**Escondidos até o link existir** (atributo `hidden`, marcador intacto no HTML):
+os botões "Ver na loja" do conversor, do roteador 4G e do repetidor (a loja
+ainda não tem esses produtos), o "Ver conversor na loja" dos 3 passos, o bloco
+do WhatsApp em Contato e o "Vídeo completo · 3 min" do herói. No diagrama de
+Como conectar, a caixa do produto perde o botão e deixa de ser link
+(`class="d-loja d-loja--espera" data-href="#LOJA-…"`). Para trazer um de
+volta: troque o marcador pelo endereço e apague o `hidden` (no diagrama, volte
+`data-href` para `href` e tire `d-loja--espera`). O `conferir-site` continua
+listando esses marcadores como aviso.
+
 ## Antes de publicar: trocar os marcadores
 
 Os links que ainda não existem estão como **marcadores**. Até a troca, os
@@ -145,31 +166,27 @@ o YouTube.
 (LCP 1,9 s, CLS 0, 256 KB — os vídeos só baixam quando aparecem).
 `demo.js` 19 KB (6,7 KB com gzip), `demo.css` 20 KB (5,6 KB com gzip).
 
-## Publicar no Cloudflare Pages
+## Publicar no Cloudflare
 
 Arquivos estáticos são grátis e sem limite de acesso no plano gratuito; o custo
 é só o domínio.
 
-**Pelo Git (recomendado).** Cloudflare → Workers & Pages → Criar → Pages →
-Conectar ao Git → este repositório.
+Desde 14/10/2026 o site é um Worker com arquivos estáticos (o formato atual do
+Cloudflare Pages), configurado em `wrangler.jsonc` na raiz do repositório: nome
+`ware-iot`, conta pessoal do Pedro fixada, só a pasta `site/` vai ao ar, e
+endereço que não existe cai no `404.html`. Publicar, da raiz do repositório:
 
-- Branch de produção: `main`
-- Framework: *None*
-- Comando de build: vazio
-- Diretório de saída: `site`
-
-Cada push na `main` publica sozinho. Nomeando o projeto `ware-iot`, o endereço
-provisório é `https://ware-iot.pages.dev` (o mesmo dos marcadores). Se o nome
-estiver ocupado, troque o domínio nos arquivos (tabela acima).
-
-**Sem Git.** Envio direto da pasta, pela linha de comando:
-
-```bash
-npx wrangler pages deploy site --project-name ware-iot
+```powershell
+& "$HOME\Projetos\manutencao-xps\cf.ps1" usar pessoal npx wrangler deploy
 ```
 
-**Domínio próprio.** No projeto: Custom domains → Set up a domain. Depois
-troque `https://ware-iot.pages.dev` nos arquivos e publique de novo.
+Endereço provisório: `https://ware-iot.ryzecode.workers.dev`. Os `_headers`
+valem igual (cabeçalhos de segurança, cache, `noindex` neste README).
+
+**Domínio próprio (wareiot.com.br).** O domínio precisa estar na mesma conta
+da Cloudflare (Add a domain, plano Free) com os nameservers dela na Hostinger;
+depois, no Worker `ware-iot`: Settings → Domains & Routes → Add → Custom
+domain → `wareiot.com.br` (e `www.wareiot.com.br`).
 
 O Pages serve `como-conectar.html` em `/como-conectar`; os links internos já
 usam esse formato. A `404.html` aparece sozinha em endereços que não existem.

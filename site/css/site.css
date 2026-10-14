@@ -153,6 +153,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* O que espera um link que ainda não existe fica com hidden (README) */
+[hidden] { display: none !important; }
+
 img,
 svg { display: block; max-width: 100%; }
 img { height: auto; }
@@ -1024,8 +1027,12 @@ figure.bloco__midia { flex-direction: column; align-items: center; }
 /* Peças do diagrama (SVG inline, cores dos tokens) */
 .d-caixa { fill: var(--surface-high); stroke: var(--line); stroke-width: 1.5; }
 .d-loja .d-caixa { fill: var(--raised); stroke: var(--accent); stroke-width: 2; }
-.d-loja:hover .d-caixa,
-.d-loja:focus-visible .d-caixa { fill: var(--accent-soft); }
+.d-loja--espera .d-botao,
+.d-loja--espera .d-botao-texto { display: none; }
+/* Sem link ainda: a caixa volta a ser caixa comum (a borda verde-água dizia "clique") */
+.d-loja.d-loja--espera .d-caixa { fill: var(--surface-high); stroke: var(--line); stroke-width: 1.5; }
+.d-loja[href]:hover .d-caixa,
+.d-loja[href]:focus-visible .d-caixa { fill: var(--accent-soft); }
 .d-loja:focus-visible { outline: none; }
 .d-loja:focus-visible .d-caixa { stroke-width: 4; }
 .d-titulo { fill: var(--text); font: 600 15px var(--font); }

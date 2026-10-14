@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Trocar https://ware-iot.pages.dev pelo domínio definitivo (ver README.md). -->
+<!-- Trocar https://wareiot.com.br pelo domínio definitivo (ver README.md). -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://ware-iot.pages.dev/</loc><lastmod>2026-10-11</lastmod></url>
-  <url><loc>https://ware-iot.pages.dev/como-conectar</loc><lastmod>2026-10-11</lastmod></url>
-  <url><loc>https://ware-iot.pages.dev/recursos</loc><lastmod>2026-10-11</lastmod></url>
-  <url><loc>https://ware-iot.pages.dev/tutoriais</loc><lastmod>2026-10-11</lastmod></url>
-  <url><loc>https://ware-iot.pages.dev/privacidade</loc><lastmod>2026-10-11</lastmod></url>
-  <url><loc>https://ware-iot.pages.dev/contato</loc><lastmod>2026-10-11</lastmod></url>
+  <url><loc>https://wareiot.com.br/</loc><lastmod>2026-10-11</lastmod></url>
+  <url><loc>https://wareiot.com.br/como-conectar</loc><lastmod>2026-10-11</lastmod></url>
+  <url><loc>https://wareiot.com.br/recursos</loc><lastmod>2026-10-11</lastmod></url>
+  <url><loc>https://wareiot.com.br/tutoriais</loc><lastmod>2026-10-11</lastmod></url>
+  <url><loc>https://wareiot.com.br/privacidade</loc><lastmod>2026-10-11</lastmod></url>
+  <url><loc>https://wareiot.com.br/contato</loc><lastmod>2026-10-11</lastmod></url>
 </urlset>

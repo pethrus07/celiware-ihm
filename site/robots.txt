@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ware-iot.pages.dev/sitemap.xml
+Sitemap: https://wareiot.com.br/sitemap.xml

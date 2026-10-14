@@ -1,0 +1,15 @@
+// Site do Ware IoT (pasta site/) no Cloudflare, conta pessoal do Pedro.
+// Publicar: manutencao-xps/cf.ps1 usar pessoal npx wrangler deploy
+// (ver site/README.md, "Publicar no Cloudflare"). Só a pasta site/ vai ao ar.
+{
+  "name": "ware-iot",
+  "account_id": "642a4a3988033760c46abb97c122e0dd",
+  "compatibility_date": "2026-10-12",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "site",
+    "not_found_handling": "404-page"
+  }
+}

@@ -86,8 +86,8 @@ operador · tablet.
 | Tags | Até 5, escolhidas da lista do Console; as mais próximas de automação, monitoramento e ferramentas de trabalho |
 | E-mail de contato | `EMAIL_CONTATO` (o mesmo do site; aparece na loja) |
 | Telefone | opcional; deixar em branco |
-| Site | o domínio do site publicado (`site/README.md`); enquanto não houver, `https://ware-iot.pages.dev` |
-| Política de privacidade | `https://ware-iot.pages.dev/privacidade` (ou o domínio definitivo), **publicada antes do envio**. A mesma URL está em `AppInfo.privacyUrl` |
+| Site | `https://wareiot.com.br` |
+| Política de privacidade | `https://wareiot.com.br/privacidade`, **publicada antes do envio**. A mesma URL está em `AppInfo.privacyUrl` |
 | Preço | Gratuito — **definitivo na Play** (ver `PUBLICACAO.md`, decisões) |
 | Países | Brasil (a ficha é só pt-BR) |
 

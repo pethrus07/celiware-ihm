@@ -59,7 +59,7 @@ upgrade de R$ [valor].
 |---|---|---|---|
 | 0 | **Correção de conexão (1.3.2):** conectar sempre pelo Wi-Fi quando o equipamento tem IP de rede local, mesmo com dados móveis ligados; teste de conexão avisa "fora do Wi-Fi" e "faixa de IP diferente" | cliente do cliente não conectou (28/09) | **Feito (1.3.2).** Falta a prova em celular real com Wi-Fi sem internet + 4G. |
 | 1 | Publicação na Play Store | reunião | **Lado técnico pronto (12/10):** `.aab` de loja com portões (sem chave de upload não sai), alvo 36, 16 KB, privacidade no app, ficha pt-BR, gráfico de recursos, 8 capturas de celular e 5 de tablet, formulários (`docs/loja/`). D-U-N-S em mãos (13/10: **[D-U-N-S]**). Falta o que é do dono, na ordem da seção "Publicação na Play Store" abaixo: domínio e site no ar, conta de organização (reunião com o cliente), chave de upload. |
-| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100), com o link "Quero aprender automação" para o Instituto (item 184) e os protocolos novos marcados como ainda sem teste em equipamento real (12/10). Visual refeito em 13/10 (palco escuro com brilho, prints maiores) e **lotes 1 e 2 de conversão feitos em 13/10** (seção "Site — conversão"; Lighthouse 95–99 / 100 / 100 / 100). Falta publicar: domínio, e-mail de contato; links da loja, WhatsApp e vídeo completo entram depois (marcadores no `site/README.md`). |
+| 2 | Site do produto: o que é, telas, recursos, como conectar, download, tutoriais | 44, 47 · reunião | **Feito** em `site/` (7 páginas, Lighthouse 99–100), com o link "Quero aprender automação" para o Instituto (item 184) e os protocolos novos marcados como ainda sem teste em equipamento real (12/10). Visual refeito em 13/10 (palco escuro com brilho, prints maiores) e **lotes 1 e 2 de conversão feitos em 13/10** (seção "Site — conversão"; Lighthouse 95–99 / 100 / 100 / 100). **No ar desde 14/10 em https://wareiot.com.br** (e-mail celiwareautomacao@gmail.com, "Loja" leva à loja Shopify da Celiware). Escondidos até o link existir: botões dos três produtos (a loja ainda não os tem), WhatsApp e vídeo completo (`site/README.md`). |
 | 3 | ~~Versão para Windows do próprio app~~ — **adiada em 11/10/2026** (decisão do Pedro) | parte cliente do 89 · reunião | `windows/` existe; `.exe` nunca gerado |
 | 4 | Grade maior e mais variáveis por tela | reunião | **Feito:** grade fina 6 ↔ 12 colunas, mover e redimensionar sem arrastar, Tabela de valores (até 30 variáveis), ≥ 40 variáveis numa tela de celular (GR-1 a GR-10). |
 | 5 | Correções no "editar memória" | 2, 11 · reunião | **Feito:** nada se perde calado, sugestões de sinal e CDAB, hexadecimal, bit de registrador de entrada (EM-1 a EM-12). |
@@ -175,11 +175,9 @@ Roteiro completo em `PUBLICACAO.md`; ficha, imagens e formulários prontos em `d
 Na ordem (combinado em 13/10):
 
 1. ~~**D-U-N-S**~~ ✅ **[D-U-N-S]**, Celiware Solucoes Tecnologicas Ltda.
-2. **Domínio do site do app:** o cliente compra (sugestão `wareiot.com.br`, livre
-   em 13/10) no CNPJ da Celiware; ligar ao site e publicar (a política de
-   privacidade tem de estar no ar antes do envio). Sem domínio,
-   `ware-iot.pages.dev` serve.
-3. **Conta de desenvolvedor de organização**, numa reunião com o cliente (código
+2. ~~**Domínio do site do app**~~ ✅ **wareiot.com.br no ar (14/10)**, com a
+   política em `https://wareiot.com.br/privacidade`.
+3. ~~**Conta de desenvolvedor de organização**~~ ✅ **criada e verificada (14/10)**, numa reunião com o cliente (código
    por SMS no celular dele, RG ou CNH do representante, cartão internacional
    para os US$ 25, endereço igual ao da D&B). Pela conta Google da Celiware; o
    site da organização é o que já está no ar, `www.celiwareautomacao.com.br`, e

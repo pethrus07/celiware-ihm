@@ -36,7 +36,9 @@ dela é o `store/icone-512.png` reduzido a 56 px, colado em x 80, y 84.
 Publicado no Cloudflare, conta pessoal do Pedro, Worker `ware-iot` com os
 arquivos estáticos (ver "Publicar no Cloudflare", abaixo). Endereço provisório
 `https://ware-iot.ryzecode.workers.dev`; domínio definitivo **wareiot.com.br**
-(ligado quando o registro sair).
+e **www.wareiot.com.br**, ligados ao Worker em 14/10 (zona na mesma conta,
+nameservers `glen`/`lisa.ns.cloudflare.com` na Hostinger; certificado Let's
+Encrypt automático).
 
 Já trocados: domínio (`https://wareiot.com.br`), e-mail
 (`celiwareautomacao@gmail.com`) e a loja (`#LOJA-INICIO` →

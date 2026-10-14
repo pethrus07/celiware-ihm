@@ -184,7 +184,10 @@ Na ordem (combinado em 13/10):
    o e-mail de contato fica nesse domínio.
 4. **Chave de upload** (credencial permanente — criar junto e guardar no cofre).
 5. `.aab`, ficha e formulários no Console; **teste interno** com o cliente antes
-   de abrir ao público. Quem tem o APK do WhatsApp precisa exportar o projeto,
+   de abrir ao público. **Decidido em 14/10:** o teste interno é também o
+   acesso antecipado dos clientes (link de convite, até 100 e-mails); o APK
+   para baixar no site foi descartado (reinstalação obrigatória depois e aviso
+   de "fonte desconhecida"). Próxima sessão começa por `PUBLICACAO.md` §0. Quem tem o APK do WhatsApp precisa exportar o projeto,
    desinstalar e instalar pela loja (a assinatura muda).
 
 ## Site — conversão (pesquisa de 13/10/2026)

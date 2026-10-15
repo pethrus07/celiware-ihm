@@ -168,7 +168,12 @@ Pequenos, nenhum atrapalha a apresentação.
 - **Adiar (shelve)** um alarme com motivo e prazo, para manutenção planejada.
 - **Exportar o histórico** de alarmes (CSV) junto com o projeto.
 
-## Publicação na Play Store (etapa 4: lado técnico feito; falta o do dono)
+## Publicação na Play Store — enviada para revisão em 15/10/2026
+
+**Em revisão no Google desde 15/10** (produção, Brasil, 1.4.0 versão 12) e já
+disponível no teste interno (link de convite). Detalhe em `PUBLICACAO.md` §0.
+Quando aprovar: liberar os R$ [valor] da publicação, tirar o "teste interno" do
+caminho dos clientes e trocar o QR/selo do site, que já apontam para a loja.
 
 Roteiro completo em `PUBLICACAO.md`; ficha, imagens e formulários prontos em `docs/loja/`.
 

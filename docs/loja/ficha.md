@@ -84,7 +84,7 @@ operador · tablet.
 | Tipo | App |
 | Categoria | **Ferramentas** (alternativa: Empresas) |
 | Tags | Até 5, escolhidas da lista do Console; as mais próximas de automação, monitoramento e ferramentas de trabalho |
-| E-mail de contato | `EMAIL_CONTATO` (o mesmo do site; aparece na loja) |
+| E-mail de contato | `celiwareautomacao@gmail.com` (o mesmo do site; aparece na loja) |
 | Telefone | opcional; deixar em branco |
 | Site | `https://wareiot.com.br` |
 | Política de privacidade | `https://wareiot.com.br/privacidade`, **publicada antes do envio**. A mesma URL está em `AppInfo.privacyUrl` |

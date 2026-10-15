@@ -21,6 +21,9 @@
 #>
 param(
   [switch]$Ensaio,
+  # Sem perguntar: sorteia uma senha forte e a grava em <Pasta>\ware-iot-upload-SENHA.txt
+  # (só o dono lê), para ir ao cofre e depois ser apagada. Nunca imprime a senha.
+  [switch]$GerarSenha,
   [string]$Pasta = (Join-Path $env:USERPROFILE "chaves")
 )
 $ErrorActionPreference = "Stop"
@@ -38,6 +41,12 @@ if (-not $Ensaio -and (Test-Path $props)) { throw "Já existe $props. Não sobre
 
 if ($Ensaio) {
   $senha = "ensaio-descartavel-123"
+} elseif ($GerarSenha) {
+  # 24 caracteres sorteados pelo gerador criptográfico, sem símbolos que confundem ao copiar.
+  $alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789".ToCharArray()
+  $bytes = [byte[]]::new(24)
+  [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+  $senha = -join ($bytes | ForEach-Object { $alfabeto[$_ % $alfabeto.Length] })
 } else {
   Write-Host ""
   Write-Host "Senha da chave de upload do Ware IoT (12 caracteres ou mais)." -ForegroundColor Cyan
@@ -78,6 +87,14 @@ if (-not $Ensaio) {
     "keyAlias=upload"
     "keyPassword=$senha"
   ) | Set-Content $props -Encoding utf8
+  if ($GerarSenha) {
+    @(
+      "Senha da chave de upload do Ware IoT (arquivo $jks, alias upload)."
+      "Copie para o cofre de credenciais junto com o .jks e APAGUE este arquivo."
+      ""
+      $senha
+    ) | Set-Content (Join-Path $Pasta "ware-iot-upload-SENHA.txt") -Encoding utf8
+  }
 }
 $senha = $null
 

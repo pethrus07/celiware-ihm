@@ -172,8 +172,9 @@ Pequenos, nenhum atrapalha a apresentação.
 
 **Em revisão no Google desde 15/10** (produção, Brasil, 1.4.0 versão 12) e já
 disponível no teste interno (link de convite). Detalhe em `PUBLICACAO.md` §0.
-Quando aprovar: liberar os R$ [valor] da publicação, tirar o "teste interno" do
-caminho dos clientes e trocar o QR/selo do site, que já apontam para a loja.
+Quando aprovar: cobrar os R$ [valor] da publicação; o selo e o QR do site passam
+a funcionar sozinhos (já apontam para a página da loja); os clientes do teste
+interno só recebem a atualização.
 
 Roteiro completo em `PUBLICACAO.md`; ficha, imagens e formulários prontos em `docs/loja/`.
 

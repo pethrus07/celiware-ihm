@@ -295,7 +295,7 @@ número de usuário, logo ou depoimento que não exista.
 - Texto gravável pela tela.
 - Backup e comparação de parâmetros de inversor.
 - CANopen. (Conversores RS-485 e Siemens S7 entraram na etapa 4, item 9.)
-- Licenciamento.
+- Licenciamento. **Monetização pelo app** (perguntas do cliente, 18/10/2026; estudo de 19/10, não é intenção do Pedro agora): no Brasil, conteúdo ou recurso digital vendido dentro do app tem de passar pela cobrança da Play (taxa até 30/09/2027: 15% em assinatura; 15% no 1º US$ 1 mi/ano em compra avulsa se inscrito no nível de 15%, senão 30%; depois cai para o modelo novo de 10% + cobrança). Cobrança alternativa ("user choice billing") existe no Brasil, ao lado da Play, com só 4 pontos a menos. Link para pagar fora: proibido no Brasil (só EUA e EEE têm programa). Hardware físico pode ser vendido e linkado livremente. O app sabe qual plano a pessoa tem (produto ativo na Play Billing), mas não recebe nome nem e-mail. Assinatura com planos, compra única ("Pro") e pacote de créditos (consumível) existem; créditos e qualquer licença vendida fora pedem servidor e login — fora da regra de corte atual. Se um dia entrar: compra única ou assinatura validada no aparelho é o caminho mais curto, e a Segurança dos dados e a política mudam antes.
 - ~~Identidade da Celiware no app~~ — **feito:** "Powered by Celiware" no
   Sobre (etapa 4).
 

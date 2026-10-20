@@ -192,6 +192,7 @@ lib/
 │   │   └── demo_project.dart         Projeto de demonstração (duas telas, receitas, uma calculada, uma regra desligada).
 │   ├── import/tag_batch.dart         "Criar várias": faixa, modelos de inversor, CSV, conflitos.
 │   ├── plant/plant_view.dart         O que o motor e o editor das regras da planta enxergam (§5.4.1).
+│   ├── update/update_check.dart      Atualização pela Play: decisão pura + verificador que nunca trava (§6.15).
 │   └── storage/                      project_repository (um projeto numa pasta, formato, gravação atômica);
 │                                     plant_store (a planta: pastas, planta.json, migração, cópias).
 ├── screens/
@@ -1135,6 +1136,17 @@ rtsp://10.0.2.2:18554/live    http://10.0.2.2:18080/foto.jpg
 
 Conferido no emulador com ela: abrir e ver a imagem, latência, derrubar a câmera (sem sinal) e religar (volta sozinha), encoder parado, senha faltando, errada (uma tentativa, "Senha recusada") e certa pelo diálogo, foto com senha, segundo plano soltando o player e reabrindo.
 
+### 6.15. Atualização pela Play
+
+Reunião de 19–20/10/2026 (D2): no futuro a versão antiga poderá ser obrigada a atualizar. A 1.4.0 não tem como saber que existe versão nova; a partir desta, o app usa a API oficial **Play In-App Updates** (pacote `in_app_update` 5.0.0, que traz `com.google.android.play:app-update` 2.1.0).
+
+- Ao abrir (depois do primeiro quadro) e ao voltar para o app (no máximo a cada 6 h), `UpdateChecker` pergunta à Play (`PlayUpdateGateway`).
+- **Flexível** (o normal): a Play baixa em segundo plano; terminado, um aviso embaixo oferece **Reiniciar**. Nunca reinicia sozinho no meio da operação.
+- **Imediata**: quando a versão publicada tem `inAppUpdatePriority` ≥ 4 (definida no envio, `PUBLICACAO.md` §12), a Play mostra a tela cheia de atualização. Se a pessoa cancelar, pede de novo ao voltar para o app.
+- **Sem internet, instalado fora da Play, em depuração, qualquer erro ou 10 s sem resposta: nada acontece** e o app segue operando — é IHM de máquina e funciona offline (NR-12: a falta de rede não pode impedir de operar).
+
+A decisão (`UpdatePolicy.decide`) é uma função pura em `lib/services/update/update_check.dart`, testada sem a Play; a chamada nativa fica em `play_update_gateway.dart`. Nos testes de widget o app é montado sem verificador. A biblioteca não acrescenta permissão ao manifesto (conferido no manifesto final: só a atividade `PlayCoreDialogWrapperActivity`). Só dá para ver funcionando com a app instalada pela Play e uma versão mais nova publicada (teste interno).
+
 ## 7. Tutoriais dentro do app
 
 Método do onboarding da Retífica (`sinapse/07-FONTES/onboarding-dentro-do-sistema.md`), portado para Flutter em `lib/widgets/tour/tour.dart`, com os textos centralizados em `lib/screens/tours.dart`.
@@ -1362,6 +1374,7 @@ Pinta um retângulo escuro na tela inteira menos (`PathOperation.difference`) o 
 | `test/widgets/rotulos_e_ajuda_test.dart` | Rótulos sem jargão inteiros em 320 e 360 dp (campo vazio, o pior caso) e o "?" de Câmeras e Ferramentas abrindo o tutorial. |
 | `test/services/plant_store_test.dart` | Planta no aparelho: o projeto único das versões antigas vira o primeiro projeto com históricos e registro (byte a byte), migração interrompida retomada sem duplicar, demonstração na primeira vez, lista perdida refeita pelas pastas; criar e importar acrescentam (o anterior intacto no disco), último aberto lembrado, renomear e duplicar (senha da câmera em chave nova), apagar (pasta, registro e cofre; o último não); histórico de alarmes e registro de dados isolados por projeto, mesmo com o mesmo id de grupo. |
 | `test/services/plant_test.dart` | Arquivo da planta (`schemaVersion` 2, ida e volta, projeto avulso em 1, versão mais nova recusada) e migração do arquivo antigo; referência qualificada ⇄ visão; motor recebe só o que as regras ligadas citam (com as entradas da calculada); regra da planta ligando duas máquinas de projetos diferentes, com qualquer um aberto; exportar, somar (regras apontando para os projetos novos), substituir com cópia antes e Nova planta. |
+| `test/services/update_check_test.dart` | Atualização pela Play: decisão (sem versão, flexível, prioridade 4–5 imediata, retomar a interrompida) e verificador que não faz nada sem internet, fora da Play, com erro ou sem resposta; flexível baixa uma vez; voltar ao app só confere de novo depois de 6 h, a imediata cancelada pede de novo. |
 | `test/widgets/projects_test.dart` | Barra com as cinco áreas (celular e trilho), Registros primeiro em Ferramentas, rótulos inteiros numa linha a 130% em 320 e 360 dp com a letra de verdade; abre dentro do projeto, seta e "voltar" levam à lista com o resumo; Novo projeto em branco acrescenta; apagar pergunta antes e o último não tem "Apagar"; Nova planta pergunta e guarda a cópia; Regras com "Deste projeto" e "Da planta". |
 
 Os testes de widget rodam no relógio simulado do Flutter: varredura, demonstração e animações avançam por passos, sem depender da velocidade da máquina. Toque que não acerta o alvo é falha, não aviso (`hitTestWarningShouldBeFatal`). Eles já pegaram seis defeitos reais antes do aparelho: quatro transbordos de layout (cartão de tela, legenda do gráfico, lâmpada estreita em dois tamanhos), leitura publicando depois do encerramento e toque sem retorno em tela só acompanhamento.

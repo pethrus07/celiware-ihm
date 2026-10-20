@@ -19,6 +19,8 @@ import 'screens/shell.dart';
 import 'services/runtime/hmi_runtime.dart';
 import 'services/voice/speech_engine.dart';
 import 'services/voice/voice_announcer.dart';
+import 'services/update/play_update_gateway.dart';
+import 'services/update/update_check.dart';
 import 'services/voice/voice_prefs.dart';
 
 /// Ponto de entrada: monta runtime + controlador e entrega ao [CeliwareIhmApp].
@@ -36,7 +38,9 @@ Future<void> main() async {
   final controller = ProjectController(library: PlantStore(), runtime: runtime);
   await controller.load();
 
-  runApp(CeliwareIhmApp(controller: controller, runtime: runtime));
+  // Atualização pela Play (D2, 19–20/10/2026): oferece ao abrir; sem
+  // internet ou fora da Play, nada acontece (§6.15).
+  runApp(CeliwareIhmApp(controller: controller, runtime: runtime, updates: UpdateChecker(gateway: PlayUpdateGateway())));
 }
 
 void _setupLogging() {
@@ -47,13 +51,16 @@ void _setupLogging() {
 /// Raiz do app. Cuida do ciclo de vida: em segundo plano, solta botões de
 /// pulso, para a varredura (bateria e rede) e grava o que estiver pendente.
 class CeliwareIhmApp extends StatefulWidget {
-  const CeliwareIhmApp({super.key, required this.controller, required this.runtime, this.speech});
+  const CeliwareIhmApp({super.key, required this.controller, required this.runtime, this.speech, this.updates});
 
   final ProjectController controller;
   final HmiRuntime runtime;
 
   /// Motor de voz (testes passam um falso); nulo = `flutter_tts`.
   final SpeechEngine? speech;
+
+  /// Verificação de atualização pela Play; nulo (testes) = não confere.
+  final UpdateChecker? updates;
 
   @override
   State<CeliwareIhmApp> createState() => _CeliwareIhmAppState();
@@ -67,6 +74,24 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
 
   /// Navegação a partir da faixa de alarme (que fica acima do Navigator).
   final _navigator = GlobalKey<NavigatorState>();
+
+  /// Aviso "atualização baixada" por cima de qualquer tela.
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+
+  /// Confere a atualização sem nunca segurar a abertura nem a operação.
+  void _checkUpdates({bool resumed = false}) {
+    final u = widget.updates;
+    if (u == null) return;
+    unawaited(u.run(resumed: resumed, onDownloaded: _offerRestart));
+  }
+
+  /// Flexível baixada: a pessoa reinicia quando puder (no meio da operação,
+  /// reiniciar sozinho derrubaria as conexões).
+  void _offerRestart() => _messenger.currentState?.showSnackBar(SnackBar(
+        duration: const Duration(days: 1),
+        content: const Text('Versão nova baixada.'),
+        action: SnackBarAction(label: 'Reiniciar', onPressed: () => unawaited(widget.updates?.install())),
+      ));
 
   @override
   void initState() {
@@ -101,6 +126,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     AppearanceController.instance.addListener(_applyAppearance);
     _applySystemBars();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdates());
   }
 
   @override
@@ -164,6 +190,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
         _voice.resume();
         _logger.resume();
         _rules.resume();
+        _checkUpdates(resumed: true);
       default:
         break;
     }
@@ -189,6 +216,7 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
         supportedLocales: const [Locale('pt', 'BR')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         navigatorKey: _navigator,
+        scaffoldMessengerKey: _messenger,
         // Faixa do topo acima de TODAS as telas, com espaço sempre
         // reservado: alarme só na tela que ninguém está olhando não é alarme
         // (ISA-18.2 §11.3.4). A pergunta de uma regra ("Parar a prensa?")

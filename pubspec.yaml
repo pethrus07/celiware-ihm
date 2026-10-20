@@ -39,6 +39,7 @@ dependencies:
   # O vídeo das câmeras não vem de pacote: é o ExoPlayer (Media3) direto,
   # em android/app/.../CameraRtsp.kt.
   flutter_secure_storage: ^11.2.0
+  in_app_update: ^5.0.0
 
 dev_dependencies:
   flutter_test:

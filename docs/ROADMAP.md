@@ -131,6 +131,7 @@ em `ARQUITETURA.md` §5.4.1, §6.1 e §6.7.
 | 3 | Exportar **a planta inteira** (um JSON com a lista de projetos, `schemaVersion` 2) ou **um projeto** (formato de sempre, abre na 1.4.0) (D7). Importar projeto soma; importar planta: somar ou substituir; "Nova planta" e substituir pedem confirmação forte e guardam a cópia da planta atual em `copias/`. | **Feito** |
 | 4 | **Regras da planta** (item 226 da lista nova): usam variáveis de qualquer projeto para interligar máquinas, em Ferramentas → Regras → "Da planta"; só no modo "propor" por padrão, nunca segurança (NR-12). O motor lê só as variáveis que as regras ligadas citam. | **Feito**; não testado com duas máquinas de verdade. |
 | 5 | **Barra com cinco áreas**: Projetos · Equipamentos · Variáveis · Ferramentas · Alarmes (Registros primeiro e em destaque em Ferramentas). Ajustes (aparência, tutoriais, sobre, privacidade) na engrenagem do topo de Projetos. Trilho do tablet com as mesmas cinco. | **Feito** |
+| 7 | **Atualização pela Play** (D2): flexível ao abrir; imediata quando a versão for publicada com prioridade ≥ 4; sem internet ou fora da Play, nada (`PUBLICACAO.md` §12). Commit separado, para descartar se não for agora. | **Feito**; só dá para ver funcionando com a versão seguinte já na Play (teste interno). |
 | 6 | Tutorial de início (v2), Regras (v2) e textos sem "Mais →"; site (`tutoriais.html`, `privacidade.html`) atualizado, **não publicado**. | **Feito** |
 
 **Antes de enviar esta versão à Play** (quando a 1.4.0 for aprovada):
@@ -143,6 +144,8 @@ em `ARQUITETURA.md` §5.4.1, §6.1 e §6.7.
   de `docs/loja/formularios.md`. Ficaram como estão porque descrevem a versão
   em revisão.
 - Publicar o site só junto com a versão nova (os textos já falam da navegação nova).
+- Conferir a ficha de Segurança dos dados com a biblioteca da Play de
+  atualização (ver `PUBLICACAO.md` §12).
 
 **Para o Pedro confirmar:** o app abre dentro do último projeto (e não na
 lista); rótulos da barra na Plex Condensed (encolhem até 9 sp no celular de

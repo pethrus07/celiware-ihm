@@ -23,23 +23,41 @@ class ProjectFormatError implements Exception {
 ///
 /// O mesmo formato serve para exportar/importar (`.ihm.json`), então o arquivo
 /// que o integrador manda por WhatsApp é idêntico ao que o app guarda.
+///
+/// Um repositório é **um** projeto numa pasta. O app guarda vários
+/// (`ProjectLibrary`): cada um ganha o seu repositório, na sua pasta.
 class ProjectRepository {
-  ProjectRepository({Directory? directory}) : _dirOverride = directory;
+  ProjectRepository({Directory? directory, Directory? logsDirectory})
+      : _dirOverride = directory,
+        _logsOverride = logsDirectory;
 
   static final Logger _log = Logger('ProjectRepository');
   static const fileName = 'projeto.ihm.json';
   static const exportExtension = 'ihm.json';
 
+  /// Pasta dos bancos do registro de dados (§6.10).
+  static const logsFolder = 'registros';
+
   final Directory? _dirOverride;
+  final Directory? _logsOverride;
 
   Future<File> _file() => sidecar(fileName);
 
   /// Arquivo ao lado do projeto, na mesma pasta privada (ex.: histórico de
   /// alarmes — que é do aparelho, não do projeto, e não vai na exportação).
+  /// Com vários projetos, cada um tem a sua pasta: o histórico de um nunca
+  /// se mistura com o de outro.
   Future<File> sidecar(String name) async {
     final dir = _dirOverride ?? await getApplicationDocumentsDirectory();
     return File('${dir.path}${Platform.pathSeparator}$name');
   }
+
+  /// Pasta dos bancos do registro de dados deste projeto. Sozinho, é
+  /// `registros/` ao lado do arquivo; na biblioteca, `registros/<projeto>/`
+  /// na raiz — a regra de backup do Android só exclui caminho fixo, e o
+  /// histórico tem de ficar fora do backup (passa de 25 MB e derrubaria o
+  /// backup do projeto junto).
+  Future<Directory> logsDirectory() async => _logsOverride ?? Directory((await sidecar(logsFolder)).path);
 
   /// Projeto salvo, ou `null` na primeira abertura do app.
   Future<Project?> load() async {
@@ -57,6 +75,8 @@ class ProjectRepository {
 
   Future<void> save(Project project) async {
     final file = await _file();
+    // Projeto novo da biblioteca: a pasta dele nasce na primeira gravação.
+    if (!file.parent.existsSync()) file.parent.createSync(recursive: true);
     final tmp = File('${file.path}.tmp');
     await tmp.writeAsBytes(encode(project), flush: true);
     await tmp.rename(file.path);

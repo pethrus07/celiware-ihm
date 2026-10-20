@@ -128,7 +128,7 @@ class _Run {
 ///
 /// Nada disso é intertravamento de segurança — o celular pode demorar ou
 /// parar de ler a qualquer momento. Segurança mora no CLP.
-class RuleEngine extends ChangeNotifier {
+class RuleEngine extends ChangeNotifier implements ProjectScoped {
   RuleEngine({
     required this.controller,
     required this.runtime,
@@ -138,6 +138,7 @@ class RuleEngine extends ChangeNotifier {
   }) {
     _evaluator = CalcEvaluator(() => controller.project);
     controller.addListener(_sync);
+    controller.attachScoped(this);
     _sync();
     _timer = Timer.periodic(tick, (_) => _evaluateAll());
     unawaited(_loadHistory());
@@ -448,6 +449,29 @@ class RuleEngine extends ChangeNotifier {
     _evaluateAll();
   }
 
+  // ── Troca de projeto ─────────────────────────────────────────────────────────
+
+  /// Grava o histórico do projeto que sai, no arquivo dele.
+  @override
+  Future<void> beforeSwitch() => flush();
+
+  /// As perguntas pendentes eram de máquinas do projeto que saiu: somem sem
+  /// gravar nada. O histórico também era dele.
+  @override
+  void onSwitch() {
+    _generation++;
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    _runs.clear();
+    _proposals.clear();
+    _history.clear();
+    notifyListeners();
+  }
+
+  /// O histórico do projeto que entrou (`historico-regras.json` da pasta dele).
+  @override
+  Future<void> afterSwitch() => _loadHistory();
+
   // ── Histórico em disco ──────────────────────────────────────────────────────
 
   void _addEvent(RuleEvent ev) {
@@ -459,9 +483,14 @@ class RuleEngine extends ChangeNotifier {
     }
   }
 
+  /// Sobe a cada troca de projeto: leitura do histórico que termina depois
+  /// da troca é do projeto que saiu e é descartada.
+  int _generation = 0;
+
   Future<void> _loadHistory() async {
     final f = historyFile;
     if (f == null) return;
+    final generation = _generation;
     try {
       final file = await f();
       if (!await file.exists()) return;
@@ -470,7 +499,7 @@ class RuleEngine extends ChangeNotifier {
         for (final j in list)
           if (j is Map) ?RuleEvent.fromJson(Map<String, dynamic>.from(j)),
       ];
-      if (_disposed) return;
+      if (_disposed || generation != _generation) return;
       _history.insertAll(0, loaded);
       notifyListeners();
     } catch (e) {
@@ -503,6 +532,7 @@ class RuleEngine extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     controller.removeListener(_sync);
+    controller.detachScoped(this);
     for (final e in _listeners.entries) {
       runtime.watch(e.key).removeListener(e.value);
     }

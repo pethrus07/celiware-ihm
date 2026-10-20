@@ -17,7 +17,6 @@ import 'app/project_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/shell.dart';
 import 'services/runtime/hmi_runtime.dart';
-import 'services/storage/project_repository.dart';
 import 'services/voice/speech_engine.dart';
 import 'services/voice/voice_announcer.dart';
 import 'services/voice/voice_prefs.dart';
@@ -32,7 +31,9 @@ Future<void> main() async {
   await VoicePrefsController.instance.load();
 
   final runtime = HmiRuntime();
-  final controller = ProjectController(repository: ProjectRepository(), runtime: runtime);
+  // Vários projetos, cada um na sua pasta; o projeto único das versões
+  // antigas vira o primeiro da lista ao abrir (ProjectLibrary.load).
+  final controller = ProjectController(library: ProjectLibrary(), runtime: runtime);
   await controller.load();
 
   runApp(CeliwareIhmApp(controller: controller, runtime: runtime));
@@ -82,8 +83,14 @@ class _CeliwareIhmAppState extends State<CeliwareIhmApp> with WidgetsBindingObse
       controller: widget.controller,
       runtime: widget.runtime,
     );
-    // Registro de dados: banco por grupo em `registros/`, ao lado do projeto.
-    _logger = DataLogger(controller: widget.controller, runtime: widget.runtime, store: LogStore.beside(widget.controller.repository));
+    // Registro de dados: banco por grupo na pasta de registros do projeto
+    // ABERTO — pedida de novo a cada vez, porque muda quando outro projeto
+    // é aberto.
+    _logger = DataLogger(
+      controller: widget.controller,
+      runtime: widget.runtime,
+      store: LogStore(directory: () => widget.controller.repository.logsDirectory()),
+    );
     // Regras entre máquinas: propõem em qualquer tela; parada vira alarme.
     _rules = RuleEngine(
       controller: widget.controller,

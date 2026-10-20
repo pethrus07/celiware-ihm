@@ -107,9 +107,9 @@ class LogStore {
 
   /// Na pasta privada do app, ao lado do projeto.
   factory LogStore.beside(ProjectRepository repository, {DatabaseFactory? factory}) =>
-      LogStore(directory: () async => Directory((await repository.sidecar(folder)).path), factory: factory);
+      LogStore(directory: repository.logsDirectory, factory: factory);
 
-  static const folder = 'registros';
+  static const folder = ProjectRepository.logsFolder;
   static final Logger _log = Logger('LogStore');
   static const _sidecars = ['', '-wal', '-shm', '-journal'];
 
@@ -378,6 +378,13 @@ class LogStore {
     try {
       await (await open).close();
     } catch (_) {/* já fechado ou nunca abriu */}
+  }
+
+  /// O projeto aberto mudou: fecha os bancos e esquece a pasta. A próxima
+  /// operação resolve [directory] de novo — a pasta do projeto novo.
+  Future<void> reset() async {
+    await close();
+    _dir = null;
   }
 
   Future<void> close() async {

@@ -175,9 +175,10 @@ class AlarmLogic {
 /// [HmiRuntime] (o equipamento continua sendo lido). Com o app em segundo
 /// plano a leitura para (bateria), então **não há alarme com o app
 /// fechado** — limite documentado em ARQUITETURA.md.
-class AlarmEngine extends ChangeNotifier {
+class AlarmEngine extends ChangeNotifier implements ProjectScoped {
   AlarmEngine({required this.controller, required this.runtime, this.historyFile, this.onDelay = const Duration(seconds: 1)}) {
     controller.addListener(_sync);
+    controller.attachScoped(this);
     _sync();
     unawaited(_loadHistory());
   }
@@ -461,6 +462,30 @@ class AlarmEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Troca de projeto ─────────────────────────────────────────────────────────
+
+  /// Grava o histórico do projeto que sai, no arquivo dele.
+  @override
+  Future<void> beforeSwitch() => flush();
+
+  /// Os alarmes e o histórico eram do projeto que saiu: a lista começa vazia
+  /// e o projeto novo levanta os dele assim que as leituras chegarem.
+  @override
+  void onSwitch() {
+    _generation++;
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    _entries.clear();
+    _pending.clear();
+    _external.clear();
+    _history.clear();
+    _changed();
+  }
+
+  /// O histórico do projeto que entrou (`historico-alarmes.json` da pasta dele).
+  @override
+  Future<void> afterSwitch() => _loadHistory();
+
   // ── Histórico em disco ──────────────────────────────────────────────────────
 
   void _addEvent(AlarmEvent ev) {
@@ -472,9 +497,14 @@ class AlarmEngine extends ChangeNotifier {
     }
   }
 
+  /// Sobe a cada troca de projeto: leitura do histórico que termina depois
+  /// da troca é do projeto que saiu e é descartada.
+  int _generation = 0;
+
   Future<void> _loadHistory() async {
     final f = historyFile;
     if (f == null) return;
+    final generation = _generation;
     try {
       final file = await f();
       if (!await file.exists()) return;
@@ -483,7 +513,7 @@ class AlarmEngine extends ChangeNotifier {
         for (final j in list)
           if (j is Map) ?AlarmEvent.fromJson(Map<String, dynamic>.from(j)),
       ];
-      if (_disposed) return;
+      if (_disposed || generation != _generation) return;
       _history.insertAll(0, loaded);
       notifyListeners();
     } catch (e) {
@@ -516,6 +546,7 @@ class AlarmEngine extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     controller.removeListener(_sync);
+    controller.detachScoped(this);
     for (final e in _listeners.entries) {
       runtime.watch(e.key).removeListener(e.value);
     }

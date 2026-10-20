@@ -59,7 +59,16 @@ class PlantView {
     required List<LogicRule> rules,
   }) {
     final extra = _qualify(others, {for (final e in others.entries) e.key: null});
-    return _merge(open.copyWith(rules: const []), extra, [for (final r in rules) PlantRef.ruleToView(r, openId)]);
+    // No editor da planta todo nome leva o projeto, inclusive os do aberto:
+    // "Cortadora · Liga máquina" ao lado de "Prensa · Liga máquina". Os ids
+    // do aberto continuam os de sempre.
+    String named(String n) => '${open.name}$nameSep$n';
+    final mine = open.copyWith(
+      rules: const [],
+      tags: [for (final t in open.tags) Tag.fromJson(t.toJson()..['name'] = named(t.name))],
+      devices: [for (final d in open.devices) d.id == CalcDevice.id ? d : Device.fromJson(d.toJson()..['name'] = named(d.name))],
+    );
+    return _merge(mine, extra, [for (final r in rules) PlantRef.ruleToView(r, openId)]);
   }
 
   /// Equipamentos e variáveis de outros projetos, qualificados. [wanted]

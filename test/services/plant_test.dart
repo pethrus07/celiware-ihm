@@ -89,6 +89,11 @@ void main() {
       expect(live.devices.map((d) => d.id), ['d1', 'pf/d1', CalcDevice.id]);
       expect(live.rules.single.targetTagId, 'liga');
 
+      // Editor: todas as variáveis de todos os projetos, todas com o projeto no nome.
+      final ed = PlantView.editor(openId: 'pp', open: prensa, others: {'pf': forno}, rules: const [global]);
+      expect(ed.tags.map((t) => (t.id, t.name)), [('liga', 'Prensa · Liga'), ('pf/temp', 'Forno · Temperatura'), ('pf/dobro', 'Forno · Dobro')]);
+      expect(ed.rules.single.targetTagId, 'liga');
+
       // Regra desligada não conecta máquina nenhuma.
       final off = PlantView.runtime(openId: 'pp', open: prensa, others: {'pf': forno}, rules: [global.copyWith(enabled: false)]);
       expect(identical(off, prensa), isTrue);

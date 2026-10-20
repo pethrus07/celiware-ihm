@@ -100,6 +100,7 @@ class _ToolsPageState extends State<ToolsPage> {
                     leading: const Icon(Icons.videocam_outlined),
                     title: const Text('Câmeras'),
                     subtitle: Text(CamerasPage.summary(p)),
+                    trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => _push(const CamerasPage()),
                   ),
                   ListTile(
@@ -107,6 +108,7 @@ class _ToolsPageState extends State<ToolsPage> {
                     leading: const Icon(Icons.receipt_long_outlined),
                     title: const Text('Receitas'),
                     subtitle: Text(RecipesPage.summary(p)),
+                    trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => _push(const RecipesPage()),
                   ),
                   // Regras entre máquinas (§9.5, LG-4 a LG-7): avisam e propõem.
@@ -116,6 +118,7 @@ class _ToolsPageState extends State<ToolsPage> {
                     leading: const Icon(Icons.rule_rounded),
                     title: const Text('Regras'),
                     subtitle: Text(ToolsPage.rulesSummary(p)),
+                    trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => _push(const RulesPage()),
                   ),
                 ]),
@@ -128,7 +131,7 @@ class _ToolsPageState extends State<ToolsPage> {
                   const VoiceSettingsTile(),
                   ListTile(
                     key: const ValueKey('procurar-na-rede'),
-                    leading: const Icon(Icons.wifi_find_rounded),
+                    leading: const Icon(Icons.radar_rounded),
                     title: const Text('Procurar na rede'),
                     subtitle: const Text('Equipamentos Modbus neste Wi-Fi'),
                     trailing: const Icon(Icons.chevron_right_rounded),

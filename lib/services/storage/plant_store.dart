@@ -51,15 +51,16 @@ class ProjectEntry {
   final int tags;
   final int screens;
 
-  /// "3 equipamentos · 12 variáveis · 4 telas"; projeto vazio diz que está vazio.
+  /// "3 equipamentos · 12 variáveis · 4 telas", sem as partes zeradas
+  /// ("1 tela"); projeto vazio diz que está vazio.
   String get summary {
-    if (equipment == 0 && tags == 0 && screens == 0) return 'Projeto vazio';
-    String n(int v, String one, String many) => v == 1 ? '1 $one' : '$v $many';
-    return [
-      n(equipment, 'equipamento', 'equipamentos'),
-      n(tags, 'variável', 'variáveis'),
-      n(screens, 'tela', 'telas'),
-    ].join(' · ');
+    String? n(int v, String one, String many) => v == 0 ? null : (v == 1 ? '1 $one' : '$v $many');
+    final parts = [
+      ?n(equipment, 'equipamento', 'equipamentos'),
+      ?n(tags, 'variável', 'variáveis'),
+      ?n(screens, 'tela', 'telas'),
+    ];
+    return parts.isEmpty ? 'Projeto vazio' : parts.join(' · ');
   }
 
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'equipment': equipment, 'tags': tags, 'screens': screens};

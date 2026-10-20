@@ -128,7 +128,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
               options: const [
                 ChoiceOption(value: 'branco', title: 'Em branco', subtitle: 'Equipamentos, variáveis e telas do zero.', icon: Icons.note_add_outlined),
                 ChoiceOption(value: 'demonstracao', title: 'Demonstração', subtitle: 'A cortadora simulada, para mexer à vontade.', icon: Icons.smart_toy_outlined),
-                ChoiceOption(value: 'arquivo', title: 'De um arquivo', subtitle: 'Projeto ou planta recebida por WhatsApp, e-mail ou Drive.', icon: Icons.file_open_outlined),
+                ChoiceOption(value: 'arquivo', title: 'De um arquivo', subtitle: 'Projeto ou planta enviados por WhatsApp, e-mail ou Drive.', icon: Icons.file_open_outlined),
               ],
             ),
           ]),

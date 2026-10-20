@@ -18,7 +18,7 @@ class AppScope extends InheritedNotifier<ProjectController> {
   const AppScope({super.key, required ProjectController controller, required this.runtime, required this.alarms, this.voice, required this.logger, this.rules, required super.child})
       : super(notifier: controller);
 
-  /// Regras entre máquinas (Mais → Regras). Nulo onde o app é montado sem elas.
+  /// Regras entre máquinas (Ferramentas → Regras). Nulo onde o app é montado sem elas.
   final RuleEngine? rules;
 
   final HmiRuntime runtime;

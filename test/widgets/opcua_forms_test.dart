@@ -31,7 +31,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_opcua_form');
   });

@@ -22,7 +22,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_privacidade');
   });
@@ -44,8 +45,9 @@ void main() {
     await tester.pumpWidget(CeliwareIhmApp(controller: controller, runtime: runtime));
     await live(tester, 600);
 
-    await tester.tap(find.text('Mais'));
-    await live(tester, 400);
+    // Privacidade mora nos Ajustes (engrenagem do topo de Projetos).
+    await tester.tap(find.byKey(const ValueKey('ajustes')));
+    await live(tester, 600);
     final tile = find.byKey(const ValueKey('privacidade'));
     await tester.scrollUntilVisible(tile, 200, scrollable: find.byType(Scrollable).first);
     // Até o meio: na beirada de baixo, a barra de abas cobre a linha.
@@ -77,7 +79,7 @@ void main() {
       'servidor OPC UA',
       'cofre do Android',
       'Quem está aplicando',
-      'Mais → Registros',
+      'Ferramentas → Registros',
       'backup do Android',
       'os registros de dados ficam de fora',
       'senhas de equipamento cadastradas',

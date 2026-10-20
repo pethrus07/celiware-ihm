@@ -55,7 +55,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_estabilidade');
     databaseFactoryOrNull = databaseFactoryFfiNoIsolate;
@@ -216,7 +217,7 @@ void main() {
       expect(tester.getRect(card), before, reason: 'a lista de telas não se mexe');
 
       // Trocar de aba sem responder (toque que não acerta o alvo é falha).
-      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Mais')));
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Ferramentas')));
       await live(tester, 500);
       expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 3);
       expect(proposalBand, findsOneWidget, reason: 'a pergunta continua esperando');

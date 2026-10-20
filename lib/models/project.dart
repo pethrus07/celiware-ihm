@@ -35,18 +35,18 @@ class Project {
   final List<Tag> tags;
   final List<HmiScreen> screens;
 
-  /// Registros de dados (Mais → Registros). A configuração viaja com o
+  /// Registros de dados (Ferramentas → Registros). A configuração viaja com o
   /// projeto; o histórico gravado é do aparelho.
   final List<LogGroup> logGroups;
 
-  /// Receitas (Mais → Receitas): tipos com os parâmetros e as máquinas, e os
+  /// Receitas (Ferramentas → Receitas): tipos com os parâmetros e as máquinas, e os
   /// valores de cada produto. Edições e regras em `recipe.dart`.
   final List<RecipeType> recipeTypes;
   final List<Recipe> recipes;
-  /// Regras entre máquinas (Mais → Regras, LG-4 a LG-7).
+  /// Regras entre máquinas (Ferramentas → Regras, LG-4 a LG-7).
   final List<LogicRule> rules;
 
-  /// Câmeras IP das máquinas (Mais → Câmeras, CM-1). Sem a senha: ela fica
+  /// Câmeras IP das máquinas (Ferramentas → Câmeras, CM-1). Sem a senha: ela fica
   /// no cofre do aparelho. Edições em `camera.dart`.
   final List<IpCamera> cameras;
 

@@ -12,7 +12,7 @@ import '../tours.dart';
 import 'camera_form_page.dart';
 import 'camera_view_page.dart';
 
-/// Mais → Câmeras (CM-1, CM-2): as câmeras agrupadas por máquina. Tocar abre
+/// Ferramentas → Câmeras (CM-1, CM-2): as câmeras agrupadas por máquina. Tocar abre
 /// em tela cheia; o lápis abre o cadastro.
 class CamerasPage extends StatelessWidget {
   const CamerasPage({super.key});

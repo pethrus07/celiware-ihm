@@ -197,7 +197,7 @@ usam esse formato. A `404.html` aparece sozinha em endereços que não existem.
 
 1. Abrir `/privacidade` no celular e conferir o e-mail.
 2. Colocar `https://DOMINIO/privacidade` no Play Console (Política de
-   privacidade) e no app (Mais → Sobre). A Play exige a página no ar antes do envio.
+   privacidade) e no app (Projetos → Ajustes → Privacidade). A Play exige a página no ar antes do envio.
 3. Enviar o `sitemap.xml` no Google Search Console (opcional).
 4. Apontar a câmera de um celular Android para o QR da página inicial (tela de
    computador) e conferir que abre o Ware IoT na Play.

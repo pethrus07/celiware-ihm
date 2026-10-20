@@ -1,6 +1,6 @@
 // Câmera IP ligada a uma máquina (REQUISITOS-ETAPA4 §9.2, CM-1 a CM-5):
 // aberta em tela cheia por um botão da tela de operação ou pela lista em
-// Mais → Câmeras.
+// Ferramentas → Câmeras.
 //
 // Mora no projeto e viaja na exportação — **menos a senha**. O projeto guarda
 // só uma referência ([IpCamera.secretRef]) para o cofre do aparelho

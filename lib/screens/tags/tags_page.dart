@@ -70,7 +70,7 @@ class _TagsPageState extends State<TagsPage> {
     return VisibleLiveTags(
       child: TourHost(
         spec: Tours.variaveis(list: _listKey, add: _addKey, more: _moreKey),
-        // Só pelo "?" ou por Mais → Tutoriais (ver DevicesPage).
+        // Só pelo "?" ou por Ajustes → Tutoriais (ver DevicesPage).
         autoStart: false,
         forceStart: widget.startTour,
         child: ListDetail(

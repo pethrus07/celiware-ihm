@@ -1,0 +1,252 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/services.dart' show ByteData, FontLoader;
+import 'package:flutter_test/flutter_test.dart';
+import 'package:ihm/app/project_controller.dart';
+import 'package:ihm/main.dart';
+import 'package:ihm/models/project.dart';
+import 'package:ihm/screens/alarms_page.dart';
+import 'package:ihm/screens/projects/projects_page.dart';
+import 'package:ihm/screens/screens_page.dart';
+import 'package:ihm/screens/shell.dart';
+import 'package:ihm/screens/tools_page.dart';
+import 'package:ihm/screens/tours.dart';
+import 'package:ihm/services/cameras/camera_vault.dart';
+import 'package:ihm/services/demo/demo_process.dart';
+import 'package:ihm/services/demo/demo_project.dart';
+import 'package:ihm/services/runtime/hmi_runtime.dart';
+import 'package:ihm/services/storage/project_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+/// A estrutura nova (reunião de 19–20/10/2026): barra com Projetos ·
+/// Equipamentos · Variáveis · Ferramentas · Alarmes, e a aba Projetos com a
+/// lista de projetos e, dentro de cada um, as telas.
+void main() {
+  WidgetController.hitTestWarningShouldBeFatal = true;
+
+  late Directory dir;
+
+  // A letra de verdade (IBM Plex): a de teste é quadrada e mais larga, e o
+  // teste dos rótulos da barra mede a largura real.
+  setUpAll(() async {
+    sqfliteFfiInit();
+    for (final (family, files) in [
+      ('Plex', ['IBMPlexSans-400', 'IBMPlexSans-500', 'IBMPlexSans-600', 'IBMPlexSans-700']),
+      ('PlexCondensed', ['IBMPlexSansCondensed-SemiBold', 'IBMPlexSansCondensed-Bold']),
+    ]) {
+      final loader = FontLoader(family);
+      for (final f in files) {
+        loader.addFont(Future.value(ByteData.sublistView(File('assets/fonts/$f.ttf').readAsBytesSync())));
+      }
+      await loader.load();
+    }
+  });
+
+  setUp(() async {
+    // Registro de dados num SQLite de verdade (a troca de projeto fecha e
+    // abre os bancos).
+    databaseFactoryOrNull = databaseFactoryFfiNoIsolate;
+    SharedPreferences.setMockInitialValues({
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
+    });
+    CameraVault.instance = MemoryCameraVault();
+    dir = await Directory.systemTemp.createTemp('ihm_projetos_tela');
+  });
+
+  tearDown(() async {
+    databaseFactoryOrNull = null;
+    DemoRegistry.discard(DemoProject.deviceId);
+    try {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } on FileSystemException {/* Windows ainda segurando o arquivo — é só a pasta temporária */}
+  });
+
+  /// Deixa o disco de verdade responder (abrir, criar e apagar projeto leem e
+  /// gravam arquivo) e redesenha; com [until], até a condição valer.
+  Future<void> settle(WidgetTester tester, {int rounds = 8, bool Function()? until}) async {
+    for (var i = 0; i < (until == null ? rounds : 60); i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+      await tester.pump(const Duration(milliseconds: 100));
+      if (until != null && until()) {
+        // O disco respondeu; mais duas voltas para o resto da tarefa (avisar
+        // a tela) terminar.
+        for (var j = 0; j < 2; j++) {
+          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        break;
+      }
+    }
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  Future<ProjectController> boot(WidgetTester tester, {Size size = const Size(390, 844), double textScale = 1, bool library = true}) async {
+    final runtime = HmiRuntime();
+    final controller = library
+        ? ProjectController(library: ProjectLibrary(root: dir), runtime: runtime)
+        : ProjectController(repository: ProjectRepository(directory: dir), runtime: runtime);
+    await tester.runAsync(controller.load);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = textScale;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(CeliwareIhmApp(controller: controller, runtime: runtime));
+    await settle(tester, rounds: 4);
+    return controller;
+  }
+
+  Future<void> shutdown(WidgetTester tester, ProjectController c) async {
+    await tester.runAsync(c.flush);
+    await tester.pumpWidget(const SizedBox());
+    final done = c.runtime.dispose();
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await done;
+    c.dispose();
+  }
+
+  group('barra com cinco áreas', () {
+    const labels = ['Projetos', 'Equipamentos', 'Variáveis', 'Ferramentas', 'Alarmes'];
+
+    testWidgets('celular: Projetos · Equipamentos · Variáveis · Ferramentas · Alarmes, sem "Mais"', (tester) async {
+      final c = await boot(tester);
+      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      expect([for (final d in bar.destinations) (d as NavigationDestination).label], labels);
+      expect(find.text('Mais'), findsNothing);
+      // Cada área abre a sua página.
+      for (final (label, page) in [('Ferramentas', ToolsPage), ('Alarmes', AlarmsPage), ('Projetos', ScreensPage)]) {
+        await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text(label)));
+        await settle(tester, rounds: 3);
+        expect(find.byType(page), findsOneWidget, reason: label);
+      }
+      // Registros é o primeiro item de Ferramentas.
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Ferramentas')));
+      await settle(tester, rounds: 2);
+      final logs = tester.getRect(find.byKey(const ValueKey('registros')));
+      for (final k in ['cameras', 'receitas', 'regras', 'voz-e-avisos', 'procurar-na-rede']) {
+        expect(tester.getRect(find.byKey(ValueKey(k))).top, greaterThan(logs.top), reason: k);
+      }
+      await shutdown(tester, c);
+    });
+
+    testWidgets('tablet: o trilho tem as mesmas cinco áreas', (tester) async {
+      final c = await boot(tester, size: const Size(1280, 800));
+      final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      expect([for (final d in rail.destinations) (d.label as Text).data], labels);
+      await shutdown(tester, c);
+    });
+
+    for (final width in [320.0, 360.0]) {
+      testWidgets('${width.toInt()} dp com letra a 130%: cada rótulo inteiro numa linha, dentro da aba', (tester) async {
+        final c = await boot(tester, size: Size(width, 700), textScale: 1.3);
+        final slot = width / labels.length;
+        for (final label in labels) {
+          final text = find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+          final paragraph = tester.renderObject<RenderParagraph>(text.first);
+          expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+          final r = tester.getRect(text.first);
+          expect(r.width, lessThanOrEqualTo(slot), reason: '$label cabe nos ${slot.toStringAsFixed(0)} dp da aba');
+          expect(r.width, greaterThanOrEqualTo(paragraph.getMaxIntrinsicWidth(double.infinity) - 0.5), reason: '$label numa linha só');
+        }
+        await shutdown(tester, c);
+      });
+    }
+  });
+
+  group('aba Projetos', () {
+    testWidgets('abre dentro do último projeto; a seta mostra a lista com o resumo de cada um', (tester) async {
+      final c = await boot(tester);
+      expect(find.byType(ScreensPage), findsOneWidget);
+      expect(find.widgetWithText(AppBar, c.project.name), findsOneWidget, reason: 'o título é o nome do projeto');
+      await tester.tap(find.byKey(tester.state<ShellState>(find.byType(Shell)).projectsKey));
+      await settle(tester, rounds: 2);
+      expect(find.byType(ProjectsPage), findsOneWidget);
+      final id = c.openId!;
+      expect(find.byKey(ValueKey('resumo-$id')), findsOneWidget);
+      final e = c.projects.single;
+      expect(tester.widget<Text>(find.byKey(ValueKey('resumo-$id'))).data, '${e.equipment} equipamento${e.equipment == 1 ? '' : 's'} · ${e.tags} variáveis · ${e.screens} telas');
+
+      // "Voltar" do Android dentro do projeto volta para a lista.
+      await tester.tap(find.byKey(ValueKey('projeto-$id')));
+      await settle(tester, until: () => find.byType(ScreensPage).evaluate().isNotEmpty);
+      expect(find.byType(ScreensPage), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await settle(tester, rounds: 2);
+      expect(find.byType(ProjectsPage), findsOneWidget);
+      await shutdown(tester, c);
+    });
+
+    testWidgets('Novo projeto em branco ACRESCENTA: o anterior continua na lista e no disco', (tester) async {
+      final c = await boot(tester);
+      final first = c.openId!;
+      final firstName = c.project.name;
+      tester.state<ShellState>(find.byType(Shell)).showProjectList();
+      await settle(tester, rounds: 2);
+
+      await tester.tap(find.text('Novo projeto'));
+      await settle(tester, rounds: 3);
+      await tester.tap(find.byKey(const ValueKey('opcao-branco')));
+      await settle(tester, rounds: 3);
+      await tester.enterText(find.byKey(const ValueKey('campo-nome')), 'Linha 2');
+      await tester.tap(find.byKey(const ValueKey('ok-nome')));
+      await settle(tester, until: () => c.project.name == 'Linha 2' && find.byType(ScreensPage).evaluate().isNotEmpty);
+
+      expect(c.project.name, 'Linha 2');
+      expect(c.project.isEmpty, isTrue);
+      expect(find.byType(ScreensPage), findsOneWidget, reason: 'já abre dentro do projeto novo');
+      expect(c.projects.map((e) => e.name), containsAll([firstName, 'Linha 2']));
+      final kept = await tester.runAsync(() => c.library!.repositoryFor(first).load());
+      expect(kept?.screens, isNotEmpty, reason: 'o projeto anterior não foi substituído');
+      await shutdown(tester, c);
+    });
+
+    testWidgets('apagar pergunta antes; o último projeto não tem "Apagar"', (tester) async {
+      final c = await boot(tester);
+      await tester.runAsync(() => c.createProject(const Project(name: 'Prensa')));
+      final prensa = c.openId!;
+      tester.state<ShellState>(find.byType(Shell)).showProjectList();
+      await settle(tester, rounds: 3);
+
+      await tester.tap(find.byKey(ValueKey('menu-projeto-$prensa')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.text('Apagar'));
+      await settle(tester, rounds: 2);
+      expect(find.text('Apagar "Prensa"?'), findsOneWidget);
+      // Cancelar não apaga nada.
+      await tester.tap(find.text('Cancelar'));
+      await settle(tester, rounds: 2);
+      expect(c.projects, hasLength(2));
+
+      await tester.tap(find.byKey(ValueKey('menu-projeto-$prensa')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.text('Apagar'));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.widgetWithText(FilledButton, 'Apagar'));
+      final folder = Directory('${dir.path}${Platform.pathSeparator}projetos${Platform.pathSeparator}$prensa');
+      await settle(tester, until: () => c.projects.length == 1 && !folder.existsSync());
+      expect(c.projects, hasLength(1));
+      expect(c.openId, isNot(prensa), reason: 'apagar o aberto abre outro');
+      expect(folder.existsSync(), isFalse);
+
+      final last = c.projects.single.id;
+      await tester.tap(find.byKey(ValueKey('menu-projeto-$last')));
+      await settle(tester, rounds: 2);
+      expect(find.text('Apagar'), findsNothing, reason: 'o app precisa de um projeto aberto');
+      await tester.tapAt(const Offset(10, 10));
+      await settle(tester, rounds: 2);
+      await shutdown(tester, c);
+    });
+
+    testWidgets('sem biblioteca (um projeto só): sem seta e sem lista', (tester) async {
+      final c = await boot(tester, library: false);
+      expect(find.byType(ScreensPage), findsOneWidget);
+      expect(find.byKey(tester.state<ShellState>(find.byType(Shell)).projectsKey), findsNothing);
+      await shutdown(tester, c);
+    });
+  });
+}

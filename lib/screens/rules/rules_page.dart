@@ -12,7 +12,7 @@ import 'rule_editor_page.dart';
 import '../tours.dart';
 import '../../widgets/tour/tour.dart';
 
-/// Mais → Regras (LG-4 a LG-7): "quando [condição] durar [T s], então gravar
+/// Ferramentas → Regras (LG-4 a LG-7): "quando [condição] durar [T s], então gravar
 /// [valor] em [variável]". Cada regra numa linha com o que ela vigia, o que
 /// faz e como está agora; a chave liga e desliga sem abrir.
 ///

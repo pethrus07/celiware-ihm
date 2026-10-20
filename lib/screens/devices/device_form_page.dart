@@ -17,6 +17,7 @@ import '../../models/opcua_config.dart';
 import '../../models/raw_config.dart';
 import '../../models/s7_config.dart';
 import '../../models/serial_config.dart';
+import '../../services/net/modbus_discovery.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
@@ -34,8 +35,12 @@ import 'vendor_profile_sheet.dart';
 /// errado. Quando falha, a tela mostra o que conferir, na ordem em que os
 /// problemas costumam acontecer.
 class DeviceFormPage extends StatefulWidget {
-  const DeviceFormPage({super.key, this.device});
+  const DeviceFormPage({super.key, this.device, this.found});
   final Device? device;
+
+  /// Equipamento achado em Ferramentas → Procurar na rede: o cadastro novo
+  /// já vem com o IP e a porta dele.
+  final DiscoveredDevice? found;
 
   @override
   State<DeviceFormPage> createState() => _DeviceFormPageState();
@@ -99,8 +104,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   late final OpcUaDeviceFields _ua = OpcUaDeviceFields(widget.device?.opcua);
   bool get _isOpcUa => _net && _protocol == _Protocol.opcua;
   late final _name = TextEditingController(text: widget.device?.name ?? '');
-  late final _host = TextEditingController(text: widget.device?.host ?? '');
-  late final _port = TextEditingController(text: '${widget.device?.port ?? 502}');
+  late final _host = TextEditingController(text: widget.device?.host ?? widget.found?.host ?? '');
+  late final _port = TextEditingController(text: '${widget.device?.port ?? widget.found?.port ?? 502}');
   late final _unit = TextEditingController(text: '${widget.device?.unitId ?? 1}');
   late final _timeout = TextEditingController(text: '${widget.device?.timeoutMs ?? 1500}');
   late final _poll = TextEditingController(text: '${widget.device?.pollMs ?? 500}');

@@ -10,6 +10,8 @@ import '../widgets/alarms/silence_button.dart';
 import '../widgets/common/adaptive.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/hmi_frame.dart';
+import '../widgets/tour/tour.dart';
+import 'tours.dart';
 
 /// Lista de alarmes (ISA-18.2 §11.6): **Ativos** — o mais grave em cima,
 /// reconhecer um a um — e **Histórico** — o que aconteceu, com hora.
@@ -66,7 +68,11 @@ class _AlarmsPageState extends State<AlarmsPage> {
             ),
           ]),
         );
-        return DefaultTabController(
+        // "?" explica a aba; não abre sozinho (o alarme chega pela faixa).
+        return TourHost(
+          spec: Tours.alarmes(),
+          autoStart: false,
+          child: DefaultTabController(
           length: 2,
           child: Scaffold(
             appBar: AppBar(
@@ -83,6 +89,7 @@ class _AlarmsPageState extends State<AlarmsPage> {
                       child: const Text('Reconhecer todos'),
                     ),
                   ),
+                const HelpButton(),
               ],
               bottom: TabBar(
                 // Com dois painéis, as abas ficam sobre a lista.
@@ -106,6 +113,7 @@ class _AlarmsPageState extends State<AlarmsPage> {
                   ])
                 : tabs,
           ),
+        ),
         );
       },
     );

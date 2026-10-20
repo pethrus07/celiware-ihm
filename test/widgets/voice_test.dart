@@ -43,7 +43,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     VoicePrefsController.instance.value = const VoicePrefs();
     dir = await Directory.systemTemp.createTemp('ihm_voz');
@@ -114,7 +115,7 @@ void main() {
   testWidgets('folha Voz e avisos: exemplo, velocidade, quem repete e desligar', (tester) async {
     final speech = InstantSpeech();
     final c = await boot(tester, speech);
-    await tester.tap(find.text('Mais'));
+    await tester.tap(find.text('Ferramentas'));
     await live(tester, 400);
     final tile = find.byKey(const ValueKey('voz-e-avisos'));
     await tester.scrollUntilVisible(tile, 200, scrollable: find.byType(Scrollable).first);
@@ -165,9 +166,9 @@ void main() {
     await shutdown(tester, c);
   });
 
-  testWidgets('sem voz pt-BR: aviso com o nome do motor na linha da aba Mais e na folha (VZ-6)', (tester) async {
+  testWidgets('sem voz pt-BR: aviso com o nome do motor na linha da aba Ferramentas e na folha (VZ-6)', (tester) async {
     final c = await boot(tester, InstantSpeech(status: const VoiceStatus(VoiceAvailability.missing, engine: 'com.google.android.tts')));
-    await tester.tap(find.text('Mais'));
+    await tester.tap(find.text('Ferramentas'));
     await live(tester, 400);
     final tile = find.byKey(const ValueKey('voz-e-avisos'));
     await tester.scrollUntilVisible(tile, 200, scrollable: find.byType(Scrollable).first);

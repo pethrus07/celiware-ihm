@@ -142,7 +142,7 @@ class ProjectController extends ChangeNotifier {
     if (id == _openId || lib.entry(id) == null) return;
     await flush();
     for (final s in [..._scoped]) {
-      await s.beforeSwitch();
+      await _bounded(s.beforeSwitch, 'gravar o pendente');
     }
     final repo = lib.repositoryFor(id);
     final next = await _read(repo, id);
@@ -160,7 +160,17 @@ class ProjectController extends ChangeNotifier {
     await runtime.apply(next);
     await lib.setOpen(id);
     for (final s in [..._scoped]) {
-      await s.afterSwitch();
+      await _bounded(s.afterSwitch, 'ler o projeto novo');
+    }
+  }
+
+  /// Um motor travado (disco cheio, banco preso) não pode prender a troca
+  /// de projeto para sempre: espera um pouco e segue, registrando no log.
+  static Future<void> _bounded(Future<void> Function() step, String what) async {
+    try {
+      await step().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      _log.warning('Troca de projeto: não deu para $what: $e');
     }
   }
 
@@ -192,7 +202,9 @@ class ProjectController extends ChangeNotifier {
           final password = await vault.read(from);
           if (password != null) await vault.write(to, password);
         }
-        return lib.add(copy.copyWith(name: lib.uniqueName('${source.name} (cópia)')));
+        final copyId = await lib.add(copy.copyWith(name: lib.uniqueName('${source.name} (cópia)')));
+        notifyListeners();
+        return copyId;
       });
 
   /// Renomeia um projeto da lista (aberto ou não).
@@ -208,6 +220,7 @@ class ProjectController extends ChangeNotifier {
         final next = p.copyWith(name: name);
         await repo.save(next);
         await _lib.touch(id, next);
+        notifyListeners();
       });
 
   /// Apaga um projeto e o que é dele no aparelho (históricos, registro de
@@ -219,6 +232,7 @@ class ProjectController extends ChangeNotifier {
         final doomed = await _snapshot(id);
         if (id == _openId) await _open(lib.entries.firstWhere((e) => e.id != id).id);
         await lib.remove(id);
+        notifyListeners();
         for (final ref in doomed?.cameraSecretRefs ?? const <String>{}) {
           await CameraVault.instance.delete(ref);
         }

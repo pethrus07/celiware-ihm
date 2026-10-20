@@ -44,7 +44,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_cameras');
     vault = MemoryCameraVault();
@@ -88,7 +89,7 @@ void main() {
 
   /// Mais → Câmeras (a página monta a lista sob demanda: rola até achar).
   Future<void> openCameras(WidgetTester tester) async {
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Mais')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Ferramentas')));
     await live(tester, 400);
     await tester.scrollUntilVisible(find.byKey(const ValueKey('cameras')), 200, scrollable: find.byType(Scrollable).last);
     await live(tester, 200);

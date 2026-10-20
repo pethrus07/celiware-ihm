@@ -46,7 +46,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_test');
   });
@@ -113,7 +114,7 @@ void main() {
       final shell = tester.state<ShellState>(find.byType(Shell));
       // Só o passo do trilho (com Voltar/Próximo, a fonte de teste — mais
       // larga que a IBM Plex — não cabe no balão).
-      final passo = Tours.inicio(screens: shell.screensKey, nav: shell.navKey, add: shell.addScreenKey, help: shell.helpKey).steps[3];
+      final passo = Tours.inicio(screens: shell.screensKey, nav: shell.navKey, add: shell.addScreenKey, help: shell.helpKey).steps.firstWhere((s) => s.title == 'O caminho');
       tester.state<TourHostState>(find.byType(TourHost).first).start(TourSpec(id: 'trilho', version: 1, title: 'Trilho', steps: [passo]));
       await live(tester, 600);
       expect(find.text('O caminho'), findsOneWidget);

@@ -30,7 +30,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_registros_ui');
     // O app usa o SQLite do Android; aqui, o do Windows pela mesma interface.
@@ -71,7 +72,7 @@ void main() {
   DataLogger loggerOf(WidgetTester tester) => AppScope.of(tester.element(find.byType(Scaffold).first)).logger;
 
   Future<void> openLogs(WidgetTester tester) async {
-    await tester.tap(find.text('Mais'));
+    await tester.tap(find.text('Ferramentas'));
     await live(tester, 400);
     await tester.ensureVisible(find.byKey(const ValueKey('registros')));
     await live(tester, 200);
@@ -81,7 +82,7 @@ void main() {
 
   testWidgets('Registros, Receitas e Regras têm o "?" com a explicação da página', (tester) async {
     final c = await boot(tester);
-    await tester.tap(find.text('Mais'));
+    await tester.tap(find.text('Ferramentas'));
     await live(tester, 600);
     for (final (key, text) in [
       ('registros', 'Grava variáveis no celular'),
@@ -103,7 +104,7 @@ void main() {
     await shutdown(tester, c);
   });
 
-  testWidgets('Mais → Registros: criar, gravar sem tela aberta, histórico com toque e pinça, desligar', (tester) async {
+  testWidgets('Ferramentas → Registros: criar, gravar sem tela aberta, histórico com toque e pinça, desligar', (tester) async {
     final c = await boot(tester);
     await openLogs(tester);
     expect(find.text('Nenhum registro'), findsOneWidget);
@@ -140,7 +141,7 @@ void main() {
     // De volta à lista de telas: nenhuma tela aberta e o registro segue gravando.
     await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
-    await tester.tap(find.text('Telas'));
+    await tester.tap(find.text('Projetos'));
     await live(tester, 12000); // 12 s: 1 linha por segundo, lote aos 10 s
     final logger = loggerOf(tester);
     final onDisk = await logger.store.count(g.id);

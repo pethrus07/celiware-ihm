@@ -14,7 +14,7 @@ import 'recipe_type_page.dart';
 import '../tours.dart';
 import '../../widgets/tour/tour.dart';
 
-/// Mais → Receitas: os ajustes de cada produto, por tipo de receita.
+/// Ferramentas → Receitas: os ajustes de cada produto, por tipo de receita.
 ///
 /// Uma seção por tipo, com as receitas dele; tocar abre a receita (onde se
 /// lê da máquina, compara e aplica). O tipo — parâmetros, faixas, máquinas —

@@ -25,7 +25,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_rules');
   });
@@ -58,7 +59,7 @@ void main() {
   }
 
   Future<void> openRules(WidgetTester tester) async {
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Mais')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Ferramentas')));
     await live(tester, 400);
     await tester.ensureVisible(find.byKey(const ValueKey('regras')));
     await live(tester, 200);
@@ -116,7 +117,7 @@ void main() {
     // Vai para outra tela; a máquina liga; a pergunta aparece lá, depois de 5 s.
     await tester.tap(find.byTooltip('Voltar'));
     await live(tester, 400);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Telas')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Projetos')));
     await live(tester, 400);
     final memory = DemoRegistry.forDevice(DemoProject.deviceId).memory;
     memory.pokeBit(ModbusArea.coil, DemoMap.coilRun, true);

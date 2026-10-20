@@ -25,7 +25,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_receitas_ui');
   });
@@ -58,7 +59,7 @@ void main() {
   }
 
   Future<void> openRecipes(WidgetTester tester) async {
-    await tester.tap(find.text('Mais'));
+    await tester.tap(find.text('Ferramentas'));
     await live(tester, 400);
     await tester.ensureVisible(find.byKey(const ValueKey('receitas')));
     await live(tester, 200);

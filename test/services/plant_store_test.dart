@@ -58,7 +58,7 @@ void main() {
   }
 
   Future<ProjectController> controller({HmiRuntime? runtime}) async {
-    final c = ProjectController(library: ProjectLibrary(root: root), runtime: runtime ?? HmiRuntime());
+    final c = ProjectController(library: PlantStore(root: root), runtime: runtime ?? HmiRuntime());
     await c.load();
     addTearDown(() async {
       await c.flush();
@@ -75,7 +75,7 @@ void main() {
 
       expect(c.projects, hasLength(1));
       final id = c.projects.single.id;
-      expect(id, ProjectLibrary.legacyId);
+      expect(id, PlantStore.legacyId);
       expect(c.openId, id);
       expect(c.project.name, 'Cortadora');
       expect(c.project.tags.single.name, 'Velocidade');
@@ -100,13 +100,13 @@ void main() {
     test('app fechado no meio da migração: a próxima abertura termina sem duplicar', () async {
       writeLegacy();
       // Primeira tentativa parou depois de mover o histórico de alarmes.
-      final dir = Directory('${root.path}${sep}projetos$sep${ProjectLibrary.legacyId}')..createSync(recursive: true);
+      final dir = Directory('${root.path}${sep}projetos$sep${PlantStore.legacyId}')..createSync(recursive: true);
       at('historico-alarmes.json').renameSync('${dir.path}${sep}historico-alarmes.json');
 
       final c = await controller();
-      expect(c.projects.map((e) => e.id), [ProjectLibrary.legacyId]);
+      expect(c.projects.map((e) => e.id), [PlantStore.legacyId]);
       expect(c.project.name, 'Cortadora');
-      expect(at('projetos/${ProjectLibrary.legacyId}/historico-alarmes.json').readAsStringSync(), contains('Porta aberta'));
+      expect(at('projetos/${PlantStore.legacyId}/historico-alarmes.json').readAsStringSync(), contains('Porta aberta'));
     });
 
     test('primeira vez no aparelho: a demonstração é o primeiro projeto', () async {
@@ -121,9 +121,9 @@ void main() {
       final c = await controller();
       final second = await c.createProject(const Project(name: 'Prensa'));
       await c.flush();
-      at('projetos/indice.json').deleteSync();
+      at('projetos/planta.json').deleteSync();
 
-      final again = ProjectLibrary(root: root);
+      final again = PlantStore(root: root);
       await again.load();
       expect(again.entries.map((e) => e.name), ['Cortadora', 'Prensa']);
       expect(again.entry(second)?.name, 'Prensa');
@@ -295,7 +295,7 @@ void main() {
     writeLegacy();
     final c = await controller();
     await c.flush();
-    final index = jsonDecode(at('projetos/indice.json').readAsStringSync()) as Map;
+    final index = jsonDecode(at('projetos/planta.json').readAsStringSync()) as Map;
     expect(index['open'], c.openId);
     expect((index['projects'] as List).single, containsPair('name', 'Cortadora'));
   });

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/project.dart';
 import '../../models/tag.dart';
 import '../../services/calc/calc_expression.dart';
 import '../../services/calc/calc_graph.dart';
@@ -24,7 +25,13 @@ class CalcExpressionField extends StatelessWidget {
     this.excludeTagId,
     this.label = 'Conta',
     this.hint = 'Ex.: [Velocidade] * 60',
+    this.source,
   });
+
+  /// De onde vêm as variáveis para citar; nulo = o projeto aberto. As
+  /// regras da planta passam a visão da planta (variáveis de todos os
+  /// projetos).
+  final Project? source;
 
   final TextEditingController controller;
 
@@ -51,9 +58,9 @@ class CalcExpressionField extends StatelessWidget {
   }
 
   Future<void> _pickVariable(BuildContext context) async {
-    final tag = await CalcVariableSheet.show(context, excludeTagId: excludeTagId);
+    final tag = await CalcVariableSheet.show(context, excludeTagId: excludeTagId, source: source);
     if (tag == null || !context.mounted) return;
-    insert(controller, CalcGraph.reference(tag, AppScope.of(context).controller.project));
+    insert(controller, CalcGraph.reference(tag, source ?? AppScope.of(context).controller.project));
     onChanged();
   }
 
@@ -141,14 +148,17 @@ class CalcErrorLine extends StatelessWidget {
 /// liga/desliga), agrupadas por equipamento, com o valor de agora. Busca a
 /// partir de 8. Devolve a escolhida.
 class CalcVariableSheet extends StatefulWidget {
-  const CalcVariableSheet({super.key, this.excludeTagId});
+  const CalcVariableSheet({super.key, this.excludeTagId, this.source});
   final String? excludeTagId;
 
-  static Future<Tag?> show(BuildContext context, {String? excludeTagId}) => showModalBottomSheet<Tag>(
+  /// Nulo = o projeto aberto (ver [CalcExpressionField.source]).
+  final Project? source;
+
+  static Future<Tag?> show(BuildContext context, {String? excludeTagId, Project? source}) => showModalBottomSheet<Tag>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
-        builder: (_) => CalcVariableSheet(excludeTagId: excludeTagId),
+        builder: (_) => CalcVariableSheet(excludeTagId: excludeTagId, source: source),
       );
 
   @override
@@ -160,7 +170,8 @@ class _CalcVariableSheetState extends State<CalcVariableSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final project = AppScope.watch(context).controller.project;
+    final open = AppScope.watch(context).controller.project;
+    final project = widget.source ?? open;
     final usable = [
       for (final t in project.tags)
         if (t.id != widget.excludeTagId && !t.isText && !t.isArray) t,

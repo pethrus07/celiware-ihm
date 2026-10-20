@@ -8,6 +8,7 @@ import '../../services/calc/calc_graph.dart';
 import '../../services/rules/rule_engine.dart';
 import '../../services/runtime/tag_codec.dart';
 import '../../widgets/common/adaptive.dart';
+import '../../widgets/common/common.dart';
 import 'rule_editor_page.dart';
 import '../tours.dart';
 import '../../widgets/tour/tour.dart';
@@ -17,7 +18,12 @@ import '../../widgets/tour/tour.dart';
 /// faz e como está agora; a chave liga e desliga sem abrir.
 ///
 /// O aviso de segurança fica sempre no topo: regra ajuda, não protege.
-class RulesPage extends StatelessWidget {
+///
+/// Com a planta (reunião de 19–20/10/2026), duas seções: **Deste projeto** —
+/// as regras da máquina aberta — e **Da planta** — as que usam variáveis de
+/// qualquer projeto para interligar máquinas. As duas seguem o mesmo modo
+/// "propor" por padrão: nenhuma é função de segurança (NR-12).
+class RulesPage extends StatefulWidget {
   const RulesPage({super.key});
 
   /// "na hora", "10 s", "5 min".
@@ -40,10 +46,47 @@ class RulesPage extends StatelessWidget {
       };
 
   @override
+  State<RulesPage> createState() => _RulesPageState();
+
+  static void _showHistory(BuildContext context, RuleEngine engine) => _RulesPageState._showHistory(context, engine);
+}
+
+class _RulesPageState extends State<RulesPage> {
+  /// Visão da planta para escrever as regras da planta com os nomes certos
+  /// (as variáveis dos outros projetos com o nome do projeto na frente).
+  Project? _plantView;
+  int _asked = 0;
+
+  Future<void> _refreshPlantView() async {
+    final c = AppScope.of(context).controller;
+    if (!c.manyProjects) return;
+    final ticket = ++_asked;
+    final view = await c.plantEditorView();
+    if (mounted && ticket == _asked) setState(() => _plantView = view);
+  }
+
+  Project? _seenProject;
+  List<LogicRule>? _seenRules;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final c = AppScope.watch(context).controller;
+    if (!identical(c.project, _seenProject) || !identical(c.plantRules, _seenRules)) {
+      _seenProject = c.project;
+      _seenRules = c.plantRules;
+      _refreshPlantView();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scope = AppScope.watch(context);
     final engine = scope.rules;
     final project = scope.controller.project;
+    final plant = scope.controller.manyProjects;
+    final plantRules = scope.controller.plantRulesView;
+    final plantView = _plantView ?? scope.controller.liveProject;
     // "?" explica a página (não abre sozinho).
     return TourHost(
       spec: Tours.regras(),
@@ -54,7 +97,7 @@ class RulesPage extends StatelessWidget {
           key: const ValueKey('historico-regras'),
           tooltip: 'Histórico',
           icon: const Icon(Icons.history_rounded),
-          onPressed: engine == null ? null : () => _showHistory(context, engine),
+          onPressed: engine == null ? null : () => RulesPage._showHistory(context, engine),
         ),
         const HelpButton(),
       ]),
@@ -72,9 +115,10 @@ class RulesPage extends StatelessWidget {
           children: [
             const _SafetyNote(),
             const SizedBox(height: Ind.space),
+            if (plant) const SectionHeader('Deste projeto', padding: EdgeInsets.fromLTRB(0, 8, 0, 12)),
             if (project.rules.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   'Nenhuma regra ainda. Exemplo: quando a temperatura da prensa passar de 85 °C por 10 s, perguntar "Parar a prensa?" e desligar se você tocar.',
                   style: TextStyle(color: Ind.textDim, height: 1.45),
@@ -83,6 +127,27 @@ class RulesPage extends StatelessWidget {
             for (final r in project.rules) ...[
               _RuleCard(rule: r, project: project, status: engine?.status(r.id) ?? (r.enabled ? RuleStatus.watching : RuleStatus.off)),
               const SizedBox(height: Ind.space),
+            ],
+            if (plant) ...[
+              const SectionHeader('Da planta', padding: EdgeInsets.fromLTRB(0, 20, 0, 12)),
+              if (plantRules.isEmpty)
+                Text(
+                  'Regras que usam variáveis de qualquer projeto, para uma máquina avisar a outra. Exemplo: quando o forno passar de 200 °C, perguntar "Parar a esteira?".',
+                  style: TextStyle(color: Ind.textDim, height: 1.45),
+                ),
+              for (final r in plantRules) ...[
+                _RuleCard(rule: r, project: plantView, plant: true, status: engine?.status(r.id) ?? (r.enabled ? RuleStatus.watching : RuleStatus.off)),
+                const SizedBox(height: Ind.space),
+              ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('nova-regra-planta'),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RuleEditorPage(plant: true))),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Nova regra da planta'),
+                ),
+              ),
             ],
           ],
         ),
@@ -149,10 +214,13 @@ class _SafetyNote extends StatelessWidget {
 }
 
 class _RuleCard extends StatelessWidget {
-  const _RuleCard({required this.rule, required this.project, required this.status});
+  const _RuleCard({required this.rule, required this.project, required this.status, this.plant = false});
   final LogicRule rule;
   final Project project;
   final RuleStatus status;
+
+  /// Regra da planta (guardada na planta; [project] é a visão da planta).
+  final bool plant;
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +230,7 @@ class _RuleCard extends StatelessWidget {
       child: InkWell(
         key: ValueKey('regra-${rule.id}'),
         borderRadius: BorderRadius.circular(Ind.radius),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RuleEditorPage(rule: rule))),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RuleEditorPage(rule: rule, plant: plant))),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 8, 16),
           child: Row(children: [
@@ -183,7 +251,14 @@ class _RuleCard extends StatelessWidget {
             Switch(
               key: ValueKey('ligar-regra-${rule.id}'),
               value: rule.enabled,
-              onChanged: (v) => AppScope.of(context).controller.saveRule(rule.copyWith(enabled: v)),
+              onChanged: (v) {
+                final c = AppScope.of(context).controller;
+                if (plant) {
+                  c.savePlantRule(rule.copyWith(enabled: v));
+                } else {
+                  c.saveRule(rule.copyWith(enabled: v));
+                }
+              },
             ),
           ]),
         ),

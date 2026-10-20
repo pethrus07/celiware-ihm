@@ -86,7 +86,7 @@ void main() {
   Future<ProjectController> boot(WidgetTester tester, {Size size = const Size(390, 844), double textScale = 1, bool library = true}) async {
     final runtime = HmiRuntime();
     final controller = library
-        ? ProjectController(library: ProjectLibrary(root: dir), runtime: runtime)
+        ? ProjectController(library: PlantStore(root: dir), runtime: runtime)
         : ProjectController(repository: ProjectRepository(directory: dir), runtime: runtime);
     await tester.runAsync(controller.load);
     tester.view.physicalSize = size;
@@ -239,6 +239,53 @@ void main() {
       expect(find.text('Apagar'), findsNothing, reason: 'o app precisa de um projeto aberto');
       await tester.tapAt(const Offset(10, 10));
       await settle(tester, rounds: 2);
+      await shutdown(tester, c);
+    });
+
+    testWidgets('o título da lista é a planta; "Nova planta" pergunta antes e guarda a cópia da atual', (tester) async {
+      final c = await boot(tester);
+      final before = c.projects.single.name;
+      tester.state<ShellState>(find.byType(Shell)).showProjectList();
+      await settle(tester, rounds: 3);
+      expect(find.widgetWithText(AppBar, c.plantName), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('menu-planta')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.text('Nova planta'));
+      await settle(tester, rounds: 2);
+      expect(find.text('Começar uma planta nova?'), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await settle(tester, rounds: 2);
+      expect(c.projects.single.name, before, reason: 'cancelar não mexe em nada');
+
+      await tester.tap(find.byKey(const ValueKey('menu-planta')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.text('Nova planta'));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.byKey(const ValueKey('confirmar-substituir-planta')));
+      final copies = Directory('${dir.path}${Platform.pathSeparator}copias');
+      await settle(tester, until: () => c.projects.length == 1 && c.projects.first.name == 'Meu projeto' && find.byType(ScreensPage).evaluate().isNotEmpty);
+      expect(c.project.isEmpty, isTrue);
+      expect(copies.listSync(), hasLength(1), reason: 'a planta de antes ficou guardada');
+      final saved = ProjectRepository.decodePlant(File(copies.listSync().single.path).readAsBytesSync());
+      expect(saved.projects.single.project.name, before);
+      await shutdown(tester, c);
+    });
+
+    testWidgets('Regras: "Deste projeto" e "Da planta", cada uma com o seu botão', (tester) async {
+      final c = await boot(tester);
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Ferramentas')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.byKey(const ValueKey('regras')));
+      await settle(tester, rounds: 4);
+      expect(find.text('DESTE PROJETO'), findsOneWidget);
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('nova-regra-planta')), 200, scrollable: find.byType(Scrollable).last);
+      expect(find.text('DA PLANTA'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('nova-regra-planta')));
+      await settle(tester, until: () => find.text('Nova regra da planta').evaluate().isNotEmpty);
+      expect(find.text('Nova regra da planta'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await settle(tester, rounds: 3);
       await shutdown(tester, c);
     });
 

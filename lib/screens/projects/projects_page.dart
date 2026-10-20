@@ -1,13 +1,16 @@
-// Aba Projetos: a lista dos projetos guardados no aparelho (reunião de
-// 19–20/10/2026 — "vai ser só o projeto no lugar de tela e vai ficar uma
-// lista de projetos; dentro da lista de projetos, vai ver a lista de telas").
+// Aba Projetos: a planta e a lista dos projetos dela (reunião de 19–20/10/2026
+// — "vai ser só o projeto no lugar de tela e vai ficar uma lista de projetos;
+// dentro da lista de projetos, vai ver a lista de telas"; decisões D6, D7 e
+// D10: Planta > Projetos, uma máquina por projeto).
 //
 // Cada projeto é o mesmo de sempre — equipamentos, variáveis, telas, regras,
 // registros, receitas e câmeras — guardado na sua pasta. Tocar abre o
 // projeto (as telas dele); Equipamentos, Variáveis, Ferramentas e Alarmes
-// passam a mostrar as coisas dele. Criar e importar sempre ACRESCENTAM: nada
-// substitui outro projeto (o "Começar do zero" antigo apagou um projeto do
-// cliente). Apagar pergunta antes e diz o que vai junto.
+// passam a mostrar as coisas dele. Criar e importar um projeto sempre
+// ACRESCENTAM (o "Começar do zero" antigo apagou um projeto do cliente).
+// O título é o nome da planta; o menu dela (⋮) envia ou salva a planta
+// inteira e cria uma planta nova — o único jeito de trocar tudo, com
+// confirmação forte e cópia automática da planta atual antes.
 
 import 'dart:io';
 
@@ -20,6 +23,7 @@ import '../../app/app_info.dart';
 import '../../app/app_scope.dart';
 import '../../app/project_controller.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/plant.dart';
 import '../../models/project.dart';
 import '../../services/demo/demo_project.dart';
 import '../../services/storage/project_repository.dart';
@@ -73,8 +77,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
       autoStart: false,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Projetos'),
-          actions: [KeyedSubtree(key: _settingsKey, child: const SettingsButton()), const HelpButton()],
+          title: c.manyProjects ? AdaptiveTitle(c.plantName) : const Text('Projetos'),
+          actions: [
+            KeyedSubtree(key: _settingsKey, child: const SettingsButton()),
+            const HelpButton(),
+            if (c.manyProjects) _PlantMenu(busy: _busy, onReplaced: widget.onOpened),
+          ],
         ),
         floatingActionButton: c.manyProjects
             ? FloatingActionButton.extended(
@@ -120,7 +128,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
               options: const [
                 ChoiceOption(value: 'branco', title: 'Em branco', subtitle: 'Equipamentos, variáveis e telas do zero.', icon: Icons.note_add_outlined),
                 ChoiceOption(value: 'demonstracao', title: 'Demonstração', subtitle: 'A cortadora simulada, para mexer à vontade.', icon: Icons.smart_toy_outlined),
-                ChoiceOption(value: 'arquivo', title: 'De um arquivo', subtitle: 'Projeto recebido por WhatsApp, e-mail ou Drive.', icon: Icons.file_open_outlined),
+                ChoiceOption(value: 'arquivo', title: 'De um arquivo', subtitle: 'Projeto ou planta recebida por WhatsApp, e-mail ou Drive.', icon: Icons.file_open_outlined),
               ],
             ),
           ]),
@@ -143,23 +151,120 @@ class _ProjectsPageState extends State<ProjectsPage> {
     if (context.mounted) widget.onOpened();
   }
 
-  /// Importar = acrescentar um projeto (nunca substitui o aberto).
+  /// Importar um projeto = acrescentar (nunca substitui o aberto). Arquivo
+  /// de planta inteira: somar os projetos dela (o padrão) ou substituir a
+  /// planta, com confirmação forte e cópia antes.
   Future<void> _import(BuildContext context) async {
     try {
-      final files = await FilePicker.pickFiles(dialogTitle: 'Abrir projeto');
+      final files = await FilePicker.pickFiles(dialogTitle: 'Abrir projeto ou planta');
       if (files.isEmpty || !context.mounted) return;
-      final project = ProjectRepository.decode(await files.first.readAsBytes());
+      final file = ProjectRepository.decodeFile(await files.first.readAsBytes());
       if (!context.mounted) return;
       final c = AppScope.of(context).controller;
-      await _run(() => c.importProject(project));
+      if (file is PlantFile) {
+        await _importPlant(context, file.plant);
+        return;
+      }
+      await _run(() => c.importProject((file as ProjectFile).project));
       if (!context.mounted) return;
-      WriteActions.toast(context, 'Projeto "${c.project.name}" acrescentado à lista.');
+      WriteActions.toast(context, 'Projeto "${c.project.name}" acrescentado à planta.');
       widget.onOpened();
     } on ProjectFormatError catch (e) {
       if (context.mounted) WriteActions.toast(context, e.message, error: true);
     } catch (e) {
       if (context.mounted) WriteActions.toast(context, 'Não consegui abrir o arquivo.', error: true);
     }
+  }
+}
+
+extension on _ProjectsPageState {
+  Future<void> _importPlant(BuildContext context, Plant plant) async {
+    final c = AppScope.of(context).controller;
+    final n = plant.projects.length;
+    final projetos = n == 1 ? '1 projeto' : '$n projetos';
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (_) => DecisionDialog<String>(
+        title: 'Planta "${plant.name}" ($projetos)',
+        body: 'Somar os projetos dela aos desta planta não apaga nada. Substituir troca a planta inteira.',
+        actions: const [
+          DialogAction(label: 'Cancelar', value: ''),
+          DialogAction(label: 'Substituir', value: 'substituir', kind: DialogActionKind.destructive, key: ValueKey('substituir-planta')),
+          DialogAction(label: 'Somar', value: 'somar', kind: DialogActionKind.primary, key: ValueKey('somar-planta')),
+        ],
+      ),
+    );
+    if (!context.mounted) return;
+    if (choice == 'somar') {
+      var added = 0;
+      await _run(() async => added = await c.addPlantProjects(plant));
+      if (context.mounted) WriteActions.toast(context, added == 1 ? '1 projeto somado à planta.' : '$added projetos somados à planta.');
+    } else if (choice == 'substituir') {
+      await _PlantMenu.replace(context, plant, onReplaced: widget.onOpened);
+    }
+  }
+}
+
+/// Menu da planta (⋮ do topo): renomear, enviar, salvar em arquivo e
+/// "Nova planta".
+class _PlantMenu extends StatelessWidget {
+  const _PlantMenu({required this.busy, required this.onReplaced});
+  final bool busy;
+  final VoidCallback onReplaced;
+
+  /// Troca a planta inteira, com a pergunta forte (diz quantos projetos
+  /// saem e onde fica a cópia) e a cópia automática antes.
+  static Future<void> replace(BuildContext context, Plant next, {required VoidCallback onReplaced, String title = 'Substituir a planta inteira?'}) async {
+    final c = AppScope.of(context).controller;
+    final n = c.projects.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => DecisionDialog<bool>(
+        title: title,
+        body: 'Os $n projetos desta planta saem do app, com os históricos e os registros gravados deles. '
+            'Antes, a planta inteira é guardada numa cópia no celular — dá para abrir de novo em Novo projeto → De um arquivo.',
+        actions: const [
+          DialogAction(label: 'Cancelar', value: false),
+          DialogAction(label: 'Substituir', value: true, kind: DialogActionKind.destructive, key: ValueKey('confirmar-substituir-planta')),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final backup = await c.replacePlant(next);
+    if (!context.mounted) return;
+    WriteActions.toast(context, 'Pronto. Cópia da planta anterior: ${backup.uri.pathSegments.last}');
+    onReplaced();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppScope.of(context).controller;
+    return PopupMenuButton<String>(
+      key: const ValueKey('menu-planta'),
+      tooltip: 'Opções da planta',
+      enabled: !busy,
+      onSelected: (v) async {
+        switch (v) {
+          case 'rename':
+            final name = await askText(context, title: 'Renomear planta', label: 'Nome da planta', initial: c.plantName);
+            if (name != null) await c.renamePlant(name);
+          case 'share':
+            final p = await c.exportPlant();
+            if (context.mounted) await ProjectFiles.sharePlant(context, p);
+          case 'export':
+            final p = await c.exportPlant();
+            if (context.mounted) await ProjectFiles.savePlant(context, p);
+          case 'new':
+            await replace(context, const Plant(), onReplaced: onReplaced, title: 'Começar uma planta nova?');
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.drive_file_rename_outline), title: Text('Renomear planta'))),
+        PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.share_rounded), title: Text('Enviar a planta'))),
+        PopupMenuItem(value: 'export', child: ListTile(leading: Icon(Icons.save_alt_rounded), title: Text('Salvar a planta em arquivo'))),
+        PopupMenuItem(value: 'new', child: ListTile(leading: Icon(Icons.restart_alt_rounded), title: Text('Nova planta'))),
+      ],
+    );
   }
 }
 
@@ -278,6 +383,36 @@ class ProjectFiles {
       ));
     } catch (e) {
       if (context.mounted) WriteActions.toast(context, 'Não consegui enviar: $e', error: true);
+    }
+  }
+
+  /// A planta inteira (todos os projetos e as regras da planta).
+  static Future<void> sharePlant(BuildContext context, Plant p) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/${ProjectRepository.plantExportName(p)}');
+      await file.writeAsBytes(ProjectRepository.encodePlant(p), flush: true);
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path, mimeType: 'application/json')],
+        subject: 'Planta ${p.name} — ${AppInfo.name}',
+        text: 'Planta "${p.name}" do ${AppInfo.name} (${p.projects.length} projetos). Para abrir: Projetos → Novo projeto → De um arquivo.',
+      ));
+    } catch (e) {
+      if (context.mounted) WriteActions.toast(context, 'Não consegui enviar: $e', error: true);
+    }
+  }
+
+  static Future<void> savePlant(BuildContext context, Plant p) async {
+    try {
+      final uri = await FilePicker.saveFile(
+        dialogTitle: 'Salvar planta',
+        fileName: ProjectRepository.plantExportName(p),
+        bytes: ProjectRepository.encodePlant(p),
+        mimeType: 'application/json',
+      );
+      if (uri != null && context.mounted) WriteActions.toast(context, 'Planta salva.');
+    } catch (e) {
+      if (context.mounted) WriteActions.toast(context, 'Não consegui salvar: $e', error: true);
     }
   }
 

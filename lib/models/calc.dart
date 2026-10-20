@@ -29,6 +29,11 @@ class CalcSpec {
 
   bool get isEmpty => expression.trim().isEmpty;
 
+  /// A mesma conta com outro texto, e os nomes guardados com as chaves
+  /// trocadas por [mapKey] (regras da planta: referência qualificada ⇄ id).
+  CalcSpec copyWithExpression(String expression, String Function(String id) mapKey) =>
+      CalcSpec(expression: expression, names: {for (final e in names.entries) mapKey(e.key): e.value});
+
   Map<String, dynamic> toJson() => {
         'expr': expression,
         if (names.isNotEmpty) 'names': names,

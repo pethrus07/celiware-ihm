@@ -1,18 +1,30 @@
-// Biblioteca de projetos: o app guarda VÁRIOS projetos, cada um na sua pasta.
+// A planta guardada no aparelho (reunião de 19–20/10/2026, D6/D7/D10):
+// Planta > Projetos (um por máquina). Cada projeto mora na sua pasta; a
+// planta (nome, lista, último aberto e as regras da planta) num arquivo só.
 //
 // Até a 1.4.0 havia um projeto só (`projeto.ihm.json`), e "Começar do zero"
-// ou "Importar projeto" o substituíam — na reunião de 19–20/10/2026 o cliente
-// perdeu um projeto assim. Agora criar e importar sempre ACRESCENTAM.
+// ou "Importar projeto" o substituíam — na reunião o cliente perdeu um
+// projeto assim. Agora criar e importar um projeto sempre ACRESCENTAM; só
+// "Nova planta" e importar uma planta inteira substituem, com confirmação
+// forte e cópia automática antes ([backup]).
 //
 // Disposição na pasta privada do app:
 //
-//   projetos/indice.json              lista (nome e contagens) + o último aberto
-//   projetos/<id>/projeto.ihm.json    o projeto, no mesmo formato da exportação
+//   projetos/planta.json              nome, lista (nome e contagens), último
+//                                     aberto e regras da planta
+//   projetos/<id>/projeto.ihm.json    o projeto, no formato do projeto avulso
 //   projetos/<id>/historico-*.json    alarmes, regras e receitas DESTE projeto
 //   registros/<id>/<grupo>.db         registro de dados (fora do backup, §6.10)
+//   copias/planta-<data>.ihm.json     cópia automática antes de substituir
 //
-// O índice é só um atalho para a lista abrir sem ler cada projeto inteiro: a
-// verdade são as pastas. Índice perdido ou ilegível se refaz lendo as pastas.
+// Por que um arquivo por projeto, e não a planta inteira num arquivo só:
+// cada edição grava só o projeto mexido (projeto com 2.000 variáveis tem
+// centenas de KB) e um arquivo estragado (bateria no meio da gravação, que a
+// gravação atômica já evita) atinge uma máquina, não a fábrica. Exportada,
+// a planta sai num arquivo só, com a lista de projetos ([Plant]).
+//
+// A lista em `planta.json` é atalho para abrir sem ler cada projeto: a
+// verdade são as pastas. Lista perdida se refaz lendo as pastas.
 
 import 'dart:convert';
 import 'dart:io';
@@ -21,6 +33,8 @@ import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/utils/ids.dart';
+import '../../models/logic_rule.dart';
+import '../../models/plant.dart';
 import '../../models/project.dart';
 import 'project_repository.dart';
 
@@ -53,7 +67,7 @@ class ProjectEntry {
   static ProjectEntry? fromJson(Object? j) {
     if (j is! Map) return null;
     final id = j['id'], name = j['name'];
-    if (id is! String || name is! String || !ProjectLibrary.validId(id)) return null;
+    if (id is! String || name is! String || !PlantStore.validId(id)) return null;
     int count(Object? v) => v is int && v >= 0 ? v : 0;
     return ProjectEntry(id: id, name: name, equipment: count(j['equipment']), tags: count(j['tags']), screens: count(j['screens']));
   }
@@ -66,18 +80,22 @@ class ProjectEntry {
   int get hashCode => Object.hash(id, name, equipment, tags, screens);
 }
 
-/// Os projetos guardados neste aparelho.
+/// A planta deste aparelho: os projetos e as regras da planta.
 ///
 /// Chame [load] uma vez antes de tudo (resolve a pasta, migra o projeto único
-/// das versões antigas e lê o índice). Depois disso, [repositoryFor] é
+/// das versões antigas e lê a planta). Depois disso, [repositoryFor] é
 /// síncrono.
-class ProjectLibrary {
-  ProjectLibrary({Directory? root}) : _rootOverride = root;
+class PlantStore {
+  PlantStore({Directory? root}) : _rootOverride = root;
 
-  static final Logger _log = Logger('ProjectLibrary');
+  static final Logger _log = Logger('PlantStore');
 
   static const folder = 'projetos';
-  static const indexName = 'indice.json';
+  static const indexName = 'planta.json';
+  static const backupFolder = 'copias';
+
+  /// Cópias automáticas guardadas (as mais antigas saem).
+  static const keepBackups = 5;
 
   /// Pasta do projeto único das versões até a 1.4.0, depois de migrado. Fixa
   /// (e não sorteada) para a migração poder ser retomada se o app fechar no
@@ -91,6 +109,14 @@ class ProjectLibrary {
   Directory? _root;
   final List<ProjectEntry> _entries = [];
   String? _lastOpen;
+  String _name = Plant.defaultName;
+  List<LogicRule> _rules = const [];
+
+  /// Nome da planta.
+  String get name => _name;
+
+  /// Regras da planta (referências qualificadas, [PlantRef]).
+  List<LogicRule> get rules => _rules;
 
   /// Os projetos, em ordem alfabética (sem diferenciar acento nem maiúscula).
   List<ProjectEntry> get entries => List.unmodifiable(_entries);
@@ -105,7 +131,7 @@ class ProjectLibrary {
 
   Directory get _rootDir {
     final r = _root;
-    if (r == null) throw StateError('ProjectLibrary.load() ainda não foi chamado');
+    if (r == null) throw StateError('PlantStore.load() ainda não foi chamado');
     return r;
   }
 
@@ -191,6 +217,15 @@ class ProjectLibrary {
       if (raw is! Map) return;
       final open = raw['open'];
       if (open is String) _lastOpen = open;
+      final name = raw['name'];
+      if (name is String && name.trim().isNotEmpty) _name = name.trim();
+      final rules = raw['rules'];
+      if (rules is List) {
+        _rules = [
+          for (final r in rules)
+            if (r is Map && r['id'] is String) LogicRule.fromJson(Map<String, dynamic>.from(r)),
+        ];
+      }
       final list = raw['projects'];
       if (list is List) {
         for (final j in list) {
@@ -199,7 +234,12 @@ class ProjectLibrary {
         }
       }
     } catch (e) {
-      _log.warning('Índice dos projetos ilegível, refazendo pelas pastas: $e');
+      // A lista se refaz pelas pastas; nome e regras da planta voltam ao
+      // padrão (o arquivo estragado fica guardado ao lado).
+      _log.warning('Planta ilegível, refazendo a lista pelas pastas: $e');
+      try {
+        f.copySync('${f.path}.corrompido-${DateTime.now().millisecondsSinceEpoch}');
+      } catch (_) {/* sem cópia, segue */}
       _entries.clear();
     }
   }
@@ -246,17 +286,19 @@ class ProjectLibrary {
     try {
       await tmp.writeAsString(
         const JsonEncoder.withIndent('  ').convert({
-          'format': 'ware-iot-projetos',
+          'format': 'ware-iot-planta',
           'version': 1,
+          'name': _name,
           'open': ?_lastOpen,
           'projects': [for (final e in _entries) e.toJson()],
+          if (_rules.isNotEmpty) 'rules': [for (final r in _rules) r.toJson()],
         }),
         flush: true,
       );
       await tmp.rename(f.path);
     } catch (e) {
       // Sem índice a lista se refaz pelas pastas na próxima abertura.
-      _log.warning('Não gravou o índice dos projetos: $e');
+      _log.warning('Não gravou a planta: $e');
     }
   }
 
@@ -318,6 +360,50 @@ class ProjectLibrary {
         _log.warning('Não apagou $d: $e');
       }
     }
+  }
+
+  Future<void> setName(String name) async {
+    final clean = name.trim();
+    if (clean.isEmpty || clean == _name) return;
+    _name = clean;
+    await _writeIndex();
+  }
+
+  Future<void> setRules(List<LogicRule> rules) async {
+    _rules = List.unmodifiable(rules);
+    await _writeIndex();
+  }
+
+  /// Todos os projetos, na ordem da lista (exportar a planta, visão das
+  /// regras da planta). Projeto ilegível sai como vazio com o nome da lista.
+  Future<Map<String, Project>> readAll() async => {
+        for (final e in _entries) e.id: await read(e.id) ?? Project(name: e.name),
+      };
+
+  /// A planta inteira, como vai para o arquivo exportado.
+  Future<Plant> export() async {
+    final all = await readAll();
+    return Plant(name: _name, projects: [for (final e in all.entries) PlantProject(e.key, e.value)], rules: _rules);
+  }
+
+  /// Guarda a planta inteira em `copias/` antes de substituí-la (Nova
+  /// planta, importar uma planta). Devolve o arquivo. Ficam as
+  /// [keepBackups] mais novas.
+  Future<File> backup() async {
+    final dir = Directory('${_rootDir.path}$_sep$backupFolder')..createSync(recursive: true);
+    final d = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    final stamp = '${d.year}-${two(d.month)}-${two(d.day)}_${two(d.hour)}${two(d.minute)}${two(d.second)}';
+    final file = File('${dir.path}${_sep}planta-$stamp.${ProjectRepository.exportExtension}');
+    await file.writeAsBytes(ProjectRepository.encodePlant(await export()), flush: true);
+    final all = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.${ProjectRepository.exportExtension}')).toList()
+      ..sort((a, b) => b.path.compareTo(a.path));
+    for (final old in all.skip(keepBackups)) {
+      try {
+        old.deleteSync();
+      } catch (_) {/* fica para a próxima */}
+    }
+    return file;
   }
 
   /// "Cortadora", "Cortadora (2)", "Cortadora (3)"… — nome que ainda não

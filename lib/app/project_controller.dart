@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
@@ -8,16 +9,19 @@ import '../models/device.dart';
 import '../models/hmi_screen.dart';
 import '../models/log_group.dart';
 import '../models/logic_rule.dart';
+import '../models/plant.dart';
 import '../models/project.dart';
 import '../models/recipe.dart';
 import '../models/tag.dart';
 import '../services/cameras/camera_vault.dart';
 import '../services/demo/demo_project.dart';
+import '../core/utils/ids.dart';
+import '../services/plant/plant_view.dart';
 import '../services/runtime/hmi_runtime.dart';
-import '../services/storage/project_library.dart';
+import '../services/storage/plant_store.dart';
 import '../services/storage/project_repository.dart';
 
-export '../services/storage/project_library.dart' show ProjectEntry, ProjectLibrary;
+export '../services/storage/plant_store.dart' show ProjectEntry, PlantStore;
 
 /// Dono do projeto aberto: toda edição passa por aqui.
 ///
@@ -30,11 +34,16 @@ export '../services/storage/project_library.dart' show ProjectEntry, ProjectLibr
 /// simplicidade — quem monta tela no chão de fábrica não pode perder trabalho
 /// porque esqueceu de salvar.
 ///
-/// **Vários projetos** ([library]): o app guarda muitos, cada um na sua
-/// pasta, e o controlador cuida do que está **aberto** — é dele que
-/// Equipamentos, Variáveis, Ferramentas e Alarmes mostram as coisas. Criar e
-/// importar sempre acrescentam um projeto; nada substitui outro. Sem
-/// biblioteca (testes, bancada), o controlador cuida de um projeto só, no
+/// **Planta** ([library], reunião de 19–20/10/2026): o app guarda uma planta
+/// com vários projetos (um por máquina), cada um na sua pasta, e o
+/// controlador cuida do projeto **aberto** — é dele que Equipamentos,
+/// Variáveis, Ferramentas e Alarmes mostram as coisas. Criar e importar um
+/// projeto sempre acrescentam; só "Nova planta" e importar uma planta
+/// inteira substituem, com cópia automática antes. As **regras da planta**
+/// usam variáveis de qualquer projeto: o motor recebe [liveProject], o
+/// projeto aberto mais o que essas regras citam dos outros ([PlantView]).
+///
+/// Sem planta (testes, bancada), o controlador cuida de um projeto só, no
 /// [ProjectRepository] dado — o comportamento das versões até a 1.4.0.
 class ProjectController extends ChangeNotifier {
   ProjectController({ProjectRepository? repository, this.library, required this.runtime})
@@ -44,7 +53,7 @@ class ProjectController extends ChangeNotifier {
   static final Logger _log = Logger('ProjectController');
 
   /// Os projetos guardados no aparelho. Nulo = um projeto só ([repository]).
-  final ProjectLibrary? library;
+  final PlantStore? library;
   final HmiRuntime runtime;
 
   ProjectRepository? _repository;
@@ -54,6 +63,51 @@ class ProjectController extends ChangeNotifier {
   bool _loaded = false;
   Future<void> _switching = Future.value();
   final List<ProjectScoped> _scoped = [];
+
+  /// Outros projetos já lidos (os que as regras da planta citam; todos,
+  /// depois de abrir o editor das regras da planta).
+  final Map<String, Project> _others = {};
+  Project? _live;
+
+  /// O que vai para o motor: o projeto aberto e, com regras da planta, as
+  /// variáveis que elas citam dos outros projetos ([PlantView.runtime]).
+  /// As telas usam [project]; o motor das regras usa este.
+  Project get liveProject => _live ?? _project;
+
+  /// Nome da planta (sem planta: o do projeto).
+  String get plantName => library?.name ?? _project.name;
+
+  /// Regras da planta, guardadas com referência qualificada ([PlantRef]).
+  List<LogicRule> get plantRules => library?.rules ?? const [];
+
+  /// Regras da planta como aparecem com este projeto aberto (as variáveis
+  /// dele com o id de sempre).
+  List<LogicRule> get plantRulesView {
+    final id = _openId;
+    return id == null ? const [] : [for (final r in plantRules) PlantRef.ruleToView(r, id)];
+  }
+
+  Map<String, Project> get _othersButOpen => {for (final e in _others.entries) if (e.key != _openId) e.key: e.value};
+
+  void _refreshLive() {
+    final lib = library, id = _openId;
+    _live = lib == null || id == null || lib.rules.isEmpty
+        ? null
+        : PlantView.runtime(openId: id, open: _project, others: _othersButOpen, rules: lib.rules);
+  }
+
+  /// Lê os projetos que as regras da planta ligadas citam e ainda não
+  /// estão na memória.
+  Future<void> _loadReferenced() async {
+    final lib = library;
+    if (lib == null) return;
+    final ids = {for (final r in lib.rules) if (r.enabled) ...PlantRef.projectsOf(r)}..remove(_openId);
+    for (final id in ids) {
+      if (_others.containsKey(id) || lib.entry(id) == null) continue;
+      final p = await lib.read(id);
+      if (p != null) _others[id] = p;
+    }
+  }
 
   /// A pasta do projeto aberto. Muda quando outro projeto é aberto — quem
   /// guarda coisa do projeto pede de novo a cada vez, nunca guarda a antiga.
@@ -79,7 +133,7 @@ class ProjectController extends ChangeNotifier {
   /// Abre o último projeto aberto, ou a demonstração na primeira vez.
   ///
   /// Com biblioteca, o projeto único das versões antigas (`projeto.ihm.json`)
-  /// vira o primeiro da lista, com os históricos dele ([ProjectLibrary.load]).
+  /// vira o primeiro da lista, com os históricos dele ([PlantStore.load]).
   Future<void> load() async {
     final lib = library;
     if (lib == null) {
@@ -97,7 +151,9 @@ class ProjectController extends ChangeNotifier {
     _repository = repo;
     _openId = id;
     _project = await _read(repo, id);
-    await runtime.apply(_project);
+    await _loadReferenced();
+    _refreshLive();
+    await runtime.apply(liveProject);
     await lib.setOpen(id);
     _loaded = true;
     notifyListeners();
@@ -112,14 +168,15 @@ class ProjectController extends ChangeNotifier {
   /// cenário assim). Na tela, criar e importar acrescentam projetos.
   Future<void> replace(Project next) async {
     _project = next;
-    await runtime.apply(next);
+    _refreshLive();
+    await runtime.apply(liveProject);
     notifyListeners();
     await _saveNow();
   }
 
   // ── Vários projetos ──────────────────────────────────────────────────────────
 
-  ProjectLibrary get _lib {
+  PlantStore get _lib {
     final lib = library;
     if (lib == null) throw StateError('Sem biblioteca: um projeto só');
     return lib;
@@ -153,11 +210,17 @@ class ProjectController extends ChangeNotifier {
     }
     _saveTimer?.cancel();
     _saveTimer = null;
+    final leaving = _openId;
+    if (leaving != null) _others[leaving] = _project;
+    _others.remove(id);
     _repository = repo;
     _openId = id;
     _project = next;
+    _refreshLive();
     notifyListeners();
-    await runtime.apply(next);
+    await _loadReferenced();
+    _refreshLive();
+    await runtime.apply(liveProject);
     await lib.setOpen(id);
     for (final s in [..._scoped]) {
       await _bounded(s.afterSwitch, 'ler o projeto novo');
@@ -220,6 +283,8 @@ class ProjectController extends ChangeNotifier {
         final next = p.copyWith(name: name);
         await repo.save(next);
         await _lib.touch(id, next);
+        if (_others.containsKey(id)) _others[id] = next;
+        _refreshLive();
         notifyListeners();
       });
 
@@ -232,6 +297,9 @@ class ProjectController extends ChangeNotifier {
         final doomed = await _snapshot(id);
         if (id == _openId) await _open(lib.entries.firstWhere((e) => e.id != id).id);
         await lib.remove(id);
+        _others.remove(id);
+        _refreshLive();
+        unawaited(runtime.apply(liveProject));
         notifyListeners();
         for (final ref in doomed?.cameraSecretRefs ?? const <String>{}) {
           await CameraVault.instance.delete(ref);
@@ -248,6 +316,149 @@ class ProjectController extends ChangeNotifier {
     return _lib.read(id);
   }
 
+  // ── Planta ───────────────────────────────────────────────────────────────────
+
+  Future<void> renamePlant(String name) async {
+    await _lib.setName(name);
+    notifyListeners();
+  }
+
+  /// A planta inteira para enviar ou salvar (`schemaVersion` 2).
+  Future<Plant> exportPlant() => _serial(() async {
+        await flush();
+        return _lib.export();
+      });
+
+  /// Grava uma regra da planta vinda do editor (ids da visão com este
+  /// projeto aberto) com as referências qualificadas.
+  Future<void> savePlantRule(LogicRule viewRule) async {
+    final stored = PlantRef.ruleToStored(viewRule, _openId!);
+    final list = [...plantRules];
+    final i = list.indexWhere((r) => r.id == stored.id);
+    if (i < 0) {
+      list.add(stored);
+    } else {
+      list[i] = stored;
+    }
+    await _setPlantRules(list);
+  }
+
+  Future<void> deletePlantRule(String id) => _setPlantRules([for (final r in plantRules) if (r.id != id) r]);
+
+  Future<void> _setPlantRules(List<LogicRule> rules) async {
+    await _lib.setRules(rules);
+    await _loadReferenced();
+    _refreshLive();
+    notifyListeners();
+    await runtime.apply(liveProject);
+  }
+
+  /// Todas as variáveis da planta, para o editor das regras da planta (lê
+  /// os projetos que ainda não estão na memória).
+  Future<Project> plantEditorView() async {
+    final lib = _lib, id = _openId!;
+    for (final e in lib.entries) {
+      if (e.id == id || _others.containsKey(e.id)) continue;
+      final p = await lib.read(e.id);
+      if (p != null) _others[e.id] = p;
+    }
+    return PlantView.editor(openId: id, open: _project, others: _othersButOpen, rules: plantRules);
+  }
+
+  /// Marca "aceita escrita por regra" numa variável da visão da planta — do
+  /// projeto aberto ou de outro (gravado no arquivo dele).
+  Future<void> allowRuleWrite(String viewTagId) async {
+    final ref = PlantRef.parse(viewTagId);
+    if (ref == null) {
+      final t = _project.tag(viewTagId);
+      if (t != null) saveTag(t.copyWith(ruleWritable: true));
+      return;
+    }
+    final (pid, tid) = ref;
+    final repo = _lib.repositoryFor(pid);
+    final p = _others[pid] ?? await repo.load();
+    final t = p?.tag(tid);
+    if (p == null || t == null) return;
+    final next = p.upsertTag(t.copyWith(ruleWritable: true));
+    await repo.save(next);
+    _others[pid] = next;
+    _refreshLive();
+    notifyListeners();
+    await runtime.apply(liveProject);
+  }
+
+  /// Soma os projetos de uma planta (arquivo) a esta, sem tirar nada. Cada
+  /// um ganha id novo (e "(2)" no nome se já existir); as regras da planta
+  /// do arquivo vêm junto, apontando para os projetos novos. Não troca o
+  /// projeto aberto. Devolve quantos projetos entraram.
+  Future<int> addPlantProjects(Plant p) => _serial(() async {
+        final ids = await _addAll(p);
+        await _lib.setRules([...plantRules, ..._remapRules(p.rules, ids)]);
+        await _loadReferenced();
+        _refreshLive();
+        notifyListeners();
+        await runtime.apply(liveProject);
+        return ids.length;
+      });
+
+  /// Troca a planta inteira (Nova planta, importar uma planta). Antes, a
+  /// planta atual vai inteira para `copias/` — devolve esse arquivo. Os
+  /// projetos que saem levam os históricos, o registro de dados e as
+  /// senhas das câmeras deles.
+  Future<File> replacePlant(Plant p) => _serial(() async {
+        final lib = _lib;
+        await flush();
+        final backup = await lib.backup();
+        final old = [for (final e in lib.entries) e.id];
+        final oldSecrets = <String>{};
+        for (final id in old) {
+          oldSecrets.addAll((await _snapshot(id))?.cameraSecretRefs ?? const <String>{});
+        }
+        final ids = await _addAll(p.projects.isEmpty ? Plant(name: p.name, projects: const [PlantProject('novo', Project(name: 'Meu projeto'))]) : p);
+        await lib.setName(p.name);
+        await lib.setRules(_remapRules(p.rules, ids));
+        await _open(ids.values.first);
+        for (final id in old) {
+          await lib.remove(id);
+          _others.remove(id);
+        }
+        for (final ref in oldSecrets) {
+          await CameraVault.instance.delete(ref);
+        }
+        _refreshLive();
+        notifyListeners();
+        return backup;
+      });
+
+  /// "Nova planta": uma planta com um projeto vazio (cópia da atual antes).
+  Future<File> newPlant() => replacePlant(const Plant(projects: [PlantProject('novo', Project(name: 'Meu projeto'))]));
+
+  /// Guarda os projetos de [p] com ids novos; devolve id do arquivo → id novo.
+  Future<Map<String, String>> _addAll(Plant p) async {
+    final ids = <String, String>{};
+    for (final pp in p.projects) {
+      final project = pp.project.withFreshCameraSecrets();
+      ids[pp.id] = await _lib.add(project.copyWith(name: _lib.uniqueName(project.name)));
+    }
+    return ids;
+  }
+
+  /// Regras de uma planta de arquivo apontando para os projetos novos; regra
+  /// com id que já existe ganha id novo.
+  List<LogicRule> _remapRules(List<LogicRule> rules, Map<String, String> ids) {
+    final taken = {for (final r in plantRules) r.id};
+    return [
+      for (final r in rules)
+        PlantRef.mapRule(
+          taken.contains(r.id) ? LogicRule.fromJson({...r.toJson(), 'id': newId('r')}) : r,
+          (ref) {
+            final q = PlantRef.parse(ref);
+            return q == null ? ref : PlantRef.of(ids[q.$1] ?? q.$1, q.$2);
+          },
+        ),
+    ];
+  }
+
   Future<Project?> _snapshot(String id) async {
     if (id == _openId) {
       await flush();
@@ -258,7 +469,8 @@ class ProjectController extends ChangeNotifier {
 
   void _commit(Project next) {
     _project = next;
-    unawaited(runtime.apply(next));
+    _refreshLive();
+    unawaited(runtime.apply(liveProject));
     notifyListeners();
     _saveTimer?.cancel();
     _saveTimer = Timer(const Duration(milliseconds: 400), () => unawaited(_saveNow()));

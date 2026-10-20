@@ -128,6 +128,9 @@ class _Run {
 ///
 /// Nada disso é intertravamento de segurança — o celular pode demorar ou
 /// parar de ler a qualquer momento. Segurança mora no CLP.
+///
+/// Trabalha sobre [ProjectController.liveProject]: as regras do projeto
+/// aberto e as da planta, que podem citar variáveis de outros projetos.
 class RuleEngine extends ChangeNotifier implements ProjectScoped {
   RuleEngine({
     required this.controller,
@@ -136,7 +139,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
     this.historyFile,
     this.tick = const Duration(seconds: 1),
   }) {
-    _evaluator = CalcEvaluator(() => controller.project);
+    _evaluator = CalcEvaluator(() => controller.liveProject);
     controller.addListener(_sync);
     controller.attachScoped(this);
     _sync();
@@ -194,7 +197,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
   /// Projeto mudou: refaz o que vigiar, solta regra apagada ou desligada.
   void _sync() {
     if (_disposed) return;
-    final project = controller.project;
+    final project = controller.liveProject;
     final ids = <String>{
       for (final r in project.rules)
         if (r.enabled) ...{
@@ -241,7 +244,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
   void _evaluateAll() {
     if (_disposed || _paused) return;
     var changed = false;
-    for (final r in controller.project.rules) {
+    for (final r in controller.liveProject.rules) {
       changed |= _evaluate(r);
     }
     if (changed) notifyListeners();
@@ -296,7 +299,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
   /// Por que a regra não pode rodar agora (nulo = pode). Também atualiza a
   /// leitura da condição.
   String? _problem(LogicRule rule, _Run run) {
-    final project = controller.project;
+    final project = controller.liveProject;
     final target = project.tag(rule.targetTagId);
     if (rule.targetTagId.isEmpty) return 'falta escolher onde gravar';
     if (target == null) return 'a variável de destino foi apagada';
@@ -316,7 +319,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
 
   void _fire(LogicRule rule, Duration held) {
     final now = clock.now();
-    final target = controller.project.tag(rule.targetTagId)!;
+    final target = controller.liveProject.tag(rule.targetTagId)!;
     _addEvent(RuleEvent(at: now, type: RuleEventType.fired, rule: rule.name, text: rule.holdSec == 0 ? 'condição presente' : 'condição durou ${held.inSeconds} s'));
     if (rule.mode == RuleMode.automatic && rule.canBeAutomatic) {
       _log.warning('Regra automática "${rule.name}": ${describeWrite(rule, target)}');
@@ -337,7 +340,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
 
   /// 'Grava DESLIGADO em "Liga prensa" (Prensa)'.
   String describeWrite(LogicRule rule, Tag target) {
-    final device = controller.project.device(target.deviceId)?.name;
+    final device = controller.liveProject.device(target.deviceId)?.name;
     return 'Grava ${TagCodec.format(target, valueFor(rule, target))} em "${target.name}"${device == null ? '' : ' ($device)'}';
   }
 
@@ -352,8 +355,8 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
   Future<String?> confirm(String ruleId) async {
     final p = _take(ruleId);
     if (p == null) return null;
-    final rule = controller.project.rule(ruleId);
-    final target = rule == null ? null : controller.project.tag(rule.targetTagId);
+    final rule = controller.liveProject.rule(ruleId);
+    final target = rule == null ? null : controller.liveProject.tag(rule.targetTagId);
     if (rule == null || target == null) return 'A regra ou o destino não existe mais';
     return _write(rule, target, automatic: false);
   }
@@ -361,7 +364,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
   /// A pessoa disse não: nada é gravado.
   void ignore(String ruleId) {
     if (_take(ruleId) == null) return;
-    final rule = controller.project.rule(ruleId);
+    final rule = controller.liveProject.rule(ruleId);
     _addEvent(RuleEvent(at: clock.now(), type: RuleEventType.ignored, rule: rule?.name ?? ''));
     notifyListeners();
   }
@@ -383,7 +386,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
 
   Future<String?> _write(LogicRule rule, Tag target, {required bool automatic}) async {
     // A permissão pode ter sido tirada entre a pergunta e o toque.
-    final now = controller.project.tag(target.id) ?? target;
+    final now = controller.liveProject.tag(target.id) ?? target;
     String? error;
     if (!now.acceptsRuleWrite) {
       error = '"${now.name}" não aceita escrita por regra';
@@ -416,7 +419,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
     _pausedAt = clock.now();
     _timer?.cancel();
     _timer = null;
-    final project = controller.project;
+    final project = controller.liveProject;
     for (final p in [..._proposals]) {
       final rule = project.rule(p.ruleId);
       if (rule != null) _withdraw(rule, 'app em segundo plano');
@@ -438,7 +441,7 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
     final since = _pausedAt;
     _pausedAt = null;
     final away = since == null ? Duration.zero : clock.now().difference(since);
-    if (away >= pausedAlarmAfter && controller.project.rules.any((r) => r.enabled)) {
+    if (away >= pausedAlarmAfter && controller.liveProject.rules.any((r) => r.enabled)) {
       final minutes = away.inMinutes;
       alarms?.raise(pausedKey,
           priority: AlarmPriority.low, message: 'As regras ficaram paradas ${minutes < 1 ? '${away.inSeconds} s' : '$minutes min'}: app em segundo plano');

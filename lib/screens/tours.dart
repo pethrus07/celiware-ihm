@@ -96,8 +96,10 @@ class Tours {
         TourStep(essential: true, title: 'Aplicar', body: 'Mostra o "de → para" e só grava depois da sua confirmação. Não substitui a segurança da máquina.'),
       ]);
 
-  static TourSpec regras() => const TourSpec(id: 'regras', version: 1, title: 'Regras', steps: [
+  /// v2: as regras da planta (variáveis de qualquer projeto).
+  static TourSpec regras() => const TourSpec(id: 'regras', version: 2, title: 'Regras', steps: [
         TourStep(essential: true, title: 'Regras', body: '"Quando a condição durar um tempo, gravar um valor": uma máquina avisa a outra.'),
+        TourStep(essential: true, title: 'Deste projeto ou da planta', body: 'As do projeto usam as variáveis dele. As da planta usam variáveis de qualquer projeto.'),
         TourStep(essential: true, title: 'Pergunta antes', body: 'O padrão é perguntar antes de gravar. Gravar sozinha só serve para parar.'),
         TourStep(essential: true, title: 'Não é segurança', body: 'Celular não é intertravamento: emergência e proteções continuam na máquina.'),
       ]);
@@ -112,9 +114,9 @@ class Tours {
   /// A lista de projetos. Como Equipamentos, só abre pelo "?".
   static TourSpec projetos({GlobalKey? list, GlobalKey? add, GlobalKey? settings}) =>
       TourSpec(id: 'projetos', version: 1, title: 'Projetos', steps: [
-        TourStep(target: list, essential: true, title: 'Projetos', body: 'Cada projeto tem os seus equipamentos, variáveis e telas. Toque para abrir.'),
+        TourStep(target: list, essential: true, title: 'Projetos', body: 'Uma máquina por projeto, com os seus equipamentos, variáveis e telas. Toque para abrir.'),
         TourStep(target: add, title: 'Novo projeto', body: 'Em branco, a demonstração ou um arquivo recebido. Nunca apaga outro projeto.'),
-        const TourStep(essential: true, title: 'Enviar', body: 'No menu ⋮ do projeto: enviar para outro celular, salvar em arquivo, duplicar.'),
+        const TourStep(essential: true, title: 'Enviar', body: 'O ⋮ do projeto envia, salva ou duplica ele. O ⋮ do topo faz o mesmo com a planta inteira.'),
         TourStep(target: settings, title: 'Ajustes', body: 'Claro ou escuro, tutoriais e sobre o app.'),
       ]);
 

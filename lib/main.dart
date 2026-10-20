@@ -32,8 +32,8 @@ Future<void> main() async {
 
   final runtime = HmiRuntime();
   // Vários projetos, cada um na sua pasta; o projeto único das versões
-  // antigas vira o primeiro da lista ao abrir (ProjectLibrary.load).
-  final controller = ProjectController(library: ProjectLibrary(), runtime: runtime);
+  // antigas vira o primeiro da lista ao abrir (PlantStore.load).
+  final controller = ProjectController(library: PlantStore(), runtime: runtime);
   await controller.load();
 
   runApp(CeliwareIhmApp(controller: controller, runtime: runtime));

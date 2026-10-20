@@ -27,7 +27,11 @@ void main() {
   const door = Tag(id: 'door', name: 'Porta fechada', deviceId: 'd1', area: ModbusArea.coil, dataType: TagDataType.bool);
   const recipe = Tag(id: 'txt', name: 'Receita', deviceId: 'd1', dataType: TagDataType.string, length: 4);
   const hourly = Tag(id: 'hora', name: 'Produção por hora', deviceId: 'd1', length: 8);
-  final t0 = DateTime.utc(2026, 10, 11, 12);
+  // Ontem ao meio-dia (UTC), e não uma data fixa: a descarga sem relógio
+  // falso confere a retenção (7 dias) pelo relógio de verdade, e a data
+  // fixa de 11/10 passou a ser apagada como velha a partir de 18/10.
+  final today = DateTime.now().toUtc();
+  final t0 = DateTime.utc(today.year, today.month, today.day, 12).subtract(const Duration(days: 1));
 
   late Directory dir;
   late HmiRuntime runtime;

@@ -11,16 +11,19 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
 import '../../models/device.dart';
+import '../../models/http_config.dart';
 import '../../models/vendor_profiles.dart';
 import '../../models/mqtt_config.dart';
 import '../../models/opcua_config.dart';
 import '../../models/raw_config.dart';
 import '../../models/s7_config.dart';
 import '../../models/serial_config.dart';
+import '../../services/net/device_vault.dart';
 import '../../services/net/modbus_discovery.dart';
 import '../../services/runtime/hmi_runtime.dart';
 import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
+import 'http_device_fields.dart';
 import 'network_scan_sheet.dart';
 import 'opcua_device_fields.dart';
 import 'raw_device_fields.dart';
@@ -75,6 +78,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     Device(kind: DeviceKind.s7) => _Protocol.s7,
     Device(kind: DeviceKind.raw) => _Protocol.raw,
     Device(kind: DeviceKind.opcua) => _Protocol.opcua,
+    Device(kind: DeviceKind.http) => _Protocol.http,
     _ => _Protocol.tcp,
   };
 
@@ -103,6 +107,15 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   /// OPC UA: caminho do endpoint, usuário e senha no lugar do ID do escravo.
   late final OpcUaDeviceFields _ua = OpcUaDeviceFields(widget.device?.opcua);
   bool get _isOpcUa => _net && _protocol == _Protocol.opcua;
+
+  /// HTTP: a URL base no lugar do IP; autenticação (senha no cofre) e
+  /// cabeçalhos em "Mais opções".
+  late final HttpDeviceFields _hf = HttpDeviceFields(
+    widget.device?.kind == DeviceKind.http ? widget.device!.http : null,
+    host: widget.device?.host ?? '',
+    port: widget.device?.port ?? HttpConfig.defaultPort,
+  );
+  bool get _isHttp => _net && _protocol == _Protocol.http;
   late final _name = TextEditingController(text: widget.device?.name ?? '');
   late final _host = TextEditingController(text: widget.device?.host ?? widget.found?.host ?? '');
   late final _port = TextEditingController(text: '${widget.device?.port ?? widget.found?.port ?? 502}');
@@ -127,6 +140,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   void initState() {
     super.initState();
     _initial = _snapshot();
+    // A senha do equipamento HTTP mora no cofre: aparece escondida no campo.
+    if (widget.device?.kind == DeviceKind.http) _hf.load().then((_) => mounted ? setState(() {}) : null);
   }
 
   @override
@@ -137,6 +152,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     _s7.dispose();
     _rw.dispose();
     _ua.dispose();
+    _hf.dispose();
     super.dispose();
   }
 
@@ -153,6 +169,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 _Protocol.s7 => DeviceKind.s7,
                 _Protocol.raw => DeviceKind.raw,
                 _Protocol.opcua => DeviceKind.opcua,
+                _Protocol.http => DeviceKind.http,
                 _ => DeviceKind.modbusRtuTcp,
               },
         framing: _protocol == _Protocol.ascii ? ModbusFraming.ascii : ModbusFraming.rtu,
@@ -160,9 +177,10 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         port: int.tryParse(_port.text) ?? 502,
         unitId: int.tryParse(_unit.text) ?? 1,
         timeoutMs: (int.tryParse(_timeout.text) ?? 1500).clamp(200, 10000),
-        pollMs: (int.tryParse(_poll.text) ?? 500).clamp(100, 60000),
+        // HTTP: servidor web pequeno atende uma pergunta de cada vez.
+        pollMs: (int.tryParse(_poll.text) ?? 500).clamp(_isHttp ? HttpConfig.minPollMs : 100, 60000),
         // Perfil de fabricante é mapa de memória Modbus: no MQTT, no S7 e no cru não existe.
-        profile: _demo || _mqtt || _isS7 || _raw || _usbRaw || _isOpcUa ? null : _profile,
+        profile: _demo || _mqtt || _isS7 || _raw || _usbRaw || _isOpcUa || _isHttp ? null : _profile,
         // Só MQTT guarda broker; nos outros fica o padrão (e o arquivo, igual).
         mqtt: _mqtt
             ? MqttBroker(
@@ -180,12 +198,13 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
         raw: _raw || _usbRaw ? _rw.build() : const RawConfig(),
         serial: _usb ? _usbF.build() : const SerialConfig(),
         opcua: _isOpcUa ? _ua.build() : const OpcUaConfig(),
+        http: _isHttp ? _hf.build() : const HttpConfig(),
       );
 
   /// O que o Salvar gravaria agora.
   String _snapshot() => jsonEncode(_build().toJson());
 
-  bool get _dirty => _snapshot() != _initial;
+  bool get _dirty => _snapshot() != _initial || (_isHttp && _hf.secretChanged);
 
   /// Voltar (seta ou gesto do sistema; no tablet, tocar noutro equipamento da
   /// lista): sem alteração, sai direto; com alteração, pergunta antes de jogar
@@ -211,14 +230,20 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   /// nunca quer a 502 que já estava no campo. Porta mexida à mão fica.
   void _setProtocol(_Protocol p) {
     final port = int.tryParse(_port.text);
-    if (port == null || const {502, MqttBroker.defaultPort, MqttBroker.tlsPort, S7Config.defaultPort, RawConfig.defaultPort, OpcUaConfig.defaultPort}.contains(port)) {
+    if (port == null || const {502, MqttBroker.defaultPort, MqttBroker.tlsPort, S7Config.defaultPort, RawConfig.defaultPort, OpcUaConfig.defaultPort, HttpConfig.defaultPort}.contains(port)) {
       _port.text = switch (p) {
         _Protocol.mqtt => '${_tls ? MqttBroker.tlsPort : MqttBroker.defaultPort}',
         _Protocol.s7 => '${S7Config.defaultPort}',
         _Protocol.raw => '${RawConfig.defaultPort}',
         _Protocol.opcua => '${OpcUaConfig.defaultPort}',
+        _Protocol.http => '${HttpConfig.defaultPort}',
         _ => '502',
       };
+    }
+    // HTTP: a URL nasce do IP que já estava no campo (e a porta vem dela).
+    if (p == _Protocol.http) {
+      _hf.startFrom(_host.text);
+      _hf.syncTo(_host, _port);
     }
     _protocol = p;
     _probe = null;
@@ -238,6 +263,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
     if (_isS7) return '${_s7.build().label} · Porta ${_port.text}';
     if (_raw) return _rw.summary(_port.text);
     if (_isOpcUa) return _ua.summary(_port.text);
+    if (_isHttp) return _hf.summary();
     if (!_mqtt) return '${_protocol.short} · Porta ${_port.text} · ID ${_unit.text}${_profileName == null ? '' : ' · $_profileName'}';
     return [
       'MQTT · Porta ${_port.text}',
@@ -250,7 +276,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
   Future<void> _test() async {
     // Testar só exige o IP — validar o formulário inteiro marcava erro no
     // nome, que não tem nada a ver com o teste.
-    if (_net && !(_ipField.currentState?.validate() ?? false)) {
+    if (_net && !((_isHttp ? _hf.urlKey : _ipField).currentState?.validate() ?? false)) {
       setState(() => _recheck = AutovalidateMode.onUserInteraction);
       return;
     }
@@ -296,7 +322,15 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
       return;
     }
     final c = AppScope.of(context).controller;
-    final next = _build();
+    var next = _build();
+    // HTTP: a senha vai para o cofre e o equipamento guarda só a chave;
+    // deixou de ser HTTP, a senha antiga sai do cofre.
+    if (_isHttp) {
+      next = next.copyWith(http: await _hf.commit(keep: true));
+    } else if (widget.device?.kind == DeviceKind.http) {
+      await _hf.commit(keep: false);
+    }
+    if (!mounted) return;
     c.saveDevice(next);
     // Trocou a marca: variável com a memória do manual ("D200") pode morar em
     // outro endereço Modbus no perfil novo. Pergunta antes de mexer.
@@ -359,6 +393,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
       return;
     }
     c.deleteDevice(_id);
+    final secret = widget.device!.kind == DeviceKind.http ? widget.device!.http.secretRef : null;
+    if (secret != null) await DeviceVault.instance.delete(secret);
     if (mounted) Navigator.pop(context);
   }
 
@@ -419,7 +455,17 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                 const SizedBox(height: Ind.space),
                 UsbAdapterRow(fields: _usbF, onChanged: () => setState(() => _probe = null)),
               ],
-              if (_net) ...[
+              if (_isHttp) ...[
+                const SizedBox(height: Ind.space),
+                HttpUrlField(
+                  fields: _hf,
+                  autovalidate: _recheck,
+                  onChanged: () => setState(() {
+                    _probe = null;
+                    _hf.syncTo(_host, _port);
+                  }),
+                ),
+              ] else if (_net) ...[
                 const SizedBox(height: Ind.space),
                 TextFormField(
                   key: _ipField,
@@ -464,7 +510,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                     : const Icon(Icons.network_check_rounded),
                 label: Text(_probing ? 'Testando…' : 'Testar conexão'),
               ),
-              if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7, opcua: _isOpcUa, raw: _raw ? _rw : null, usb: _usb ? _usbF : null))],
+              if (_probe != null) ...[const SizedBox(height: 12), KeyedSubtree(key: _probeKey, child: _ProbeCard(result: _probe!, tcp: tcp, mqtt: _mqtt, s7: _isS7, opcua: _isOpcUa, http: _isHttp, raw: _raw ? _rw : null, usb: _usb ? _usbF : null))],
               if (tcp) ...[
                 const SizedBox(height: Ind.spaceLarge),
                 Theme(
@@ -481,7 +527,7 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                       // Marca e modelo: com ela, as variáveis aceitam a memória
                       // como no manual ("D200"). Genérico = endereço Modbus direto.
                       // No MQTT, no S7 e no cru não há mapa de memória Modbus.
-                      if (!_mqtt && !_isS7 && !_raw && !_usbRaw && !_isOpcUa) ...[
+                      if (!_mqtt && !_isS7 && !_raw && !_usbRaw && !_isOpcUa && !_isHttp) ...[
                         ListTile(
                           key: const ValueKey('marca-modelo'),
                           contentPadding: EdgeInsets.zero,
@@ -523,6 +569,8 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
                         S7DeviceOptions(fields: _s7, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
                       else if (_isOpcUa)
                         OpcUaDeviceOptions(fields: _ua, host: _host, port: _port, timeout: _timeout, poll: _poll, onChanged: _refresh)
+                      else if (_isHttp)
+                        HttpDeviceOptions(fields: _hf, timeout: _timeout, poll: _poll, onChanged: _refresh)
                       else ...[
                         const SizedBox(height: Ind.space),
                         StepperField(label: 'Porta', controller: _port, min: 1, max: 65535, helper: _protocol == _Protocol.tcp ? 'Modbus TCP usa 502.' : 'A do gateway (veja o manual dele; ex.: 4001, 8899).', onChanged: () => setState(() {})),
@@ -620,12 +668,13 @@ class _DeviceFormPageState extends State<DeviceFormPage> {
 }
 
 class _ProbeCard extends StatelessWidget {
-  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false, this.s7 = false, this.opcua = false, this.raw, this.usb});
+  const _ProbeCard({required this.result, required this.tcp, this.mqtt = false, this.s7 = false, this.opcua = false, this.http = false, this.raw, this.usb});
   final ProbeResult result;
   final bool tcp;
   final bool mqtt;
   final bool s7;
   final bool opcua;
+  final bool http;
 
   /// Equipamento cru: o teste fala de mensagem e de perfil.
   final RawDeviceFields? raw;
@@ -684,7 +733,7 @@ class _ProbeCard extends StatelessWidget {
             const SizedBox(height: 6),
             // Recusou = achou o aparelho; o problema é porta ou Modbus
             // desligado. Nem vale mandar conferir Wi-Fi e IP.
-            for (final t in usb != null ? usbProbeChecks(result, raw: usb!.isRaw) : mqtt ? _mqttChecks() : s7 ? S7DeviceFields.checks(result) : opcua ? OpcUaDeviceFields.checks(result) : raw != null ? rawProbeChecks(result, udp: raw!.isUdp) : result.refused
+            for (final t in usb != null ? usbProbeChecks(result, raw: usb!.isRaw) : mqtt ? _mqttChecks() : s7 ? S7DeviceFields.checks(result) : opcua ? OpcUaDeviceFields.checks(result) : http ? HttpDeviceFields.checks(result) : raw != null ? rawProbeChecks(result, udp: raw!.isUdp) : result.refused
                 ? const [
                     'A porta está certa? Modbus TCP usa 502 — confira em "Mais opções".',
                     'O Modbus TCP está ligado no equipamento? Alguns vêm desligados de fábrica.',
@@ -741,7 +790,8 @@ enum _Protocol {
   mqtt('MQTT', 'MQTT · broker', 'MQTT'),
   s7('Siemens S7', 'Siemens S7', 'S7'),
   raw('Arduino / mensagem própria', 'Arduino · mensagem própria', 'Arduino'),
-  opcua('OPC UA', 'OPC UA · servidor', 'OPC UA');
+  opcua('OPC UA', 'OPC UA · servidor', 'OPC UA'),
+  http('HTTP / API REST', 'HTTP · API REST', 'HTTP');
 
   const _Protocol(this.chip, this.subtitle, this.short);
   final String chip;

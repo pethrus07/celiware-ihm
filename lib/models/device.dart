@@ -1,6 +1,7 @@
 // Equipamento: onde os dados moram.
 
 import '../core/modbus/modbus_framing.dart';
+import 'http_config.dart';
 import 'mqtt_config.dart';
 import 'opcua_config.dart';
 import 's7_config.dart';
@@ -48,6 +49,11 @@ enum DeviceKind {
   /// no modo de segurança None. Caminho do endpoint e usuário ficam em
   /// [Device.opcua].
   opcua,
+
+  /// Equipamento que fala HTTP/HTTPS na rede local: gateway, ESP32,
+  /// controlador com API REST. URL base, autenticação e cabeçalhos ficam em
+  /// [Device.http]; cada variável aponta para uma requisição (`Tag.http`).
+  http,
 }
 
 extension DeviceKindMeta on DeviceKind {
@@ -71,6 +77,8 @@ extension DeviceKindMeta on DeviceKind {
         return 'Cabo USB (RS-485/RS-232)';
       case DeviceKind.opcua:
         return 'Servidor OPC UA';
+      case DeviceKind.http:
+        return 'Equipamento HTTP (API REST)';
     }
   }
 
@@ -105,6 +113,7 @@ class Device {
     this.raw = const RawConfig(),
     this.serial = const SerialConfig(),
     this.opcua = const OpcUaConfig(),
+    this.http = const HttpConfig(),
   });
 
   final String id;
@@ -148,6 +157,10 @@ class Device {
   /// Em [DeviceKind.opcua]: caminho do endpoint, usuário e senha.
   final OpcUaConfig opcua;
 
+  /// Em [DeviceKind.http]: https, caminho base, autenticação (a senha fica no
+  /// cofre), cabeçalhos extras.
+  final HttpConfig http;
+
   bool get isDemo => kind == DeviceKind.demo;
 
   /// Variável aponta para área + endereço Modbus (a demonstração também:
@@ -168,7 +181,7 @@ class Device {
   /// Fala com o equipamento pela rede (IP e porta), qualquer que seja o
   /// protocolo.
   bool get isNetwork =>
-      kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt || kind == DeviceKind.s7 || kind == DeviceKind.raw || kind == DeviceKind.opcua;
+      kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt || kind == DeviceKind.s7 || kind == DeviceKind.raw || kind == DeviceKind.opcua || kind == DeviceKind.http;
 
   /// Descrição curta para listas: "192.168.0.10:502 · ID 1".
   String get addressLabel => isDemo
@@ -185,6 +198,8 @@ class Device {
           ? 'Cabo USB · ${serial.label}${serial.isRaw ? '' : ' · ID $unitId'}'
           : kind == DeviceKind.opcua
           ? '$host:$port${opcua.path} · OPC UA${opcua.anonymous ? '' : ' · ${opcua.username}'}'
+          : kind == DeviceKind.http
+          ? '${http.baseUrl(host, port)} · HTTP${http.needsSecret ? ' · ${http.auth == HttpAuth.basic ? http.username : 'token'}' : ''}'
           : '$host:$port · ${kind == DeviceKind.modbusRtuTcp ? '${framing.label} · ' : ''}ID $unitId';
 
   Device copyWith({
@@ -201,6 +216,7 @@ class Device {
     RawConfig? raw,
     SerialConfig? serial,
     OpcUaConfig? opcua,
+    HttpConfig? http,
   }) =>
       Device(
         id: id,
@@ -217,6 +233,7 @@ class Device {
         raw: raw ?? this.raw,
         serial: serial ?? this.serial,
         opcua: opcua ?? this.opcua,
+        http: http ?? this.http,
         profile: profile,
       );
 
@@ -237,6 +254,7 @@ class Device {
         raw: raw,
         serial: serial,
         opcua: opcua,
+        http: http,
         profile: profile,
       );
 
@@ -252,7 +270,8 @@ class Device {
       s7 == other.s7 &&
       raw == other.raw &&
       serial == other.serial &&
-      opcua == other.opcua;
+      opcua == other.opcua &&
+      http == other.http;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -275,17 +294,24 @@ class Device {
         if (isUsb && serial.isRaw) 'raw': {'profile': raw.profile.toJson()},
         // OPC UA anônimo na raiz não grava nada além do tipo.
         if (kind == DeviceKind.opcua && opcua.toJson().isNotEmpty) 'opcua': opcua.toJson(),
+        // HTTP sem senha na raiz não grava nada além do tipo; senha e token
+        // nunca (ficam no cofre).
+        if (kind == DeviceKind.http && http.toJson().isNotEmpty) 'http': http.toJson(),
       };
 
-  factory Device.fromJson(Map<String, dynamic> j) => Device(
+  factory Device.fromJson(Map<String, dynamic> j) {
+    final kind = DeviceKindMeta.fromName(j['kind'] as String?);
+    final pollMs = (j['pollMs'] as int?) ?? 500;
+    return Device(
         id: j['id'] as String,
         name: j['name'] as String,
-        kind: DeviceKindMeta.fromName(j['kind'] as String?),
+        kind: kind,
         host: (j['host'] as String?) ?? '',
         port: (j['port'] as int?) ?? 502,
         unitId: (j['unitId'] as int?) ?? 1,
         timeoutMs: (j['timeoutMs'] as int?) ?? 1500,
-        pollMs: (j['pollMs'] as int?) ?? 500,
+        // HTTP: nunca abaixo do mínimo (arquivo editado à mão).
+        pollMs: kind == DeviceKind.http && pollMs < HttpConfig.minPollMs ? HttpConfig.minPollMs : pollMs,
         framing: ModbusFramingMeta.fromName(j['framing'] as String?),
         profile: j['profile'] as String?,
         mqtt: j['mqtt'] is Map ? MqttBroker.fromJson(Map<String, dynamic>.from(j['mqtt'] as Map)) : const MqttBroker(),
@@ -293,5 +319,7 @@ class Device {
         raw: j['raw'] is Map ? RawConfig.fromJson(Map<String, dynamic>.from(j['raw'] as Map)) : const RawConfig(),
         serial: j['serial'] is Map ? SerialConfig.fromJson(Map<String, dynamic>.from(j['serial'] as Map)) : const SerialConfig(),
         opcua: j['opcua'] is Map ? OpcUaConfig.fromJson(Map<String, dynamic>.from(j['opcua'] as Map)) : const OpcUaConfig(),
+        http: j['http'] is Map ? HttpConfig.fromJson(Map<String, dynamic>.from(j['http'] as Map)) : const HttpConfig(),
       );
+  }
 }

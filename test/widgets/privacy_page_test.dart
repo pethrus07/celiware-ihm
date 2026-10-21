@@ -77,6 +77,8 @@ void main() {
     for (final fato in [
       'broker MQTT',
       'servidor OPC UA',
+      'equipamento com servidor web HTTP',
+      'A senha ou o token de equipamento HTTP também fica no cofre do Android',
       'cofre do Android',
       'Quem está aplicando',
       'Ferramentas → Registros',

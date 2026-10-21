@@ -9,6 +9,7 @@
 import '../core/modbus/modbus_memory.dart';
 import 'alarm.dart';
 import 'calc.dart';
+import 'http_config.dart';
 import 'narration.dart';
 import 'mqtt_config.dart';
 import 'opcua_config.dart';
@@ -169,6 +170,7 @@ class Tag {
     this.ruleWritable = false,
     this.opcua,
     this.addressPending = false,
+    this.http,
   });
 
   final String id;
@@ -244,6 +246,11 @@ class Tag {
   /// ficam no padrão.
   final OpcUaTagAddress? opcua;
 
+  /// Requisição HTTP que lê a variável (método, caminho, corpo), o seletor do
+  /// valor na resposta e o comando para gravar. Só em variável de equipamento
+  /// HTTP; aí, como no MQTT, área e endereço Modbus ficam no padrão.
+  final HttpTagAddress? http;
+
   /// A conta, quando a variável é calculada (§9.5, LG-1). Mora no equipamento
   /// virtual [CalcDevice]; é sempre só leitura.
   final CalcSpec? calc;
@@ -294,7 +301,7 @@ class Tag {
   /// MQTT, **e** há tópico onde publicar — curinga não serve).
   /// No cru, o comando vem da variável ou do perfil do equipamento.
   /// Calculada nunca grava.
-  bool get canWrite => writable && calc == null && (mqtt?.canPublish ?? s7?.canWrite ?? (raw != null || opcua != null || area.isWritable));
+  bool get canWrite => writable && calc == null && (mqtt?.canPublish ?? s7?.canWrite ?? (raw != null || opcua != null || http != null || area.isWritable));
 
   /// Quantas posições da área a variável ocupa (bits ou registradores).
   int get span => area.isBit ? length : dataType.registerCount * length;
@@ -317,6 +324,8 @@ class Tag {
     if (r != null) return r.label;
     final o = opcua;
     if (o != null) return isArray ? '${o.nodeId} · $length valores' : o.nodeId;
+    final h = http;
+    if (h != null) return isArray ? '${h.label} · $length valores' : h.label;
     final base = '${area.shortLabel} $address';
     if (isBitOfRegister) return '$base.$bitIndex';
     if (span > 1) return '${area.shortLabel} $address..$lastAddress';
@@ -347,6 +356,7 @@ class Tag {
     bool? ruleWritable,
     OpcUaTagAddress? opcua,
     bool? addressPending,
+    HttpTagAddress? http,
   }) =>
       Tag(
         id: id,
@@ -374,6 +384,7 @@ class Tag {
         ruleWritable: ruleWritable ?? this.ruleWritable,
         opcua: opcua ?? this.opcua,
         addressPending: addressPending ?? this.addressPending,
+        http: http ?? this.http,
       );
 
   /// Troca o texto da memória — inclusive para nulo (endereço digitado à mão),
@@ -404,6 +415,7 @@ class Tag {
         ruleWritable: ruleWritable,
         opcua: opcua,
         addressPending: addressPending,
+        http: http,
       );
 
   /// Corrige combinações impossíveis vindas de edição ou de arquivo antigo:
@@ -411,10 +423,10 @@ class Tag {
   /// escala zero (que apagaria o valor) volta a 1.
   Tag normalized() {
     var t = this;
-    // MQTT, S7, cru, OPC UA e calculada: os campos Modbus voltam ao padrão, para
+    // MQTT, S7, cru, OPC UA, HTTP e calculada: os campos Modbus voltam ao padrão, para
     // nenhuma regra de área (bit força liga/desliga, entrada tira a escrita)
     // valer sem querer.
-    if ((t.mqtt != null || t.s7 != null || t.raw != null || t.opcua != null || t.calc != null) && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
+    if ((t.mqtt != null || t.s7 != null || t.raw != null || t.opcua != null || t.http != null || t.calc != null) && (t.area != ModbusArea.holdingRegister || t.address != 0 || t.bitIndex != 0 || t.byteOrder != ByteOrder.abcd)) {
       t = t.copyWith(area: ModbusArea.holdingRegister, address: 0, bitIndex: 0, byteOrder: ByteOrder.abcd);
     }
     // Calculada: só leitura, um valor só, número com vírgula ou liga/desliga
@@ -484,6 +496,7 @@ class Tag {
         if (s7 != null) 's7': s7!.toJson(),
         if (raw != null) 'raw': raw!.toJson(),
         if (opcua != null) 'opcua': opcua!.toJson(),
+        if (http != null) 'http': http!.toJson(),
         // Como o MQTT: só quando existe (projeto sem calculada fica igual).
         if (calc != null) 'calc': calc!.toJson(),
         if (ruleWritable) 'ruleWritable': true,
@@ -524,5 +537,6 @@ class Tag {
         ruleWritable: (j['ruleWritable'] as bool?) ?? false,
         opcua: j['opcua'] is Map ? OpcUaTagAddress.fromJson(Map<String, dynamic>.from(j['opcua'] as Map)) : null,
         addressPending: (j['addressPending'] as bool?) ?? false,
+        http: j['http'] is Map ? HttpTagAddress.fromJson(Map<String, dynamic>.from(j['http'] as Map)) : null,
       ).normalized();
 }

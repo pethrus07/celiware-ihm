@@ -116,6 +116,10 @@ class MqttCodec {
 
   static const Object _missing = Object();
 
+  /// O marcador de "campo não existe" que [pick] devolve (o HTTP usa o mesmo
+  /// caminho JSON).
+  static const Object missing = _missing;
+
   /// Valor no [path] do JSON: "sensores.temp", "valores[2]", "valores.2".
   /// Devolve um marcador próprio (não `null`) quando o campo não existe:
   /// `null` é um valor JSON válido e o erro precisa ser outro.

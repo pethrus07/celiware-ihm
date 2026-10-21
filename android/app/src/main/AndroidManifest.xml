@@ -5,6 +5,18 @@
          (machine_monitor, InoRobot) ela só existia no manifesto de debug —
          funcionava no teste e morreria na Play Store. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- HTTP sem criptografia (equipamento HTTP da rede local, foto da câmera):
+         de propósito NÃO há usesCleartextTraffic nem network_security_config.
+         Essa política do Android vale só para as pilhas HTTP da plataforma
+         (HttpURLConnection, OkHttp, WebView), que o app não usa para isso; o
+         HttpClient do Dart abre sockets próprios e o Flutter 3.47 não repassa
+         a política ao Dart. E ela não aceita faixa de IP (só nome ou IP exato),
+         então "só endereços privados" não dá para escrever aqui. Quem decide é
+         o app: http:// só para IP privado, de enlace ou nome da rede local;
+         IP da internet só com https:// (HttpConfig.cleartextProblem,
+         ARQUITETURA §4.21). Mantendo o padrão do targetSdk 36 (texto claro
+         proibido), qualquer pilha nativa continua sem texto claro. -->
+
     <!-- Saber se o Wi-Fi caiu, para a mensagem certa ao operador. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- Vincular as conexões à rede Wi-Fi/cabo da máquina quando ela não tem

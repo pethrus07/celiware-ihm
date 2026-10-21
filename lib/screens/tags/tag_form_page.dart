@@ -12,6 +12,7 @@ import '../../core/utils/ids.dart';
 import '../../core/utils/validators.dart';
 import '../../models/alarm.dart';
 import '../../models/device.dart';
+import '../../models/http_config.dart';
 import '../../models/project.dart';
 import '../../models/narration.dart';
 import '../../models/tag.dart';
@@ -27,6 +28,7 @@ import '../devices/device_form_page.dart';
 import 'address_field.dart';
 import 'alarm_editor.dart';
 import 'device_pick.dart';
+import 'http_tag_fields.dart';
 import 'mqtt_tag_fields.dart';
 import 'opcua_tag_fields.dart';
 import 'raw_tag_fields.dart';
@@ -170,6 +172,10 @@ class _TagFormPageState extends State<TagFormPage> {
   /// NodeId — o endereço quando o equipamento é um servidor OPC UA.
   late final OpcUaTagFields _ua = OpcUaTagFields(widget.tag?.opcua);
 
+  /// Requisição, seletor do valor e comando — o endereço quando o
+  /// equipamento é HTTP.
+  late final HttpTagFields _hf = HttpTagFields(widget.tag?.http);
+
   HmiRuntime? _runtime;
   Timer? _liveTimer;
   Object? _liveValue;
@@ -200,10 +206,11 @@ class _TagFormPageState extends State<TagFormPage> {
   // Arduino pela rede ou pelo cabo USB: campo da mensagem.
   bool get _isRaw => _device?.speaksRaw ?? false;
   bool get _isOpcUa => _device?.kind == DeviceKind.opcua;
+  bool get _isHttp => _device?.kind == DeviceKind.http;
 
   /// MQTT, cru e OPC UA não têm área, endereço, ordem de bytes nem
   /// registrador (no OPC UA o servidor diz o tipo).
-  bool get _notModbus => _isMqtt || _isRaw || _isOpcUa;
+  bool get _notModbus => _isMqtt || _isRaw || _isOpcUa || _isHttp;
 
   /// Pode virar "Lê e grava": no MQTT e no cru qualquer variável (publica no
   /// tópico de comando, manda o comando do modelo); no S7, menos as entradas;
@@ -273,6 +280,7 @@ class _TagFormPageState extends State<TagFormPage> {
     _s7.dispose();
     _rw.dispose();
     _ua.dispose();
+    _hf.dispose();
     super.dispose();
   }
 
@@ -431,7 +439,8 @@ class _TagFormPageState extends State<TagFormPage> {
     final s7 = _isS7 ? _s7.build() : null;
     final raw = _isRaw ? _rw.build() : null;
     final opcua = _isOpcUa ? _ua.build() : null;
-    final other = mqtt != null || s7 != null || raw != null || opcua != null;
+    final http = _isHttp ? _hf.build() : null;
+    final other = mqtt != null || s7 != null || raw != null || opcua != null || http != null;
     return Tag(
       id: _id,
       name: _name.text.trim().isEmpty ? 'Variável' : _name.text.trim(),
@@ -440,6 +449,7 @@ class _TagFormPageState extends State<TagFormPage> {
       s7: s7,
       raw: raw,
       opcua: opcua,
+      http: http,
       area: other ? ModbusArea.holdingRegister : _area,
       address: other ? 0 : _addressReading.address ?? 0,
       dataType: _type,
@@ -447,7 +457,7 @@ class _TagFormPageState extends State<TagFormPage> {
       bitIndex: other ? 0 : (int.tryParse(_bit.text) ?? 0).clamp(0, 15),
       // Texto S7: o tamanho vem da faixa (P#… BYTE 22), não de registradores;
       // no OPC UA o texto vem inteiro do servidor; o cru não tem lista.
-      length: _type == TagDataType.bool || ((s7 != null || opcua != null) && _type == TagDataType.string) || raw != null ? 1 : (int.tryParse(_length.text) ?? 1).clamp(1, 120),
+      length: _type == TagDataType.bool || ((s7 != null || opcua != null || http != null) && _type == TagDataType.string) || raw != null ? 1 : (int.tryParse(_length.text) ?? 1).clamp(1, 120),
       writable: _writable && !_memoryReadOnly,
       ruleWritable: _ruleWritable,
       unit: _unit.text.trim(),
@@ -469,13 +479,14 @@ class _TagFormPageState extends State<TagFormPage> {
     if (_isS7) return _s7Error() == null ? _draft() : null;
     if (_isRaw) return _rw.build() == null ? null : _draft();
     if (_isOpcUa) return _ua.error() == null ? _draft() : null;
+    if (_isHttp) return _hf.error() == null ? _draft() : null;
     return _addressReading.address == null ? null : _draft();
   }
 
   /// O que a leitura depende: mudou durante a ida ao equipamento, o valor
   /// que voltou é de outra configuração e não vale.
   static String _readKey(Tag t) =>
-      '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.byteOrder.name}|${t.bitIndex}|${t.length}|${t.scale}|${t.offset}|${t.mqtt == null ? '' : jsonEncode(t.mqtt!.toJson())}|${t.s7?.address ?? ''}|${t.raw == null ? '' : jsonEncode(t.raw!.toJson())}|${t.opcua?.nodeId ?? ''}';
+      '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.byteOrder.name}|${t.bitIndex}|${t.length}|${t.scale}|${t.offset}|${t.mqtt == null ? '' : jsonEncode(t.mqtt!.toJson())}|${t.s7?.address ?? ''}|${t.raw == null ? '' : jsonEncode(t.raw!.toJson())}|${t.opcua?.nodeId ?? ''}|${t.http == null ? '' : jsonEncode(t.http!.toJson())}';
 
   /// O mesmo, sem a ordem dos bytes: as ordens que falharam valem para ele.
   static String _decodeKey(Tag t) => '${t.deviceId}|${t.area.name}|${t.address}|${t.dataType.name}|${t.length}';
@@ -554,6 +565,7 @@ class _TagFormPageState extends State<TagFormPage> {
         _s7.address.text.trim(),
         _rw.build()?.toJson() ?? '',
         _ua.nodeId.text.trim(),
+        _hf.build().toJson(),
       ]);
 
   bool get _dirty => (_initialDeviceId != null && _deviceId != _initialDeviceId) || _snapshot() != _initialSnapshot;
@@ -674,7 +686,7 @@ class _TagFormPageState extends State<TagFormPage> {
       ?hex,
     ];
     if (parts.isNotEmpty) return parts.join(' · ');
-    return _isOpcUa ? 'Escala, unidade, decimais' : mqtt ? 'Escala, unidade, decimais, validade' : s7 ? 'Escala, unidade, decimais, formato' : 'Escala, unidade, decimais, formato, hex';
+    return _isOpcUa || _isHttp ? 'Escala, unidade, decimais' : mqtt ? 'Escala, unidade, decimais, validade' : s7 ? 'Escala, unidade, decimais, formato' : 'Escala, unidade, decimais, formato, hex';
   }
 
   /// "÷ 10", "× 0,5 + 3"... ou nulo sem escala.
@@ -748,6 +760,15 @@ class _TagFormPageState extends State<TagFormPage> {
     _applyPick(p.suggestedName, p.type);
   }
 
+  /// Escolheu um campo da resposta no "Testar" do HTTP: o caminho JSON, o
+  /// tipo que combina com o valor e um nome de partida.
+  void _onHttpPick(HttpPick p) {
+    _hf.extract = HttpExtract.json;
+    _hf.select.text = p.path;
+    if (_decimals == 0) _decimals = p.decimals;
+    _applyPick(p.suggestedName, p.type);
+  }
+
   /// Endereço S7 digitado: o tamanho dele sugere o tipo, se o de agora não
   /// cabe (DB1.DBX0.3 → liga/desliga, DB1.DBD8 → número com vírgula).
   void _onS7Changed() {
@@ -788,6 +809,8 @@ class _TagFormPageState extends State<TagFormPage> {
       if (_rw.build() == null) return (_addressAnchor, false);
     } else if (_isOpcUa) {
       if (_ua.error() != null) return (_addressAnchor, false);
+    } else if (_isHttp) {
+      if (_hf.error() != null) return (_addressAnchor, false);
     } else {
       if (_memoryError() != null) return (_memoryAnchor, false);
       if (_addressReading.error != null) return (_addressAnchor, _addressInMore);
@@ -906,6 +929,7 @@ class _TagFormPageState extends State<TagFormPage> {
     final s7 = _isS7;
     final raw = _isRaw;
     final opcua = _isOpcUa;
+    final http = _isHttp;
     final canWrite = _canWrite;
     final draft = _draft();
     final live = _current();
@@ -987,6 +1011,8 @@ class _TagFormPageState extends State<TagFormPage> {
                                 ? 'Diga qual campo da mensagem'
                                 : opcua
                                 ? 'Complete o NodeId'
+                                : http
+                                ? 'Confira a requisição'
                                 : _addressReading.overMax
                                 ? 'Endereço acima de 65535'
                                 : _addressReading.error ?? 'Complete equipamento e endereço',
@@ -1090,6 +1116,12 @@ class _TagFormPageState extends State<TagFormPage> {
                             key: _addressAnchor,
                             child: OpcUaAddressBlock(fields: _ua, device: _device, onChanged: _onFieldChanged, onPick: _onOpcUaPick),
                           )
+                        // HTTP: método, caminho, onde está o valor e o Testar.
+                        else if (http)
+                          KeyedSubtree(
+                            key: _addressAnchor,
+                            child: HttpAddressBlock(fields: _hf, device: _device, draft: _draft, onChanged: _onFieldChanged, onPick: _onHttpPick),
+                          )
                         else if (!_addressInMore)
                           ..._modbusAddress(),
                         // Lista é obrigatória para o gráfico de barras: aí fica à vista.
@@ -1102,7 +1134,7 @@ class _TagFormPageState extends State<TagFormPage> {
                         ],
                         // Texto: o tamanho é o essencial (quantos registradores ler).
                         // No MQTT o texto vem inteiro na mensagem.
-                        if (isText && !mqtt && !s7 && !raw && !opcua) ...[
+                        if (isText && !mqtt && !s7 && !raw && !opcua && !http) ...[
                           const SizedBox(height: Ind.space),
                           KeyedSubtree(
                             key: _lengthAnchor,
@@ -1138,6 +1170,7 @@ class _TagFormPageState extends State<TagFormPage> {
                           const SizedBox(height: Ind.spaceSmall),
                           RawCommandField(fields: _rw, device: _device, onChanged: _onFieldChanged),
                         ],
+                        if (http && _writable && canWrite) HttpCommandField(fields: _hf, isBool: _type == TagDataType.bool, onChanged: _onFieldChanged),
                         // Alarme: uma linha só, à vista (é segurança, não detalhe); o
                         // editor abre numa folha. Texto e lista não alarmam.
                         if (!draft.isText && !draft.isArray) ...[
@@ -1165,7 +1198,7 @@ class _TagFormPageState extends State<TagFormPage> {
 
   /// Com perfil de fabricante (e fora do MQTT), o endereço Modbus fica em
   /// "Mais opções": à vista, só a "Memória do CLP".
-  bool get _addressInMore => _profile != null && !_isMqtt && !_isS7 && !_isRaw && !_isOpcUa;
+  bool get _addressInMore => _profile != null && !_isMqtt && !_isS7 && !_isRaw && !_isOpcUa && !_isHttp;
 
   /// Título do bloco de endereço, com o aviso de quando o tipo mudou "Onde
   /// fica" sozinho.

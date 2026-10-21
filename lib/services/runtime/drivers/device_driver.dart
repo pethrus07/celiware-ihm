@@ -5,6 +5,7 @@ import '../../../models/device.dart';
 import '../../../models/tag.dart';
 import '../tag_codec.dart';
 import '../tag_store.dart';
+import 'http_driver.dart';
 import 'modbus_driver.dart';
 import 'mqtt_driver.dart';
 import 'opcua_driver.dart';
@@ -77,6 +78,8 @@ abstract class DeviceDriver {
         return device.serial.isRaw ? RawDriver(device) : ModbusDriver(clientFactory(device));
       case DeviceKind.opcua:
         return OpcUaDriver(device);
+      case DeviceKind.http:
+        return HttpDriver(device);
       case DeviceKind.calc:
         // As contas leem o projeto e o TagStore: quem monta o CalcDriver é o
         // HmiRuntime, que tem os dois. Aqui só chega um "Testar conexão".

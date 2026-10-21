@@ -367,6 +367,8 @@ class ElementConfigSheet extends StatelessWidget {
 
     // ── Posição e tamanho ── (ajuste fino sem arrastar: na grade fina a célula
     // tem ~30 dp e o arrasto fica impreciso). Recolhido: quase nunca precisa.
+    // Na extra-fina o editor tem também as setas na barra de baixo, com a
+    // tela à vista (_NudgeBar em screen_editor_page.dart).
     final screen = project.screen(screenId);
     if (screen != null) {
       w.add(const SizedBox(height: 20));

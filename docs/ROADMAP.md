@@ -179,6 +179,33 @@ coisas do usuário vira "Meu projeto". O que ficou para depois:
 | **Trocar de projeto descarta em silêncio a pergunta pendente de uma regra da planta** (`rule_engine.dart`, `onSwitch`), sem evento no histórico. Contraria o §6.12 / LG-7 ("toda retirada vai para o histórico"). | Não é segurança (o modo é "propor"); registrar "pergunta retirada ao trocar de projeto" no histórico. |
 | **Duas conexões para o mesmo CLP** (`hmi_runtime.dart` ~186): as sessões são por id de equipamento; uma regra da planta que cite um projeto duplicado abre uma segunda conexão TCP ao mesmo CLP, e CLP que aceita uma conexão só oscila em "sem comunicação". | Não confirmado em hardware. Reaproveitar a sessão por IP + porta + id do escravo. |
 
+## Grade mais fina no editor (pedido do cliente, 21/10/2026)
+
+Pedido confirmado pelo Pedro em 21/10/2026: uma grade mais fina que a "fina"
+para posicionar elementos com precisão em sinóticos. **Feito em 21/10/2026**
+(detalhe em `ARQUITETURA.md` §5.3 e §6.3):
+
+- **Extra-fina (24 colunas)** em Regras da tela → Grade, ao lado de Normal e
+  Fina. Ir para ela dobra posição e tamanho e a tela não mexe; voltar para a
+  fina arredonda as bordas sem sobrepor, com a pergunta antes ("N elementos
+  vão para a célula mais próxima").
+- **Toque com precisão: setas, não zoom.** Com o elemento selecionado, o botão
+  de setas troca a barra de baixo por Mover · Tamanho e quatro setas de uma
+  célula por toque, com a tela à vista. O elemento não encolhe na extra-fina
+  (mínimo = o da fina), então continua fácil de tocar.
+- **Arquivo:** só o valor de `columns` muda (24); `schemaVersion` segue 1. A
+  1.4.0/1.5.0 abre a tela com todos os elementos no lugar (lá ela é tratada
+  como fina; no tablet a letra dos cartões amplia menos).
+
+**A conferir com o cliente:** "sinótico" no pedido é imagem de fundo com
+elementos **por cima**, mas o editor não deixa elemento sobrepor outro — hoje a
+imagem fica num bloco e os elementos ao lado dela. Se ele precisa de fato
+dos elementos sobre o desenho, falta uma **imagem de fundo da tela** (camada
+atrás da grade, fora da regra de sobreposição). Não entrou: mexe no arquivo
+(campo novo na tela) e no desenho da operação, e não estava no pedido.
+Também não testado num aparelho de verdade (só nos testes de widget e nas
+capturas `QA_PNG`).
+
 ## Próximo — visual e operação
 
 Na ordem em que convém fazer. Cada item é uma versão pequena, testada no

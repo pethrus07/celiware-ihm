@@ -133,8 +133,8 @@ class ElementCatalog {
   ElementCatalog._();
 
   /// Tamanho inicial em células da grade de [columns] colunas. A ficha está
-  /// em células da grade normal (6); na fina (12) tudo dobra, para o
-  /// elemento nascer com o mesmo tamanho na tela.
+  /// em células da grade normal (6); na fina (12) tudo dobra e na extra-fina
+  /// (24) quadruplica, para o elemento nascer com o mesmo tamanho na tela.
   static (int, int) defaultSize(ElementType type, int columns) {
     final info = of(type);
     final k = HmiScreen.scaleOf(columns);
@@ -157,13 +157,18 @@ class ElementCatalog {
   /// descer a uma célula fina para caber mais variáveis por tela. Quem grava
   /// (botão, ajuste) nunca desce de 2×2 na fina: ~60 dp, acima dos 48 dp de
   /// alvo de toque.
+  ///
+  /// A extra-fina é para **posicionar** com precisão, não para encolher: o
+  /// mínimo é o da fina em dobro (sempre par), o mesmo tamanho na tela. Assim
+  /// todo elemento continua tocável (~28 dp no menor) e a volta para a fina
+  /// nunca perde um elemento no arredondamento ([HmiScreen.withColumns]).
   static (int, int) minSize(ElementType type, int columns) {
     final info = of(type);
     final k = HmiScreen.scaleOf(columns);
     if (k == 1) return (info.minW, info.minH);
     final oneLine = !info.writes &&
         (type == ElementType.value || type == ElementType.lamp || type == ElementType.multistate || type == ElementType.label);
-    return (info.minW * k, oneLine ? 1 : info.minH * k);
+    return (info.minW * k, oneLine ? k ~/ 2 : info.minH * k);
   }
 
   static const List<ElementInfo> all = [

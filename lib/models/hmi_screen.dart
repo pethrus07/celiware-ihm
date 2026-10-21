@@ -159,10 +159,23 @@ class HmiScreen {
   /// encaixe mais preciso). Ver [withColumns].
   static const int fineColumns = 12;
 
-  /// Quantas células finas cabem numa normal, por lado (1 ou 2).
-  static int scaleOf(int columns) => columns >= fineColumns ? 2 : 1;
+  /// Grade extra-fina (pedido do cliente, 21/10/2026): cada célula da fina
+  /// vira 2×2, para encaixar elementos com precisão — por exemplo junto do
+  /// desenho de um sinótico. A célula fica com ~14 dp no celular, abaixo de
+  /// um alvo de toque: por isso o elemento não encolhe (o mínimo é o da fina,
+  /// em dobro) e o passo de uma célula vem das setas do editor, não do dedo.
+  static const int extraFineColumns = 24;
 
+  /// As três grades, da mais grossa para a mais fina.
+  static const List<int> levels = [defaultColumns, fineColumns, extraFineColumns];
+
+  /// Quantas células desta grade cabem numa normal, por lado (1, 2 ou 4).
+  static int scaleOf(int columns) => columns >= extraFineColumns ? 4 : columns >= fineColumns ? 2 : 1;
+
+  /// Fina **ou** extra-fina.
   bool get fine => columns >= fineColumns;
+
+  bool get extraFine => columns >= extraFineColumns;
 
   final String id;
   final String name;
@@ -207,27 +220,77 @@ class HmiScreen {
         elements: elements ?? this.elements,
       );
 
-  /// A mesma tela em outra grade, **sem mover nada na tela**: 6 → 12
-  /// multiplica posição e tamanho por 2. 12 → 6 só se todos forem pares —
-  /// senão devolve nulo (algum elemento ficaria em meia célula).
+  /// A mesma tela em outra grade.
+  ///
+  /// Para uma grade mais fina, **sem mover nada na tela**: posição e tamanho
+  /// multiplicam por 2 (6 → 12, 12 → 24) ou por 4 (6 → 24).
+  ///
+  /// Para uma mais grossa, um degrau de cada vez:
+  ///   • 24 → 12 **arredonda as bordas** ([_halfEdge]): o elemento em meia
+  ///     célula da fina anda meia célula. Bordas que se encostavam arredondam
+  ///     para o mesmo lugar, então nada passa a sobrepor, nada sai da grade e
+  ///     o mínimo da fina continua valendo (o da extra-fina é sempre par);
+  ///   • 12 → 6 só se todos forem pares — senão devolve nulo (o mínimo de uma
+  ///     linha da fina é uma célula, que arredondada podia sumir).
+  /// 24 → 6 passa pela fina e dá nulo se a fina arredondada não for toda par.
+  /// Grade fora das três (arquivo de versão mais nova) também dá nulo.
   HmiScreen? withColumns(int target) {
     if (target == columns) return this;
-    if (columns == defaultColumns && target == fineColumns) {
+    if (!levels.contains(columns) || !levels.contains(target)) return null;
+    if (target > columns) {
+      final k = target ~/ columns;
       return copyWith(columns: target, elements: [
-        for (final e in elements) e.copyWith(x: e.x * 2, y: e.y * 2, w: e.w * 2, h: e.h * 2),
+        for (final e in elements) e.copyWith(x: e.x * k, y: e.y * k, w: e.w * k, h: e.h * k),
       ]);
     }
-    if (columns == fineColumns && target == defaultColumns) {
-      if (elements.any((e) => e.x.isOdd || e.y.isOdd || e.w.isOdd || e.h.isOdd)) return null;
-      return copyWith(columns: target, elements: [
-        for (final e in elements) e.copyWith(x: e.x ~/ 2, y: e.y ~/ 2, w: e.w ~/ 2, h: e.h ~/ 2),
-      ]);
+    if (columns == extraFineColumns) {
+      final half = _halved;
+      if (half.elements.any(_collapsed)) return null;
+      return target == fineColumns ? half : half.withColumns(target);
     }
-    return null;
+    // 12 → 6.
+    if (elements.any((e) => e.x.isOdd || e.y.isOdd || e.w.isOdd || e.h.isOdd)) return null;
+    return copyWith(columns: target, elements: [
+      for (final e in elements) e.copyWith(x: e.x ~/ 2, y: e.y ~/ 2, w: e.w ~/ 2, h: e.h ~/ 2),
+    ]);
   }
 
-  /// Elementos que impedem voltar para a grade normal.
+  /// Borda da extra-fina na fina: a metade, arredondando meia célula para
+  /// cima. É crescente e `f(v + 2) = f(v) + 1` — é isso que garante que
+  /// vizinhos não se sobreponham e que largura par chegue exata.
+  static int _halfEdge(int v) => (v + 1) ~/ 2;
+
+  /// A extra-fina arredondada para a fina, sem conferir nada.
+  HmiScreen get _halved => copyWith(columns: fineColumns, elements: [
+        for (final e in elements)
+          e.copyWith(
+            x: _halfEdge(e.x),
+            y: _halfEdge(e.y),
+            w: _halfEdge(e.right) - _halfEdge(e.x),
+            h: _halfEdge(e.bottom) - _halfEdge(e.y),
+          ),
+      ]);
+
+  /// Sumiu no arredondamento. Pelo editor não acontece (o mínimo da
+  /// extra-fina é de duas células); só um elemento de uma célula — vindo de
+  /// um app antigo, que não conhece a extra-fina — chega aqui.
+  static bool _collapsed(HmiElement e) => e.w < 1 || e.h < 1;
+
+  /// Elementos em meia célula da grade de cima: na fina, os que impedem
+  /// voltar para a normal; na extra-fina, os que andam meia célula ao voltar
+  /// para a fina.
   int get oddElements => elements.where((e) => e.x.isOdd || e.y.isOdd || e.w.isOdd || e.h.isOdd).length;
+
+  /// Quantos elementos impedem ir para [target] (0 = dá para ir).
+  int blockersFor(int target) {
+    if (withColumns(target) != null) return 0;
+    if (columns == extraFineColumns) {
+      final half = _halved;
+      final collapsed = half.elements.where(_collapsed).length;
+      return collapsed > 0 || target == fineColumns ? collapsed : half.oddElements;
+    }
+    return oddElements;
+  }
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,

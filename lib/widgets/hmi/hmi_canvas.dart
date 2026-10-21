@@ -102,9 +102,12 @@ class HmiCanvas extends StatelessWidget {
 
   /// Respiro entre elementos. Com 6 px a tela parecia um bloco só; 12 separa
   /// cada elemento sem desperdiçar a célula. Na grade fina a célula é a
-  /// metade, então o respiro acompanha (20% da célula, entre 4 e 12).
+  /// metade, então o respiro acompanha (20% da célula, entre 4 e 12). Na
+  /// extra-fina o respiro é o da fina (20% de duas células): trocar entre as
+  /// duas não muda um pixel da tela.
   static const double gap = 12;
-  static double gapFor(double cell) => (cell * 0.2).clamp(4.0, gap);
+  static double gapFor(double cell, [int columns = HmiScreen.defaultColumns]) =>
+      (cell * (columns >= HmiScreen.extraFineColumns ? 2 : 1) * 0.2).clamp(4.0, gap);
 
   /// Maior célula aceita (dp) na grade normal: 2× a do celular em pé
   /// ([refCell]) — o tablet em pé usa a largura inteira. Deitado, quem manda
@@ -123,7 +126,8 @@ class HmiCanvas extends StatelessWidget {
   static const double maxZoom = 2;
 
   /// Quanto a tela é ampliada numa célula de [cell] dp (1 = como montada).
-  /// Na grade fina a célula de referência é a metade.
+  /// Na grade fina a célula de referência é a metade; na extra-fina, um quarto
+  /// (a mesma ampliação da fina para a mesma tela).
   static double zoomFor(double cell, int columns) => (cell * HmiScreen.scaleOf(columns) / refCell).clamp(1.0, maxZoom);
 
   /// Na grade fina o teto é a largura (até 1.200 dp): é a grade de quem quer
@@ -158,8 +162,11 @@ class HmiCanvas extends StatelessWidget {
         // cresce na mesma proporção (no celular, zoom 1 — nada muda).
         final zoom = zoomFor(cell, screen.columns);
         final lc = cell / zoom;
-        final g = gapFor(lc);
-        final rows = math.max(screen.rows + (editMode ? 4 : 0), editMode ? 8 : 1);
+        final g = gapFor(lc, screen.columns);
+        // Linhas vazias embaixo para crescer: 4 (na extra-fina 8, a mesma
+        // altura da fina).
+        final spare = k >= 4 ? 8 : 4;
+        final rows = math.max(screen.rows + (editMode ? spare : 0), editMode ? 2 * spare : 1);
 
         return _GridScroll(
           cell: cell,
@@ -187,7 +194,7 @@ class HmiCanvas extends StatelessWidget {
                         // Posição do toque já vem na medida do desenho (lc).
                         onEmptyCellTap?.call((d.localPosition.dx / lc).floor(), (d.localPosition.dy / lc).floor());
                       },
-                      child: CustomPaint(painter: _GridPainter(cell: lc, columns: screen.columns, rows: rows)),
+                      child: CustomPaint(painter: _GridPainter(cell: lc, columns: screen.columns, rows: rows, major: k >= 4 ? 2 : 1)),
                     ),
                   ),
                 for (final e in screen.elements)
@@ -425,21 +432,28 @@ class _GridPainter extends CustomPainter {
   /// Paleta com que foi criado: troca de tema força redesenho.
   final int rev = Ind.revision;
 
-  _GridPainter({required this.cell, required this.columns, required this.rows});
+  _GridPainter({required this.cell, required this.columns, required this.rows, this.major = 1});
   final double cell;
   final int columns;
   final int rows;
 
+  /// De quantas em quantas células vem o ponto forte. Na extra-fina (2) os
+  /// pontos fortes são os da fina e os do meio ficam miúdos: com todos
+  /// iguais a ~14 dp, a grade virava uma trama e escondia o sinótico.
+  final int major;
+
   @override
   void paint(Canvas canvas, Size size) {
     final dot = Paint()..color = Ind.lineStrong;
+    final minor = Paint()..color = Ind.line;
     for (var y = 0; y <= rows; y++) {
       for (var x = 0; x <= columns; x++) {
-        canvas.drawCircle(Offset(x * cell, y * cell), 1.4, dot);
+        final strong = x % major == 0 && y % major == 0;
+        canvas.drawCircle(Offset(x * cell, y * cell), strong ? 1.4 : 1.0, strong ? dot : minor);
       }
     }
   }
 
   @override
-  bool shouldRepaint(_GridPainter o) => o.cell != cell || o.columns != columns || o.rows != rows || o.rev != rev;
+  bool shouldRepaint(_GridPainter o) => o.cell != cell || o.columns != columns || o.rows != rows || o.major != major || o.rev != rev;
 }

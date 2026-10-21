@@ -200,7 +200,19 @@ class _HttpAddressBlockState extends State<HttpAddressBlock> {
           label: Text(_testing ? 'Testando…' : 'Testar'),
         ),
       ),
-      if (_result != null) ...[const SizedBox(height: 12), _TestCard(result: _result!, tag: widget.draft(), onPick: (p) => widget.onPick(p))],
+      // Escolher um campo testa de novo: o cartão passa a mostrar o valor tirado
+      // em vez do aviso antigo ("diga qual campo ler"), que já foi resolvido.
+      if (_result != null) ...[
+        const SizedBox(height: 12),
+        _TestCard(
+          result: _result!,
+          tag: widget.draft(),
+          onPick: (p) {
+            widget.onPick(p);
+            Future.microtask(_test);
+          },
+        ),
+      ],
     ]);
   }
 }

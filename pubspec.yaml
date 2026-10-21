@@ -4,7 +4,7 @@ publish_to: 'none'
 
 # versionName+versionCode do Android. O número depois do + sobe a cada envio
 # para a Play Store (ela recusa código repetido).
-version: 1.4.0+12
+version: 1.5.0+13
 
 environment:
   sdk: ^3.13.4

@@ -5,9 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ihm/app/project_controller.dart';
 import 'package:ihm/core/modbus/modbus_memory.dart';
 import 'package:ihm/main.dart';
+import 'package:ihm/models/device.dart';
 import 'package:ihm/models/logic_rule.dart';
+import 'package:ihm/models/project.dart';
 import 'package:ihm/models/tag.dart';
+import 'package:ihm/screens/rules/condition_help.dart';
 import 'package:ihm/screens/rules/rule_editor_page.dart';
+import 'package:ihm/services/calc/calc_expression.dart';
+import 'package:ihm/services/calc/calc_graph.dart';
 import 'package:ihm/screens/tags/tag_form_page.dart';
 import 'package:ihm/screens/tours.dart';
 import 'package:ihm/services/demo/demo_process.dart';
@@ -143,6 +148,72 @@ void main() {
     expect(find.text('Gravou · Parar a cortadora'), findsOneWidget);
     expect(find.text('Perguntou · Parar a cortadora'), findsOneWidget);
     await shutdown(tester, c);
+  });
+
+  // Pedido do cliente: exemplos e ajuda na tela de nova regra.
+  testWidgets('"Como escrever": a folha de exemplos põe o modelo no campo, com a variável da pessoa, e vale para o parser', (tester) async {
+    final c = await boot(tester);
+    await openRules(tester);
+    await tapKey(tester, 'nova-regra', wait: 700);
+    await tapKey(tester, 'como-escrever', wait: 600);
+    expect(find.text('Como escrever a condição'), findsOneWidget);
+    final examples = ConditionHelpSheet.examples(c.project);
+    expect(examples, hasLength(8));
+    expect(find.text('Entre 20 e 30'), findsOneWidget);
+
+    // "Entre 20 e 30" (faixa = duas comparações com "e").
+    await tapKey(tester, 'exemplo-condicao-3', wait: 600);
+    expect(find.text('Como escrever a condição'), findsNothing);
+    final field = tester.widget<TextField>(find.byKey(const ValueKey('campo-conta')));
+    final text = field.controller!.text;
+    expect(text, examples[3].text);
+    expect(text, isNot(contains(ConditionHelpSheet.placeholder)), reason: 'a demonstração tem variável de número');
+    final program = CalcProgram.compile(text, CalcGraph.scope(c.project));
+    expect(program.type, CalcType.boolean);
+    expect(find.byKey(const ValueKey('erro-conta')), findsNothing);
+    // A primeira variável fica selecionada: o "Variável" troca por outra.
+    final sel = field.controller!.selection;
+    expect(text.substring(sel.start, sel.end), startsWith('['));
+
+    // Outro exemplo com a condição já escrita: troca e oferece desfazer.
+    await tapKey(tester, 'como-escrever', wait: 600);
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('exemplo-condicao-7')), 100,
+        scrollable: find.descendant(of: find.byKey(const ValueKey('exemplos-condicao')), matching: find.byType(Scrollable)).first);
+    await tapKey(tester, 'exemplo-condicao-7', wait: 600);
+    expect(field.controller!.text, examples[7].text);
+    expect(CalcProgram.compile(field.controller!.text, CalcGraph.scope(c.project)).type, CalcType.boolean);
+    await tester.tap(find.text('Desfazer'));
+    await live(tester, 400);
+    expect(field.controller!.text, examples[3].text);
+
+    await tester.tap(find.byTooltip('Voltar'));
+    await live(tester, 700);
+    await tester.tap(find.byKey(const ValueKey('descartar-alteracoes')));
+    await live(tester, 1200);
+    await shutdown(tester, c);
+  });
+
+  test('os exemplos de condição são todos condições válidas; sem a variável do tipo, [Variável] para trocar', () {
+    final demo = DemoProject.build();
+    for (final e in ConditionHelpSheet.examples(demo)) {
+      expect(CalcProgram.compile(e.text, CalcGraph.scope(demo)).type, CalcType.boolean, reason: '${e.phrase}: ${e.text}');
+    }
+    // Só uma variável de número (nome com espaço vai entre colchetes).
+    const onlyNumber = Project(devices: [Device(id: 'd', name: 'CLP')], tags: [Tag(id: 't', name: 'Pressão da linha', deviceId: 'd')]);
+    final scope = CalcGraph.scope(onlyNumber);
+    for (final e in ConditionHelpSheet.examples(onlyNumber)) {
+      if (e.text.contains(ConditionHelpSheet.placeholder)) {
+        // Trocar [Variável] por uma liga/desliga de verdade dá condição válida.
+        final withFlag = e.text.replaceAll(ConditionHelpSheet.placeholder, '[Ligada]');
+        const flag = Tag(id: 'f', name: 'Ligada', deviceId: 'd', area: ModbusArea.coil, dataType: TagDataType.bool);
+        final p = onlyNumber.copyWith(tags: [...onlyNumber.tags, flag]);
+        expect(CalcProgram.compile(withFlag, CalcGraph.scope(p)).type, CalcType.boolean, reason: e.phrase);
+      } else {
+        expect(e.text, contains('[Pressão da linha]'));
+        expect(CalcProgram.compile(e.text, scope).type, CalcType.boolean, reason: e.phrase);
+      }
+    }
+    expect(ConditionHelpSheet.examples(const Project()).every((e) => e.text.contains(ConditionHelpSheet.placeholder)), isTrue);
   });
 
   testWidgets('regra que não pode rodar aparece parada na lista; desligar pela chave', (tester) async {

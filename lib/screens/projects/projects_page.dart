@@ -348,12 +348,15 @@ class _ProjectMenu extends StatelessWidget {
             final p = await c.exportProject(entry.id);
             if (p != null && context.mounted) await ProjectFiles.save(context, p);
           case 'delete':
+            // Regras da planta que citam o projeto: desligadas ao apagar.
+            final rules = c.plantRulesUsing(entry.id).length;
             final ok = await confirmDelete(
               context,
               title: 'Apagar "${entry.name}"?',
               body: 'Somem deste celular o projeto, os históricos de alarmes, '
                   'regras e receitas e os registros gravados dele. Os outros projetos não mudam. '
-                  'Para guardar uma cópia, use "Salvar em arquivo" antes.',
+                  'Para guardar uma cópia, use "Salvar em arquivo" antes.'
+                  '${rules == 0 ? '' : rules == 1 ? '\n\n1 regra da planta usa este projeto e será desligada.' : '\n\n$rules regras da planta usam este projeto e serão desligadas.'}',
             );
             if (ok) await c.deleteProject(entry.id);
         }

@@ -454,14 +454,39 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
 
   // ── Troca de projeto ─────────────────────────────────────────────────────────
 
-  /// Grava o histórico do projeto que sai, no arquivo dele.
+  /// Grava o histórico do projeto que sai, no arquivo dele, e guarda qual é
+  /// o arquivo: a retirada das perguntas ([onSwitch]) ainda vai para ele.
   @override
-  Future<void> beforeSwitch() => flush();
+  Future<void> beforeSwitch() async {
+    await _leaving;
+    await flush();
+    _leavingFile = await historyFile?.call();
+  }
 
-  /// As perguntas pendentes eram de máquinas do projeto que saiu: somem sem
-  /// gravar nada. O histórico também era dele.
+  /// Arquivo do histórico do projeto que está saindo (de [beforeSwitch]).
+  File? _leavingFile;
+
+  /// Gravação do histórico do projeto que saiu, ainda em andamento.
+  Future<void> _leaving = Future.value();
+
+  /// As perguntas pendentes somem sem gravar nada — inclusive as das regras
+  /// da planta, que continuam valendo no projeto que entra: a situação pode
+  /// já ser outra quando a regra voltar a vigiar. Toda retirada vai para o
+  /// histórico (LG-7): "troca de projeto", no histórico do projeto que saiu.
   @override
   void onSwitch() {
+    final project = controller.liveProject;
+    for (final p in [..._proposals]) {
+      final rule = project.rule(p.ruleId);
+      if (rule != null) _withdraw(rule, 'troca de projeto');
+    }
+    final file = _leavingFile;
+    _leavingFile = null;
+    // Algo entrou no histórico depois da gravação do beforeSwitch (a
+    // retirada, ou um disparo no meio da troca): grava no arquivo de quem saiu.
+    if (file != null && (_saveTimer?.isActive ?? false)) {
+      _leaving = _saveHistoryTo(file, [..._history]);
+    }
     _generation++;
     _saveTimer?.cancel();
     _saveTimer = null;
@@ -473,7 +498,10 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
 
   /// O histórico do projeto que entrou (`historico-regras.json` da pasta dele).
   @override
-  Future<void> afterSwitch() => _loadHistory();
+  Future<void> afterSwitch() async {
+    await _leaving;
+    await _loadHistory();
+  }
 
   // ── Histórico em disco ──────────────────────────────────────────────────────
 
@@ -514,9 +542,16 @@ class RuleEngine extends ChangeNotifier implements ProjectScoped {
     final f = historyFile;
     if (f == null) return;
     try {
-      final file = await f();
+      await _saveHistoryTo(await f(), _history);
+    } catch (e) {
+      _log.warning('Não gravou o histórico das regras: $e');
+    }
+  }
+
+  Future<void> _saveHistoryTo(File file, List<RuleEvent> events) async {
+    try {
       final tmp = File('${file.path}.tmp');
-      await tmp.writeAsString(jsonEncode([for (final e in _history) e.toJson()]), flush: true);
+      await tmp.writeAsString(jsonEncode([for (final e in events) e.toJson()]), flush: true);
       await tmp.rename(file.path);
     } catch (e) {
       _log.warning('Não gravou o histórico das regras: $e');

@@ -6,7 +6,11 @@ import 'package:flutter/services.dart' show ByteData, FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ihm/app/project_controller.dart';
 import 'package:ihm/main.dart';
+import 'package:ihm/models/calc.dart';
+import 'package:ihm/models/logic_rule.dart';
+import 'package:ihm/models/plant.dart';
 import 'package:ihm/models/project.dart';
+import 'package:ihm/models/tag.dart';
 import 'package:ihm/screens/alarms_page.dart';
 import 'package:ihm/screens/devices/device_form_page.dart';
 import 'package:ihm/screens/projects/backups_page.dart';
@@ -241,6 +245,36 @@ void main() {
       expect(find.text('Apagar'), findsNothing, reason: 'o app precisa de um projeto aberto');
       await tester.tapAt(const Offset(10, 10));
       await settle(tester, rounds: 2);
+      await shutdown(tester, c);
+    });
+
+    // Revisão de 21/10/2026: apagar deixava as regras da planta que citavam
+    // o projeto virando "Regra X parada" em todos os projetos.
+    testWidgets('apagar avisa quantas regras da planta usam o projeto; confirmar desliga essas regras', (tester) async {
+      final c = await boot(tester);
+      final first = c.openId!;
+      // Calculada: sem rede no teste, e o motor das regras lê de verdade.
+      const k = Tag(id: 'k', name: 'Temperatura', deviceId: CalcDevice.id, dataType: TagDataType.float32, calc: CalcSpec(expression: '2 * 40'));
+      await tester.runAsync(() => c.createProject(const Project(name: 'Forno', devices: [CalcDevice.device], tags: [k])));
+      final forno = c.openId!;
+      final ref = '{${PlantRef.of(forno, 'k')}}';
+      await tester.runAsync(() async {
+        await c.open(first);
+        await c.savePlantRule(LogicRule(id: 'g1', name: 'Forno quente', condition: CalcSpec(expression: '$ref > 80')));
+        await c.savePlantRule(LogicRule(id: 'g2', name: 'Forno frio', condition: CalcSpec(expression: '$ref < 20')));
+      });
+      tester.state<ShellState>(find.byType(Shell)).showProjectList();
+      await settle(tester, rounds: 3);
+
+      await tester.tap(find.byKey(ValueKey('menu-projeto-$forno')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.text('Apagar'));
+      await settle(tester, rounds: 2);
+      expect(find.textContaining('2 regras da planta usam este projeto e serão desligadas.'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Apagar'));
+      await settle(tester, until: () => c.projects.length == 1 && c.plantRules.every((r) => !r.enabled));
+      expect(c.projects.map((e) => e.id), [first]);
+      expect(c.plantRules.map((r) => (r.id, r.enabled)), [('g1', false), ('g2', false)], reason: 'desligadas, não apagadas');
       await shutdown(tester, c);
     });
 

@@ -5,6 +5,7 @@ import 'package:ihm/core/modbus/modbus_client_simulated.dart';
 import 'package:ihm/core/modbus/modbus_memory.dart';
 import 'package:ihm/models/device.dart';
 import 'package:ihm/models/project.dart';
+import 'package:ihm/models/s7_config.dart';
 import 'package:ihm/models/tag.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/runtime/tag_codec.dart';
@@ -115,5 +116,71 @@ void main() {
     await runtime.apply(const Project(devices: [device], tags: [run]));
     runtime.subscribe(['speed']);
     expect((await until('speed', (r) => r.quality == TagQuality.configError)).message, contains('apagada'));
+  });
+
+  // Revisão de 21/10/2026: regra da planta que cita um projeto duplicado
+  // trazia o mesmo CLP com outro id — e abria uma segunda conexão TCP.
+  test('dois equipamentos com o mesmo endereço dividem UMA conexão; outro escravo, outra', () async {
+    final created = <String>[];
+    final mem = ModbusMemory(holdingRegisters: 8, coils: 8)..pokeRegister(ModbusArea.holdingRegister, 2, 70);
+    final rt = HmiRuntime(clientFactory: (d) {
+      created.add(d.id);
+      return SimulatedModbusClient(memory: mem, latency: Duration.zero);
+    });
+    addTearDown(rt.dispose);
+    const a = Device(id: 'd1', name: 'CLP', host: '192.168.0.10', pollMs: 20);
+    // Mesmo CLP vindo de outro projeto: id qualificado, IP escrito diferente.
+    const b = Device(id: 'p2/d1', name: 'Cópia · CLP', host: ' 192.168.0.10 ', pollMs: 20);
+    const ta = Tag(id: 'v', name: 'Velocidade', deviceId: 'd1', address: 2, writable: true);
+    const tb = Tag(id: 'p2/v', name: 'Cópia · Velocidade', deviceId: 'p2/d1', address: 2, writable: true);
+    Future<void> good(String id, [Object? value]) async {
+      for (var i = 0; i < 150; i++) {
+        final r = rt.watch(id).value;
+        if (r.isGood && (value == null || r.value == value)) return;
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      fail('$id não chegou a ${value ?? 'boa'}: ${rt.watch(id).value.quality}');
+    }
+
+    await rt.apply(const Project(devices: [a, b], tags: [ta, tb]));
+    rt.subscribe(['v', 'p2/v']);
+    await good('v', 70);
+    await good('p2/v', 70);
+    expect(created, ['d1'], reason: 'uma sessão só, a do primeiro equipamento');
+    expect(rt.health('p2/d1'), same(rt.health('d1')), reason: 'o selo dos dois é o da mesma conexão');
+
+    await rt.write('p2/v', 99);
+    expect(mem.register(ModbusArea.holdingRegister, 2), 99);
+    await good('v', 99);
+    expect(created, ['d1'], reason: 'gravar também vai pela conexão que já existe');
+
+    // Outro escravo atrás do mesmo IP é outro equipamento: sessão própria.
+    await rt.apply(Project(devices: [a, b.copyWith(unitId: 2)], tags: const [ta, tb]));
+    await good('p2/v');
+    expect(created, ['d1', 'p2/d1']);
+    expect(rt.health('p2/d1'), isNot(same(rt.health('d1'))));
+
+    // Voltou a ser o mesmo endereço: a sessão própria fecha e a do dono lê os dois.
+    await rt.apply(const Project(devices: [a, b], tags: [ta, tb]));
+    mem.pokeRegister(ModbusArea.holdingRegister, 2, 33);
+    await good('p2/v', 33);
+    expect(created, ['d1', 'p2/d1']);
+    expect(rt.health('p2/d1'), same(rt.health('d1')));
+  });
+
+  test('endereço da conexão: protocolo, IP, porta e escravo ou rack/slot; cabo USB nunca divide', () {
+    const tcp = Device(id: 'a', name: 'A', host: '10.0.0.5');
+    expect(HmiRuntime.linkKey(tcp), HmiRuntime.linkKey(const Device(id: 'b', name: 'B', host: '10.0.0.5', pollMs: 100, timeoutMs: 900)));
+    expect(HmiRuntime.linkKey(tcp), isNot(HmiRuntime.linkKey(const Device(id: 'b', name: 'B', host: '10.0.0.5', port: 503))));
+    expect(HmiRuntime.linkKey(tcp), isNot(HmiRuntime.linkKey(const Device(id: 'b', name: 'B', host: '10.0.0.5', unitId: 3))));
+    expect(HmiRuntime.linkKey(tcp), isNot(HmiRuntime.linkKey(const Device(id: 'b', name: 'B', kind: DeviceKind.modbusRtuTcp, host: '10.0.0.5'))));
+    const s7a = Device(id: 's1', name: 'S7', kind: DeviceKind.s7, host: '10.0.0.6', port: 102);
+    const s7b = Device(id: 's2', name: 'S7', kind: DeviceKind.s7, host: '10.0.0.6', port: 102, s7: S7Config(family: S7Family.s7300));
+    expect(HmiRuntime.linkKey(s7a), isNotNull);
+    expect(HmiRuntime.linkKey(s7a), isNot(HmiRuntime.linkKey(s7b)), reason: 'slot 1 × slot 2: outra CPU');
+    for (final k in [DeviceKind.usbSerial, DeviceKind.mqtt, DeviceKind.opcua, DeviceKind.raw, DeviceKind.demo, DeviceKind.calc]) {
+      expect(HmiRuntime.linkKey(Device(id: 'x', name: 'X', kind: k, host: '10.0.0.5')), isNull, reason: k.name);
+    }
+    expect(HmiRuntime.linkKey(const Device(id: 'x', name: 'X')), isNull, reason: 'sem IP não se compara');
   });
 }

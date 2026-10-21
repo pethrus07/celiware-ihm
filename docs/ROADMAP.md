@@ -175,6 +175,9 @@ coisas do usuário vira "Meu projeto". O que ficou para depois:
 | **Imediata cancelada fica 24 h sem nada** (prioridade 4). Durante o intervalo o app não oferece nem a flexível. | Escolha por menos interrupção; trocar pela flexível no intervalo é decisão do Pedro. |
 | **Duas cópias da planta no mesmo segundo** têm o mesmo nome: a segunda substitui a primeira. | Só acontece com dois "Substituir" seguidos no mesmo segundo; a cópia que fica é a da planta mais recente. |
 | **Mover entre volumes** (`PlantStore._move`, copiar para `.tmp` e renomear) não tem teste direto: o teste cobre a retomada (destino igual à origem), não a cópia em si. | No Android a pasta do app é um volume só; o caminho da cópia é defensivo. |
+| **Apagar um projeto deixa as regras da planta que o citam** (`project_controller.dart` ~294-307, `plant_view.dart` ~82): elas viram o alarme médio "Regra X parada" em todos os projetos até alguém apagar a regra. | Avisar no diálogo de apagar ("2 regras da planta usam este projeto") e desligar essas regras. Pequeno; entra na próxima versão. |
+| **Trocar de projeto descarta em silêncio a pergunta pendente de uma regra da planta** (`rule_engine.dart`, `onSwitch`), sem evento no histórico. Contraria o §6.12 / LG-7 ("toda retirada vai para o histórico"). | Não é segurança (o modo é "propor"); registrar "pergunta retirada ao trocar de projeto" no histórico. |
+| **Duas conexões para o mesmo CLP** (`hmi_runtime.dart` ~186): as sessões são por id de equipamento; uma regra da planta que cite um projeto duplicado abre uma segunda conexão TCP ao mesmo CLP, e CLP que aceita uma conexão só oscila em "sem comunicação". | Não confirmado em hardware. Reaproveitar a sessão por IP + porta + id do escravo. |
 
 ## Próximo — visual e operação
 

@@ -91,8 +91,9 @@ abstract final class TemplateBuilder {
           id: '${tagBase}_$i',
           name: tt.name,
           deviceId: device.id,
-          // Só o tipo de memória mais provável; o endereço fica a configurar.
-          area: tt.type == TagDataType.bool ? ModbusArea.coil : ModbusArea.holdingRegister,
+          // Só o tipo de memória (o do modelo, ou o mais provável pelo
+          // tipo); o endereço fica a configurar.
+          area: tt.area ?? (tt.type == TagDataType.bool ? ModbusArea.coil : ModbusArea.holdingRegister),
           dataType: tt.type,
           length: tt.length,
           writable: tt.writable,

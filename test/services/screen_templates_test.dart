@@ -14,7 +14,8 @@ import 'package:ihm/services/runtime/tag_store.dart';
 import 'package:ihm/services/templates/screen_templates.dart';
 import 'package:ihm/services/templates/template_builder.dart';
 import 'package:ihm/widgets/hmi/element_catalog.dart';
-import 'package:ihm/widgets/hmi/elements/control_elements.dart';
+
+import '../support/screen_checks.dart';
 
 const _generic = Device(id: 'gen', name: 'Prensa', host: '10.0.0.3');
 const _md500 = Device(id: 'md', name: 'Inversor da bomba', host: '10.0.0.4', profile: 'inovance-md500');
@@ -39,7 +40,7 @@ void main() {
     expect(ScreenTemplates.all.first, same(ScreenTemplates.blank));
     final ids = ScreenTemplates.all.map((t) => t.id).toList();
     expect(ids.toSet().length, ids.length);
-    expect(ids, containsAll(['maquina', 'inversor-basico', 'inversor-completo', 'servo-basico', 'servo-completo', 'leitor-codigo', 'temperatura', 'celula-carga']));
+    expect(ids, containsAll(['maquina', 'inversor-basico', 'inversor-completo', 'servo-basico', 'servo-completo', 'leitor-codigo', 'temperatura', 'celula-carga', 'io-8', 'io-16']));
     for (final t in ScreenTemplates.all) {
       expect(ScreenTemplates.byId(t.id), same(t));
     }
@@ -61,44 +62,10 @@ void main() {
         expect(s.columns, HmiScreen.fineColumns);
         expect(s.elements, isNotEmpty);
         final tags = {for (final x in [...r.created, ...r.reused]) x.id: x};
-        expect(s.elements.map((e) => e.id).toSet().length, s.elements.length, reason: 'id de elemento repetido');
         expect(r.created.map((x) => x.id).toSet().length, r.created.length, reason: 'id de variável repetido');
-
-        for (final e in s.elements) {
-          final where = '${e.type.name} "${e.props['label']}" em ${e.x},${e.y}';
-          // Dentro da grade, acima do mínimo e sem sobrepor: a mesma regra do editor.
-          expect(ElementCatalog.fits(s, e), isTrue, reason: where);
-          if (ElementCatalog.of(e.type).writes) {
-            expect(e.w >= 3 && e.h >= 3, isTrue, reason: '$where: quem grava tem pelo menos 3×3');
-          } else if (e.w < s.columns && e.type != ElementType.label) {
-            expect(e.h, greaterThanOrEqualTo(4), reason: '$where: meia largura com rótulo precisa de 4 de altura');
-          }
-          // Cada variável serve ao elemento que a recebeu.
-          for (final id in e.tagIds) {
-            expect(tags[id], isNotNull, reason: '$where aponta para variável que não existe');
-          }
-          final main = e.tagId == null ? null : tags[e.tagId];
-          if (e.type == ElementType.button) {
-            final mode = ButtonModeMeta.fromName(e.props['mode'] as String?);
-            expect(main, isNotNull, reason: where);
-            if (mode.isBit) {
-              expect(main!.dataType, TagDataType.bool, reason: '$where: modo de bit pede liga/desliga');
-              final fb = e.props['feedbackTagId'];
-              if (fb != null) expect(tags[fb]!.dataType, TagDataType.bool, reason: '$where: retorno');
-            } else {
-              expect(mode, ButtonMode.value);
-              expect(main!.dataType.isNumeric, isTrue, reason: where);
-              expect(e.props['value'], isA<int>(), reason: '$where: valor da marca');
-            }
-            expect(main.writable, isTrue, reason: '$where: botão grava');
-          } else {
-            final fit = ElementCatalog.of(e.type).fit;
-            for (final id in e.tagIds) {
-              expect(fit.accepts(tags[id]!), isTrue, reason: '$where não aceita "${tags[id]!.name}"');
-            }
-          }
-          if (e.type == ElementType.input) expect(main!.writable, isTrue, reason: where);
-        }
+        // Grade, mínimos, alvo de toque e a variável certa em cada elemento.
+        final problems = templateScreenProblems(s, tags);
+        expect(problems, isEmpty, reason: problems.join('\n'));
 
         // Nenhuma variável sobrando: todas aparecem em algum elemento.
         final used = s.tagIds;
@@ -178,14 +145,14 @@ void main() {
       expect(r.created.map((x) => x.name), isNot(contains('Liga inversor')));
     });
 
-    test('MD500: botões gravam 1 avante, 2 ré, 6 parada em rampa e 7 reset; estados da marca', () {
+    test('MD500: botões gravam 1 avante, 2 reverso, 6 parada em rampa e 7 reset; estados da marca', () {
       final r = _build(ScreenTemplates.inverterBasic, _md500);
       final comando = byMap(r, 'comando', VendorProfiles.inovanceMd500);
       final buttons = {
         for (final e in r.screen.elements.where((e) => e.type == ElementType.button)) e.props['label']: e,
       };
-      expect(buttons.keys, unorderedEquals(['Avante', 'Ré', 'Parar', 'Reset']));
-      expect({for (final b in buttons.entries) b.key: b.value.props['value']}, {'Avante': 1, 'Ré': 2, 'Parar': 6, 'Reset': 7});
+      expect(buttons.keys, unorderedEquals(['Avante', 'Reverso', 'Parar', 'Reset']));
+      expect({for (final b in buttons.entries) b.key: b.value.props['value']}, {'Avante': 1, 'Reverso': 2, 'Parar': 6, 'Reset': 7});
       expect(buttons.values.every((b) => b.tagId == comando.id && b.props['mode'] == 'value'), isTrue);
       final estado = r.screen.elements.firstWhere((e) => e.props['label'] == 'Estado');
       expect(estado.tagId, byMap(r, 'estado', VendorProfiles.inovanceMd500).id);
@@ -261,6 +228,78 @@ void main() {
       expect(second.reused.length, first.created.length);
       expect(second.pending, first.created.length);
       expect(second.screen.tagIds, first.screen.tagIds);
+    });
+  });
+
+  group('pedidos da reunião de 19/10/2026', () {
+    test('"Reverso" no lugar de "Ré": botões, estados das marcas e descrições', () {
+      for (final t in [ScreenTemplates.inverterBasic, ScreenTemplates.servoBasic]) {
+        final labels = _build(t, _generic).screen.elements.map((e) => e.props['label']);
+        expect(labels, contains('Reverso'), reason: t.name);
+        expect(labels, isNot(contains('Ré')), reason: t.name);
+      }
+      for (final codes in ScreenTemplates.driveCodes.values) {
+        final texts = codes.states.map((s) => s['text']);
+        expect(texts, contains('REVERSO'));
+        expect(texts, isNot(contains('RÉ')));
+      }
+      final sentido = _build(ScreenTemplates.inverterBasic, _generic).created.firstWhere((x) => x.name == 'Sentido reverso');
+      expect(sentido.description, isNot(contains('ré')));
+      for (final p in [VendorProfiles.inovanceMd500, VendorProfiles.invtGd20]) {
+        for (final t in p.templates) {
+          expect(t.description, isNot(matches(RegExp(r'\bré\b'))), reason: '${p.name}: ${t.key}');
+        }
+      }
+    });
+
+    test('Máquina: modo manual/automático só de leitura e o OEE calculado pelas três parcelas', () {
+      final r = _build(ScreenTemplates.machine, _generic);
+      final byName = {for (final t in r.created) t.name: t};
+      final auto = byName['Em automático']!;
+      expect(auto.dataType, TagDataType.bool);
+      expect(auto.writable, isFalse, reason: 'o modo se troca no painel da máquina, não pela tela');
+      final modo = r.screen.elements.singleWhere((e) => e.props['label'] == 'Modo');
+      expect(modo.type, ElementType.multistate);
+      expect(modo.tagId, auto.id);
+      expect((modo.props['states'] as List).map((s) => (s as Map)['text']), ['MANUAL', 'AUTOMÁTICO']);
+
+      final oee = r.screen.elements.singleWhere((e) => e.type == ElementType.oee);
+      expect(oee.props['source'], 'calc');
+      expect(oee.props['scale'], 'percent');
+      expect(oee.props.containsKey('warn'), isFalse, reason: 'faixa não se inventa');
+      expect(oee.tagIds.map((id) => r.created.firstWhere((t) => t.id == id).name), ['Disponibilidade', 'Desempenho', 'Qualidade']);
+      expect(oee.w, HmiScreen.fineColumns, reason: 'largura toda, como o OEE nasce');
+      // Continua com o que já tinha.
+      expect(byName.keys, containsAll(['Estado da máquina', 'Liga máquina', 'Máquina em operação', 'Reset de alarme', 'Velocidade', 'Ajuste de velocidade', 'Produção', 'Alarme da máquina']));
+      expect(r.screen.elements.where((e) => e.type == ElementType.button).map((e) => e.props['label']), unorderedEquals(['Liga', 'Reset']));
+    });
+
+    for (final (t, n) in [(ScreenTemplates.io8, 8), (ScreenTemplates.io16, 16)]) {
+      test('I/O de CLP com $n entradas e $n saídas: uma lâmpada para cada, tudo a configurar', () {
+        final r = _build(t, _generic);
+        expect(r.created.length, 2 * n);
+        expect(r.created.every((x) => x.addressPending && x.dataType == TagDataType.bool && !x.writable), isTrue);
+        final inputs = r.created.where((x) => x.name.startsWith('Entrada ')).toList();
+        final outputs = r.created.where((x) => x.name.startsWith('Saída ')).toList();
+        expect(inputs.map((x) => x.name), [for (var i = 0; i < n; i++) 'Entrada E$i']);
+        expect(outputs.map((x) => x.name), [for (var i = 0; i < n; i++) 'Saída S$i']);
+        expect(inputs.every((x) => x.area == ModbusArea.discreteInput), isTrue, reason: 'entrada física');
+        expect(outputs.every((x) => x.area == ModbusArea.coil), isTrue);
+        final lamps = r.screen.elements.where((e) => e.type == ElementType.lamp).map((e) => e.props['label']).toList();
+        expect(lamps, [for (var i = 0; i < n; i++) 'E$i', for (var i = 0; i < n; i++) 'S$i']);
+        expect(r.screen.elements.where((e) => ElementCatalog.of(e.type).writes), isEmpty, reason: 'só para ver e ligar as memórias');
+        // Toda saída abaixo de toda entrada.
+        final lastInput = r.screen.elements.where((e) => e.tagId != null && inputs.any((x) => x.id == e.tagId)).map((e) => e.bottom).reduce((a, b) => a > b ? a : b);
+        final firstOutput = r.screen.elements.where((e) => e.tagId != null && outputs.any((x) => x.id == e.tagId)).map((e) => e.y).reduce((a, b) => a < b ? a : b);
+        expect(firstOutput, greaterThan(lastInput));
+      });
+    }
+
+    test('I/O de 16 reaproveita as 8 do I/O de 8 no mesmo equipamento', () {
+      final first = _build(ScreenTemplates.io8, _generic);
+      final second = _build(ScreenTemplates.io16, _generic, project: _project.upsertTags(first.created));
+      expect(second.reused.length, 16);
+      expect(second.created.length, 16);
     });
   });
 

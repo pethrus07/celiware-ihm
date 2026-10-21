@@ -20,6 +20,7 @@ import 'package:ihm/services/demo/demo_process.dart';
 import 'package:ihm/services/demo/demo_project.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/storage/project_repository.dart';
+import 'package:ihm/services/templates/ready_projects.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -204,6 +205,45 @@ void main() {
       expect(c.projects.map((e) => e.name), containsAll([firstName, 'Linha 2']));
       final kept = await tester.runAsync(() => c.library!.repositoryFor(first).load());
       expect(kept?.screens, isNotEmpty, reason: 'o projeto anterior não foi substituído');
+      await shutdown(tester, c);
+    });
+
+    testWidgets('De um projeto pronto SOMA à planta: nome único, abre, e o anterior continua', (tester) async {
+      final c = await boot(tester, size: const Size(360, 740));
+      final first = c.openId!;
+      final firstName = c.project.name;
+      // Um "Tex G4" já na planta: o pronto ganha nome único, como a importação.
+      await tester.runAsync(() => c.createProject(const Project(name: 'Tex G4')));
+      tester.state<ShellState>(find.byType(Shell)).showProjectList();
+      await settle(tester, rounds: 3);
+
+      await tester.tap(find.text('Novo projeto'));
+      await settle(tester, rounds: 3);
+      await tester.tap(find.byKey(const ValueKey('opcao-pronto')));
+      await settle(tester, rounds: 3);
+      // A lista: nome e uma linha de cada, nada cortado no celular de 360 dp.
+      for (final rp in ReadyProjects.all) {
+        expect(find.byKey(ValueKey('opcao-${rp.id}')), findsOneWidget, reason: rp.title);
+        expect(find.text(rp.title), findsOneWidget);
+      }
+      for (final t in find.byType(RichText).evaluate()) {
+        final p = t.renderObject! as RenderParagraph;
+        expect(p.didExceedMaxLines, isFalse, reason: '"${p.text.toPlainText()}" cortado');
+      }
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('opcao-tex-g4')), 200, scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.byKey(const ValueKey('opcao-tex-g4')));
+      await settle(tester, until: () => c.project.name.startsWith('Tex G4 ') && find.byType(ScreensPage).evaluate().isNotEmpty);
+
+      expect(c.project.name, isNot('Tex G4'), reason: 'nome único');
+      expect(c.project.name, startsWith('Tex G4'));
+      expect(c.project.screens.map((s) => s.name), ['Operação', 'Entradas e saídas']);
+      expect(c.project.tags.every((t) => t.addressPending), isTrue);
+      expect(find.byType(ScreensPage), findsOneWidget, reason: 'já abre dentro do projeto novo');
+      expect(find.textContaining('manual Modbus do Tex G4'), findsOneWidget, reason: 'o aviso diz o próximo passo');
+      expect(c.projects.map((e) => e.name), containsAll([firstName, 'Tex G4', c.project.name]));
+      expect(c.projects.length, 3, reason: 'somou; nada foi substituído');
+      final kept = await tester.runAsync(() => c.library!.repositoryFor(first).load());
+      expect(kept?.screens, isNotEmpty, reason: 'o projeto anterior continua no disco');
       await shutdown(tester, c);
     });
 

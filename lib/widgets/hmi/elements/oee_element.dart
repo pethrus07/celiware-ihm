@@ -112,6 +112,9 @@ abstract final class Oee {
   /// Nome de cada vaga, na ordem de `tagIds`.
   static const titles = ['Disponibilidade', 'Desempenho', 'Qualidade', 'OEE'];
 
+  /// Aviso da parcela cuja variável está com o endereço a configurar.
+  static const pendingText = 'A configurar';
+
   /// Abreviação para quando o nome inteiro não cabe na linha.
   static const shortTitles = ['Disp.', 'Desemp.', 'Qual.', 'OEE'];
 
@@ -149,6 +152,10 @@ abstract final class Oee {
   /// "esperando"; sem comunicação guarda o último valor como "parado".
   static OeePart part(Tag? tag, TagReading r, OeeScale scale) {
     if (tag == null) return const OeePart(OeeState.missing);
+    // Endereço a configurar (variável de modelo de tela ou de projeto
+    // pronto): falta configurar, na cor de interação como nos outros
+    // elementos — não o erro vermelho, que nem caberia na linha do celular.
+    if (tag.addressPending) return const OeePart(OeeState.missing, message: pendingText);
     if (r.quality == TagQuality.addressError || r.quality == TagQuality.configError) {
       return OeePart(OeeState.error, message: r.message);
     }
@@ -573,7 +580,7 @@ class _PartValue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (part.state == OeeState.missing) return Align(alignment: alignment, child: const _Prompt(short: true));
+    if (part.state == OeeState.missing) return Align(alignment: alignment, child: _Prompt(short: true, text: part.message.isEmpty ? null : part.message));
     if (part.state == OeeState.error) return Align(alignment: alignment, child: _ErrorText(part.message));
     final f = part.fraction;
     final stale = part.state == OeeState.stale;
@@ -614,8 +621,11 @@ class _PartValue extends StatelessWidget {
 
 /// Vaga sem variável: o mesmo aviso dos outros elementos, na cor de interação.
 class _Prompt extends StatelessWidget {
-  const _Prompt({this.short = false});
+  const _Prompt({this.short = false, this.text});
   final bool short;
+
+  /// No lugar do "Escolha" (ex.: [Oee.pendingText]).
+  final String? text;
 
   @override
   Widget build(BuildContext context) => FittedBox(
@@ -623,7 +633,7 @@ class _Prompt extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.link_off_rounded, size: 15, color: Ind.accent),
           const SizedBox(width: 5),
-          Text(short ? 'Escolha' : 'Escolha a variável', style: TextStyle(color: Ind.accent, fontWeight: FontWeight.w600, fontSize: 13)),
+          Text(text ?? (short ? 'Escolha' : 'Escolha a variável'), style: TextStyle(color: Ind.accent, fontWeight: FontWeight.w600, fontSize: 13)),
         ]),
       );
 }

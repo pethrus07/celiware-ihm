@@ -115,7 +115,7 @@ class Tours {
   static TourSpec projetos({GlobalKey? list, GlobalKey? add, GlobalKey? settings}) =>
       TourSpec(id: 'projetos', version: 1, title: 'Projetos', steps: [
         TourStep(target: list, essential: true, title: 'Projetos', body: 'Uma máquina por projeto, com os seus equipamentos, variáveis e telas. Toque para abrir.'),
-        TourStep(target: add, title: 'Novo projeto', body: 'Em branco, a demonstração ou um arquivo recebido. Nunca apaga outro projeto.'),
+        TourStep(target: add, title: 'Novo projeto', body: 'Em branco, a demonstração, um projeto pronto ou um arquivo recebido. Nunca apaga outro projeto.'),
         const TourStep(essential: true, title: 'Enviar', body: 'O ⋮ do projeto envia, salva ou duplica ele. O ⋮ do topo faz o mesmo com a planta inteira.'),
         TourStep(target: settings, title: 'Ajustes', body: 'Claro ou escuro, tutoriais e sobre o app.'),
       ]);

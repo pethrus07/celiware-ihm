@@ -20,6 +20,7 @@ import 'package:ihm/screens/screen_run_page.dart';
 import 'package:ihm/screens/tours.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/storage/project_repository.dart';
+import 'package:ihm/services/templates/ready_projects.dart';
 import 'package:ihm/services/templates/screen_templates.dart';
 import 'package:ihm/services/templates/template_builder.dart';
 import 'package:ihm/widgets/hmi/element_catalog.dart';
@@ -30,7 +31,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// verdade (IBM Plex) do celular de 320 dp ao tablet, claro e escuro — cada
 /// modelo no equipamento genérico (variáveis a configurar), o mesmo depois
 /// de preenchidos os endereços (valores na tela) e o de inversor também com
-/// o mapa do MD500 (palavra de comando):
+/// o mapa do MD500 (palavra de comando); e as telas dos projetos prontos
+/// (`ready_projects.dart`), do mesmo jeito:
 ///
 ///   • nenhum elemento sai da grade nem encosta noutro;
 ///   • quem grava tem pelo menos 48 dp de alvo de toque;
@@ -103,13 +105,27 @@ void main() {
         cases[id] = '${t.id}${switch (d.id) { 'md' => '-md500', 'cfg' => '-configurado', _ => '' }}';
       }
     }
+    // Os projetos prontos: cada um como nasce (tudo a configurar) e com os
+    // endereços preenchidos — cada um com o seu equipamento. Tela feita de
+    // um modelo do catálogo (Operador = Máquina) já foi conferida acima.
+    for (final rp in ReadyProjects.all) {
+      for (final configured in [false, true]) {
+        final built = rp.build();
+        p = p.copyWith(devices: [...p.devices, ...built.devices]).upsertTags(configured ? built.tags.map(fill) : built.tags);
+        for (final (i, s) in built.screens.indexed) {
+          if (ScreenTemplates.all.contains(rp.screens[i].template)) continue;
+          p = p.upsertScreen(s);
+          cases[s.id] = 'pronto-${rp.id}-${s.name}${configured ? '-configurado' : ''}';
+        }
+      }
+    }
     return (p, cases);
   }
 
   Future<(ProjectController, ModbusMemory)> boot(WidgetTester tester, Size dp, Appearance look, Project p) async {
     // Memória do tamanho do mapa do inversor (falha em 0x8000): o mapa lê sem
     // "endereço inexistente", e nenhum socket abre no teste.
-    final memory = ModbusMemory(coils: 100, discreteInputs: 100, holdingRegisters: 65536, inputRegisters: 100);
+    final memory = ModbusMemory(coils: 400, discreteInputs: 400, holdingRegisters: 65536, inputRegisters: 100);
     final runtime = HmiRuntime(clientFactory: (_) => SimulatedModbusClient(memory: memory, latency: Duration.zero));
     final controller = ProjectController(repository: ProjectRepository(directory: dir), runtime: runtime);
     await tester.runAsync(controller.load);
@@ -194,12 +210,14 @@ void main() {
       final tag = e.tagId == null ? null : c.project.tag(e.tagId!);
       if (tag == null || tag.addressPending) continue;
       if (e.type == ElementType.multistate) {
+        // Liga/desliga como estado (o modo manual/automático): 0 e 1 no bit.
+        void poke(int v) => tag.area.isBit ? memory.pokeBit(tag.area, tag.address, v != 0) : memory.pokeRegister(tag.area, tag.address, v);
         for (final s in (e.props['states'] as List).cast<Map<String, Object?>>()) {
-          memory.pokeRegister(tag.area, tag.address, s['value']! as int);
+          poke(s['value']! as int);
           await live(tester, 600);
           out.addAll(problems(tester, screen, '$what (${s['text']})'));
         }
-        memory.pokeRegister(tag.area, tag.address, 0);
+        poke(0);
       } else if (e.type == ElementType.lamp) {
         memory.pokeBit(tag.area, tag.address, true);
         await live(tester, 600);

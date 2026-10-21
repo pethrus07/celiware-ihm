@@ -6,8 +6,9 @@
 // Cada projeto é o mesmo de sempre — equipamentos, variáveis, telas, regras,
 // registros, receitas e câmeras — guardado na sua pasta. Tocar abre o
 // projeto (as telas dele); Equipamentos, Variáveis, Ferramentas e Alarmes
-// passam a mostrar as coisas dele. Criar e importar um projeto sempre
-// ACRESCENTAM (o "Começar do zero" antigo apagou um projeto do cliente).
+// passam a mostrar as coisas dele. Criar, importar e partir de um projeto
+// pronto (`ready_projects.dart`) sempre ACRESCENTAM (o "Começar do zero"
+// antigo apagou um projeto do cliente).
 // O título é o nome da planta; o menu dela (⋮) envia ou salva a planta
 // inteira e cria uma planta nova — o único jeito de trocar tudo, com
 // confirmação forte e cópia automática da planta atual antes. As cópias se
@@ -28,6 +29,7 @@ import '../../models/plant.dart';
 import '../../models/project.dart';
 import '../../services/demo/demo_project.dart';
 import '../../services/storage/project_repository.dart';
+import '../../services/templates/ready_projects.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/write_actions.dart';
 import '../../widgets/tour/tour.dart';
@@ -111,7 +113,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
     );
   }
 
-  /// "Novo projeto": em branco, a demonstração ou de um arquivo.
+  /// "Novo projeto": em branco, a demonstração, de um projeto pronto ou de
+  /// um arquivo.
   Future<void> _create(BuildContext context) async {
     final kind = await showModalBottomSheet<String>(
       context: context,
@@ -130,6 +133,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
               options: const [
                 ChoiceOption(value: 'branco', title: 'Em branco', subtitle: 'Equipamentos, variáveis e telas do zero.', icon: Icons.note_add_outlined),
                 ChoiceOption(value: 'demonstracao', title: 'Demonstração', subtitle: 'A cortadora simulada, para mexer à vontade.', icon: Icons.smart_toy_outlined),
+                ChoiceOption(value: 'pronto', title: 'De um projeto pronto', subtitle: 'Diretoria, supervisão, operador, monitoramento ou Tex G4.', icon: Icons.inventory_2_outlined),
                 ChoiceOption(value: 'arquivo', title: 'De um arquivo', subtitle: 'Projeto ou planta enviados por WhatsApp, e-mail ou Drive.', icon: Icons.file_open_outlined),
               ],
             ),
@@ -146,11 +150,51 @@ class _ProjectsPageState extends State<ProjectsPage> {
         await _run(() => c.createProject(Project(name: name)));
       case 'demonstracao':
         await _run(() => c.createProject(DemoProject.build()));
+      case 'pronto':
+        await _ready(context);
+        return;
       case 'arquivo':
         await _import(context);
         return;
     }
     if (context.mounted) widget.onOpened();
+  }
+
+  /// "De um projeto pronto": a lista (nome e uma linha); escolher cria o
+  /// projeto somado à planta, com nome único, e abre.
+  Future<void> _ready(BuildContext context) async {
+    final picked = await showModalBottomSheet<ReadyProject>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.8,
+        maxChildSize: 0.95,
+        builder: (ctx, scroll) => ListView(
+          controller: scroll,
+          padding: const EdgeInsets.fromLTRB(Ind.page, 0, Ind.page, 32),
+          children: [
+            Text('Projeto pronto', style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: Ind.space),
+            ChoiceCards<String>(
+              columns: 1,
+              selected: '',
+              onChanged: (id) => Navigator.pop(ctx, ReadyProjects.byId(id)),
+              options: [
+                for (final p in ReadyProjects.all) ChoiceOption(value: p.id, title: p.title, subtitle: p.description, icon: p.icon),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    final c = AppScope.of(context).controller;
+    await _run(() => c.createProject(picked.build()));
+    if (!context.mounted) return;
+    WriteActions.toast(context, 'Projeto "${c.project.name}" acrescentado à planta. ${picked.hint}');
+    widget.onOpened();
   }
 
   /// Importar um projeto = acrescentar (nunca substitui o aberto). Arquivo

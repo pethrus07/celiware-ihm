@@ -119,26 +119,26 @@ void main() {
     expect(fieldText(tester, 'campo-nome'), 'Máquina');
     expect(find.descendant(of: find.byKey(const ValueKey('escolher-equipamento-modelo')), matching: find.text('Cortadora de rótulos')), findsOneWidget);
     // "Liga máquina", "Reset de alarme" e "Velocidade" já existem na demonstração.
-    expect(tester.widget<Text>(find.byKey(const ValueKey('resumo-modelo'))).data, 'Cria 5 variáveis com o endereço a configurar; usa 3 que já existem.');
+    expect(tester.widget<Text>(find.byKey(const ValueKey('resumo-modelo'))).data, 'Cria 9 variáveis com o endereço a configurar; usa 3 que já existem.');
     expect(find.text('Criar'), findsOneWidget);
     await tapKey(tester, 'ok-nome', wait: 900);
 
     final s = c.project.screens.firstWhere((s) => s.name == 'Máquina');
     expect(s.columns, HmiScreen.fineColumns);
-    expect(s.elements.length, 7);
+    expect(s.elements.length, 9);
     final created = c.project.tags.skip(before).toList();
-    expect(created.length, 5);
+    expect(created.length, 9);
     expect(created.every((t) => t.addressPending && t.deviceId == DemoProject.deviceId), isTrue);
     expect(s.tagIds, containsAll(['demo_liga', 'demo_reset', 'demo_vel']));
     // No editor: o aviso de baixo e os elementos sem endereço marcados.
     expect(find.text('Elemento'), findsOneWidget);
     expect(find.byKey(const ValueKey('aviso-a-configurar')), findsOneWidget);
-    expect(find.text('5 variáveis com o endereço a configurar — preencha em Variáveis.'), findsOneWidget);
+    expect(find.text('9 variáveis com o endereço a configurar — preencha em Variáveis.'), findsOneWidget);
     expect(find.textContaining('a configurar'), findsWidgets);
     // De volta à lista: o cartão diz o que falta.
     await back(tester);
     expect(find.byKey(ValueKey('a-configurar-${s.id}')), findsOneWidget);
-    expect(tester.widget<Text>(find.byKey(ValueKey('a-configurar-${s.id}'))).data, ' · 5 a configurar');
+    expect(tester.widget<Text>(find.byKey(ValueKey('a-configurar-${s.id}'))).data, ' · 9 a configurar');
     await shutdown(tester, c);
   });
 

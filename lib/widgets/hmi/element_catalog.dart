@@ -126,6 +126,10 @@ class ElementInfo {
 /// Em qualquer elemento menos botão e ajuste: `goTo` = id da tela que abre ao
 /// tocar (nos dois, o toque já tem dono: gravar).
 ///
+/// Em lâmpada, mostrador, indicador, barra e medidor: `transparent: true` =
+/// "Fundo transparente" (sem cartão; só vale com imagem de fundo na tela,
+/// ver [transparentTypes]).
+///
 /// `color` é o nome de um [StateColor]. Chaves ausentes usam o padrão do
 /// renderizador; chaves desconhecidas são preservadas (arquivo de versão
 /// mais nova abre sem perder nada).
@@ -141,6 +145,25 @@ class ElementCatalog {
     final (mw, _) = minSize(type, columns);
     return ((info.defaultW * k).clamp(mw, columns), info.defaultH * k);
   }
+
+  /// Tipos que podem ficar "pousados" na imagem de fundo da tela, sem cartão
+  /// (`props.transparent`, em Mais opções da configuração): os que só
+  /// mostram um estado ou um número. Quem grava (botão, ajuste) mantém o
+  /// cartão — é ele que diz "isto se toca"; gráfico, tabela e OEE sem cartão
+  /// virariam linhas soltas sobre o desenho. O texto fixo já não tem cartão.
+  static const Set<ElementType> transparentTypes = {
+    ElementType.lamp,
+    ElementType.value,
+    ElementType.multistate,
+    ElementType.bar,
+    ElementType.gauge,
+  };
+
+  /// O elemento [e] é desenhado sem cartão na tela [screen]: "Fundo
+  /// transparente" marcado e a tela com imagem de fundo. O texto fixo, numa
+  /// tela com imagem, também (só ganha o contorno nas letras).
+  static bool drawnBare(HmiScreen screen, HmiElement e) =>
+      screen.background != null && (e.type == ElementType.label || (e.transparent && transparentTypes.contains(e.type)));
 
   /// Posição e tamanho aceitos: dentro da grade, acima do mínimo e sem
   /// sobrepor outro elemento. O arrasto do editor e os botões de ajuste usam

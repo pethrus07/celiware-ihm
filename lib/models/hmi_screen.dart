@@ -1,4 +1,7 @@
-// Tela montada pelo usuário: uma grade com elementos gráficos.
+// Tela montada pelo usuário: uma grade com elementos gráficos (e, se o
+// usuário quiser, uma imagem de fundo por trás deles — o sinótico).
+
+import 'dart:math' as math;
 
 /// Tipos de elemento — o conjunto "principal do mercado" das IHMs.
 ///
@@ -84,6 +87,10 @@ class HmiElement {
     if (many is List) yield* many.whereType<String>();
   }
 
+  /// "Fundo transparente" (só vale numa tela com imagem de fundo): sem
+  /// cartão, pousado no desenho.
+  bool get transparent => props['transparent'] == true;
+
   int get right => x + w;
   int get bottom => y + h;
 
@@ -140,6 +147,121 @@ class HmiElement {
   }
 }
 
+/// Como a imagem de fundo ocupa a tela ([ScreenBackground.fit]).
+enum BackgroundFit {
+  /// Largura da tela: a imagem inteira na largura da grade, altura pela
+  /// proporção dela (a grade cresce até caber). O padrão.
+  width,
+
+  /// Tela inteira: cobre a área de [ScreenBackground.rows] linhas, cortando
+  /// o que sobra.
+  cover,
+
+  /// Caber sem cortar: a imagem inteira dentro da mesma área, com sobra.
+  contain,
+}
+
+/// Imagem de fundo da tela (item 62 da lista do cliente, "sinótico"): a
+/// planta da fábrica, a foto da máquina ou um diagrama, **atrás** da grade e
+/// dos elementos.
+///
+/// Guardada como o elemento imagem: PNG em base64 dentro do arquivo do
+/// projeto (exportar leva junto), reduzida antes de entrar
+/// ([maxSide], `shrinkImage`). [width] e [height] são os pixels da imagem
+/// guardada: com eles a área da imagem sai em células sem decodificar nada —
+/// é o que deixa editor e operação desenharem no mesmo lugar.
+///
+/// Tudo em unidades da grade, nunca da janela: a imagem cresce com a largura
+/// como os elementos, então a lâmpada posta sobre a prensa continua sobre a
+/// prensa no celular, no tablet e no editor.
+class ScreenBackground {
+  const ScreenBackground({
+    required this.data,
+    required this.width,
+    required this.height,
+    this.fit = BackgroundFit.width,
+    this.rows,
+    this.dim = 0,
+    this.extra = const {},
+  });
+
+  /// O mesmo teto das imagens por etapa do elemento imagem (página de PDF,
+  /// diagrama): nítido no tablet e ainda leve para mandar por WhatsApp.
+  static const int maxSide = 1200;
+
+  /// "Escurecer a imagem" (%), para ler os elementos por cima.
+  static const List<int> dimChoices = [0, 30, 60];
+
+  final String data;
+  final int width;
+  final int height;
+  final BackgroundFit fit;
+
+  /// Altura da área em linhas da grade da tela, nos encaixes "tela inteira"
+  /// e "caber sem cortar": a tela que o editor mostrava quando o encaixe foi
+  /// escolhido. Nulo = a altura da imagem na largura da tela.
+  final int? rows;
+
+  /// Quanto atenuar a imagem (0, 30 ou 60 %), na cor de fundo do tema.
+  final int dim;
+
+  /// Chaves de uma versão mais nova do app: preservadas ao salvar.
+  final Map<String, dynamic> extra;
+
+  /// Linhas da grade de [columns] colunas que a imagem ocupa.
+  int areaRows(int columns) {
+    final r = rows;
+    if (fit != BackgroundFit.width && r != null && r > 0) return r;
+    if (width <= 0 || height <= 0) return 0;
+    return (columns * height / width - 1e-9).ceil();
+  }
+
+  ScreenBackground copyWith({String? data, int? width, int? height, BackgroundFit? fit, int? rows, bool clearRows = false, int? dim}) => ScreenBackground(
+        data: data ?? this.data,
+        width: width ?? this.width,
+        height: height ?? this.height,
+        fit: fit ?? this.fit,
+        rows: clearRows ? null : rows ?? this.rows,
+        dim: dim ?? this.dim,
+        extra: extra,
+      );
+
+  /// A mesma área numa grade [factor] vezes mais fina (ou mais grossa, com
+  /// fator < 1, arredondando para cima: a imagem nunca perde pedaço).
+  ScreenBackground scaled(double factor) {
+    final r = rows;
+    if (r == null) return this;
+    return copyWith(rows: math.max(1, (r * factor - 1e-9).ceil()));
+  }
+
+  Map<String, dynamic> toJson() => {
+        ...extra,
+        'data': data,
+        'width': width,
+        'height': height,
+        if (fit != BackgroundFit.width) 'fit': fit.name,
+        if (rows != null) 'rows': rows,
+        if (dim > 0) 'dim': dim,
+      };
+
+  static const _known = {'data', 'width', 'height', 'fit', 'rows', 'dim'};
+
+  /// Nulo quando não há imagem legível (sem `data`).
+  static ScreenBackground? fromJson(Object? raw) {
+    if (raw is! Map || raw['data'] is! String || (raw['data'] as String).isEmpty) return null;
+    final j = Map<String, dynamic>.from(raw);
+    return ScreenBackground(
+      data: j['data'] as String,
+      width: (j['width'] as num?)?.toInt() ?? 0,
+      height: (j['height'] as num?)?.toInt() ?? 0,
+      fit: BackgroundFit.values.firstWhere((f) => f.name == j['fit'], orElse: () => BackgroundFit.width),
+      rows: (j['rows'] as num?)?.toInt(),
+      dim: (j['dim'] as num?)?.toInt().clamp(0, 90) ?? 0,
+      extra: {for (final k in j.keys) if (!_known.contains(k)) k: j[k]},
+    );
+  }
+}
+
 /// Uma tela nomeada.
 class HmiScreen {
   const HmiScreen({
@@ -149,6 +271,8 @@ class HmiScreen {
     this.readOnly = false,
     this.confirmWrites = true,
     this.elements = const [],
+    this.background,
+    this.extra = const {},
   });
 
   /// 6 colunas: num celular de 390 dp dá células de ~60 dp — acima do mínimo
@@ -189,9 +313,23 @@ class HmiScreen {
 
   final List<HmiElement> elements;
 
-  /// Linhas ocupadas (a tela rola se passar da altura do aparelho).
+  /// Imagem de fundo (sinótico), atrás da grade e dos elementos. Campo
+  /// opcional: só vai para o arquivo quando existe, e o `schemaVersion`
+  /// segue 1. A 1.4.0/1.5.0 não conhece a chave: abre a tela sem desenhar a
+  /// imagem (ver docs/ARQUITETURA.md §5.3).
+  final ScreenBackground? background;
+
+  /// Chaves da tela que esta versão não conhece (arquivo de versão mais
+  /// nova): preservadas ao salvar, como os tipos de elemento desconhecidos.
+  final Map<String, dynamic> extra;
+
+  /// Linhas ocupadas pelos elementos (a tela rola se passar da altura do
+  /// aparelho).
   int get rows =>
       elements.fold(0, (m, e) => e.bottom > m ? e.bottom : m);
+
+  /// Linhas que a tela desenha: os elementos e a imagem de fundo.
+  int get drawnRows => math.max(rows, background?.areaRows(columns) ?? 0);
 
   /// Todas as variáveis que a tela usa (equipamentos da faixa, "usada em").
   Set<String> get tagIds => {for (final e in elements) ...e.tagIds};
@@ -210,6 +348,7 @@ class HmiScreen {
     bool? readOnly,
     bool? confirmWrites,
     List<HmiElement>? elements,
+    ScreenBackground? background,
   }) =>
       HmiScreen(
         id: id,
@@ -218,6 +357,36 @@ class HmiScreen {
         readOnly: readOnly ?? this.readOnly,
         confirmWrites: confirmWrites ?? this.confirmWrites,
         elements: elements ?? this.elements,
+        background: background ?? this.background,
+        extra: extra,
+      );
+
+  /// A mesma tela com outra imagem de fundo — ou sem nenhuma ([b] nulo).
+  HmiScreen withBackground(ScreenBackground? b) => HmiScreen(
+        id: id,
+        name: name,
+        columns: columns,
+        readOnly: readOnly,
+        confirmWrites: confirmWrites,
+        elements: elements,
+        background: b,
+        // Um fundo ilegível guardado de lado não volta por cima do novo.
+        extra: extra.containsKey('background') ? (Map.of(extra)..remove('background')) : extra,
+      );
+
+  /// Cópia com outro id e outro nome ("Duplicar"): elementos com ids novos
+  /// ([elementId]), a imagem de fundo e o resto vão juntos.
+  HmiScreen duplicate({required String id, required String name, required String Function() elementId}) => HmiScreen(
+        id: id,
+        name: name,
+        columns: columns,
+        readOnly: readOnly,
+        confirmWrites: confirmWrites,
+        elements: [
+          for (final e in elements) HmiElement(id: elementId(), type: e.type, x: e.x, y: e.y, w: e.w, h: e.h, props: Map.of(e.props)),
+        ],
+        background: background,
+        extra: extra,
       );
 
   /// A mesma tela em outra grade.
@@ -241,7 +410,7 @@ class HmiScreen {
       final k = target ~/ columns;
       return copyWith(columns: target, elements: [
         for (final e in elements) e.copyWith(x: e.x * k, y: e.y * k, w: e.w * k, h: e.h * k),
-      ]);
+      ]).withBackground(background?.scaled(k.toDouble()));
     }
     if (columns == extraFineColumns) {
       final half = _halved;
@@ -252,7 +421,7 @@ class HmiScreen {
     if (elements.any((e) => e.x.isOdd || e.y.isOdd || e.w.isOdd || e.h.isOdd)) return null;
     return copyWith(columns: target, elements: [
       for (final e in elements) e.copyWith(x: e.x ~/ 2, y: e.y ~/ 2, w: e.w ~/ 2, h: e.h ~/ 2),
-    ]);
+    ]).withBackground(background?.scaled(0.5));
   }
 
   /// Borda da extra-fina na fina: a metade, arredondando meia célula para
@@ -269,7 +438,7 @@ class HmiScreen {
             w: _halfEdge(e.right) - _halfEdge(e.x),
             h: _halfEdge(e.bottom) - _halfEdge(e.y),
           ),
-      ]);
+      ]).withBackground(background?.scaled(0.5));
 
   /// Sumiu no arredondamento. Pelo editor não acontece (o mínimo da
   /// extra-fina é de duas células); só um elemento de uma célula — vindo de
@@ -292,13 +461,18 @@ class HmiScreen {
     return oddElements;
   }
   Map<String, dynamic> toJson() => {
+        ...extra,
         'id': id,
         'name': name,
         'columns': columns,
         'readOnly': readOnly,
         'confirmWrites': confirmWrites,
         'elements': [for (final e in elements) e.toJson()],
+        // Só quando há imagem: tela sem fundo fica igual à da 1.5.0.
+        if (background != null) 'background': background!.toJson(),
       };
+
+  static const _known = {'id', 'name', 'columns', 'readOnly', 'confirmWrites', 'elements', 'background'};
 
   factory HmiScreen.fromJson(Map<String, dynamic> j) => HmiScreen(
         id: j['id'] as String,
@@ -310,5 +484,12 @@ class HmiScreen {
           for (final e in (j['elements'] as List? ?? const []))
             HmiElement.fromJson(Map<String, dynamic>.from(e as Map)),
         ],
+        background: ScreenBackground.fromJson(j['background']),
+        extra: {
+          for (final k in j.keys)
+            if (!_known.contains(k)) k: j[k],
+          // Fundo que esta versão não sabe ler (sem imagem): vai e volta igual.
+          if (j['background'] != null && ScreenBackground.fromJson(j['background']) == null) 'background': j['background'],
+        },
       );
 }

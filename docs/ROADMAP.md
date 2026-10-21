@@ -197,14 +197,49 @@ para posicionar elementos com precisão em sinóticos. **Feito em 21/10/2026**
   1.4.0/1.5.0 abre a tela com todos os elementos no lugar (lá ela é tratada
   como fina; no tablet a letra dos cartões amplia menos).
 
-**A conferir com o cliente:** "sinótico" no pedido é imagem de fundo com
-elementos **por cima**, mas o editor não deixa elemento sobrepor outro — hoje a
-imagem fica num bloco e os elementos ao lado dela. Se ele precisa de fato
-dos elementos sobre o desenho, falta uma **imagem de fundo da tela** (camada
-atrás da grade, fora da regra de sobreposição). Não entrou: mexe no arquivo
-(campo novo na tela) e no desenho da operação, e não estava no pedido.
-Também não testado num aparelho de verdade (só nos testes de widget e nas
+Não testado num aparelho de verdade (só nos testes de widget e nas
 capturas `QA_PNG`).
+
+## Sinótico: imagem de fundo da tela (item 62 da lista do cliente, 21/10/2026)
+
+Pedido do cliente (item 62, "sinótico da fábrica"), confirmado pelo Pedro em
+21/10/2026: montar a tela sobre um desenho (planta da fábrica, foto da
+máquina, diagrama) com os elementos **por cima**. **Feito em 21/10/2026, na
+parte "imagem de fundo + elementos por cima"** (detalhe em `ARQUITETURA.md`
+§5.3 e §6.3):
+
+- **Regras da tela → Imagem de fundo:** Escolher imagem (foto, desenho ou uma
+  página de PDF), Trocar, Remover; **Encaixar** (largura da tela · tela
+  inteira, cortando · caber sem cortar) e **Escurecer a imagem** (nada, 30 %,
+  60 %; no tema claro o nome é "Clarear"). A imagem é reduzida como as do
+  elemento imagem (1.200 px no maior lado) e mora dentro do arquivo do
+  projeto: exportar, a planta inteira e "Duplicar" levam junto.
+- **Desenho:** a imagem fica atrás da grade e dos elementos, medida em
+  células como eles — editor e operação iguais, no celular e no tablet. No
+  editor ela fica a 60 % para os pontos da grade aparecerem; na operação,
+  cheia.
+- **Fundo transparente** (Configurar → Mais opções, só numa tela com imagem):
+  lâmpada, mostrador, indicador de estado, barra e medidor ficam sem cartão,
+  com o texto contornado na cor de fundo do tema. Botão, ajuste, gráficos,
+  tabela e OEE mantêm o cartão.
+- **Arquivo:** campo opcional `background` na tela, `schemaVersion` segue 1.
+  **Limite das versões antigas:** a 1.4.0/1.5.0 abre a tela sem a imagem (o
+  resto igual), mas **não guarda** chave de tela que não conhece — se o
+  projeto for alterado e salvo nelas, a imagem de fundo se perde. A partir
+  desta versão, chaves desconhecidas da tela (e do fundo) são preservadas.
+  Para não perder o desenho: atualizar todos os aparelhos antes de mandar um
+  projeto com sinótico.
+
+**Passo seguinte, se o cliente quiser:** um sinótico da **PLANTA** — uma tela
+que junta as máquinas de vários projetos (planta da fábrica com cada máquina
+na cor do estado dela: rodando, parada, alarme, sem comunicação). Hoje cada
+tela é de um projeto e só lê as variáveis dele; isso pede uma tela no nível
+da planta, que leia variáveis de vários projetos como as regras da planta
+fazem (§5.4.1). Não entrou: não estava no pedido de 21/10.
+
+**A conferir:** não testado num aparelho de verdade (seletor de arquivo do
+Android e PDF só no aparelho; os testes de widget e as capturas `QA_PNG`
+cobrem o resto).
 
 ## Próximo — visual e operação
 

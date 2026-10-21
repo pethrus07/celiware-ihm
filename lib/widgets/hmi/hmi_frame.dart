@@ -46,6 +46,35 @@ class HmiScreenContext extends InheritedWidget {
       old.editMode != editMode || old.readOnly != readOnly || old.confirmWrites != confirmWrites || old.onNavigate != onNavigate;
 }
 
+/// Elemento "pousado" na imagem de fundo da tela (item 62, sinótico): a
+/// moldura ([HmiFrame]) não desenha o cartão, e todo texto de dentro ganha
+/// um contorno na cor de fundo do tema — escuro no tema escuro, claro no
+/// claro —, para o valor ser lido sobre qualquer cor do desenho.
+///
+/// Vale para o elemento com "Fundo transparente" (`props.transparent`) numa
+/// tela com imagem de fundo, e para o texto fixo (que já não tem cartão)
+/// nessa mesma tela. A tela decide ([HmiCanvas]); a moldura só obedece.
+class HmiSurface extends InheritedWidget {
+  const HmiSurface({super.key, required this.bare, required super.child});
+
+  final bool bare;
+
+  static bool bareOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<HmiSurface>()?.bare ?? false;
+
+  /// Contorno do texto: a cor de fundo do tema em volta de cada letra.
+  static List<Shadow> get halo => [
+        Shadow(color: Ind.bg, blurRadius: 3),
+        for (final o in const [Offset(1, 0), Offset(-1, 0), Offset(0, 1), Offset(0, -1)]) Shadow(color: Ind.bg, offset: o, blurRadius: 1.5),
+      ];
+
+  /// [child] pousado (com o contorno no texto) quando [bare]; senão, igual.
+  static Widget wrap({required bool bare, required Widget child}) =>
+      bare ? HmiSurface(bare: true, child: DefaultTextStyle.merge(style: TextStyle(shadows: halo), child: child)) : child;
+
+  @override
+  bool updateShouldNotify(HmiSurface old) => old.bare != bare;
+}
+
 /// Liga um widget a uma variável: entrega a [Tag] (do projeto) e a última
 /// [TagReading] (do runtime), e redesenha só quando muda o que a tela mostra.
 class TagBuilder extends StatelessWidget {
@@ -310,14 +339,28 @@ class HmiFrame extends StatelessWidget {
   /// Cartão com o acabamento do sistema visual: camada, borda de 1 px,
   /// sombra em duas camadas e brilho no topo ([CardEdge]). A borda de
   /// estado (falta configurar / erro) substitui a borda neutra.
-  Widget _panel({required EdgeInsets padding, required Widget child, Color? borderColor, double width = 1}) => CustomPaint(
-        foregroundPainter: CardEdge(rev: Ind.revision),
-        child: Container(
-          decoration: Ind.card(color: color, border: borderColor, width: borderColor == null ? 1 : width),
-          padding: padding,
-          child: child,
-        ),
-      );
+  ///
+  /// "Fundo transparente" sobre a imagem da tela ([HmiSurface]): sem cartão,
+  /// sem tinta e sem borda — só a borda de problema (falta configurar, erro,
+  /// alarme), que comunica estado. O texto ganha o contorno do [HmiSurface].
+  Widget _panel({required EdgeInsets padding, required Widget child, Color? borderColor, double width = 1}) => Builder(builder: (context) {
+        if (HmiSurface.bareOf(context)) {
+          final problem = borderColor != null && borderColor != border;
+          return Container(
+            decoration: problem ? BoxDecoration(borderRadius: BorderRadius.circular(Ind.radius), border: Border.all(color: borderColor, width: width)) : null,
+            padding: padding,
+            child: child,
+          );
+        }
+        return CustomPaint(
+          foregroundPainter: CardEdge(rev: Ind.revision),
+          child: Container(
+            decoration: Ind.card(color: color, border: borderColor, width: borderColor == null ? 1 : width),
+            padding: padding,
+            child: child,
+          ),
+        );
+      });
 
   /// Rótulo em cima, corpo embaixo (elemento de duas linhas de grade ou
   /// mais). Rótulo longo ("TEMPERATURA DO MOTOR" num 3×2 de 320 dp) encolhe

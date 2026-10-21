@@ -14,7 +14,7 @@ Cinco formas de testar o app sem CLP, da mais simples à mais realista.
 
 Já vem no app: equipamento "Cortadora de rótulos", tipo **Demonstração**. Tem um "programa de CLP" rodando (`lib/services/demo/demo_process.dart`): ligar faz a velocidade subir em rampa até o setpoint, a produção contar conforme o comprimento do rótulo, o motor esquentar; acima de 85 °C dispara o alarme de sobretemperatura e a máquina para; o reset só limpa depois que esfria abaixo de 80 °C.
 
-Para recomeçar do zero: Mais → Restaurar a demonstração.
+Para ter a demonstração de novo: Projetos → Novo projeto → Demonstração (acrescenta um projeto; nada é apagado).
 
 ## 2. Simulador Python (rede de verdade)
 

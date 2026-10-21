@@ -8,7 +8,10 @@ lâmpadas, mostradores e gráficos — sem programar.
   de fabricante entram depois).
 - **Variáveis intermediárias**: a tela aponta para "Velocidade", não para "HR 2";
   o mesmo dado aparece em vários lugares com uma leitura só.
-- **Telas salvas no aparelho**, exportáveis como arquivo para outro celular.
+- **Planta com vários projetos** (um por máquina), salva no aparelho; cada
+  projeto ou a planta inteira vai como arquivo para outro celular.
+- **Regras da planta** que ligam máquinas de projetos diferentes (avisam e
+  propõem; nunca são função de segurança).
 - **Máquina de demonstração embutida**: o app funciona completo sem nada na rede.
 - **Alarmes** no padrão ISA-18.2: prioridade por cor, forma e número, faixa no topo, histórico.
 - **Tema claro e escuro** (ou automático, pelo celular).
@@ -22,6 +25,8 @@ flutter run
 ```
 
 O app abre com o projeto de demonstração (cortadora de rótulos simulada).
+A barra de baixo tem Projetos · Equipamentos · Variáveis · Ferramentas ·
+Alarmes; ajuda ("?") e ajustes (engrenagem) ficam no topo.
 
 ## Real × Simulação
 

@@ -11,7 +11,7 @@ import '../services/voice/voice_prefs.dart';
 import '../widgets/alarms/alarm_widgets.dart';
 import '../widgets/common/common.dart';
 
-/// Linha "Voz e avisos" da aba Mais: o estado numa frase e toque para a
+/// Linha "Voz e avisos" da aba Ferramentas: o estado numa frase e toque para a
 /// folha. Falta de voz pt-BR aparece aqui, na cor de alarme — é onde a
 /// pessoa procura quando "o fone não falou".
 class VoiceSettingsTile extends StatelessWidget {

@@ -74,7 +74,7 @@ class _Run {
 /// Com o app em segundo plano a leitura para (bateria), e o registro também:
 /// o histórico mostra o buraco. Ponto de extensão do serviço em primeiro
 /// plano (REQUISITOS-ETAPA4 §9.6): ver [pause].
-class DataLogger extends ChangeNotifier {
+class DataLogger extends ChangeNotifier implements ProjectScoped {
   DataLogger({
     required this.controller,
     required this.runtime,
@@ -84,6 +84,7 @@ class DataLogger extends ChangeNotifier {
     this.startupGrace = const Duration(seconds: 10),
   }) {
     controller.addListener(_sync);
+    controller.attachScoped(this);
     _sync();
     if (tickEvery != null) _tickTimer = Timer.periodic(tickEvery, (_) => tick());
     if (flushEvery != null) _flushTimer = Timer.periodic(flushEvery, (_) => unawaited(flush()));
@@ -376,6 +377,39 @@ class DataLogger extends ChangeNotifier {
     }
   }
 
+  // ── Troca de projeto ─────────────────────────────────────────────────────────
+
+  Future<void>? _reopen;
+
+  /// Grava o lote do projeto que sai, nos bancos dele.
+  @override
+  Future<void> beforeSwitch() => flush();
+
+  /// Esquece os grupos do projeto que saiu e fecha os bancos dele; a pasta
+  /// passa a ser a do projeto novo (`registros/<projeto>/`). Fechar entra na
+  /// fila de disco antes de qualquer gravação do projeto novo.
+  @override
+  void onSwitch() {
+    _runs.clear();
+    _leftovers.clear();
+    _usage.clear();
+    _lastRotation = null;
+    _problem = null;
+    final now = clock.now();
+    _seenAt.clear();
+    for (final id in _watchedSince.keys) {
+      _watchedSince[id] = now;
+    }
+    _reopen = _serial(store.reset);
+  }
+
+  /// Abre a pasta do projeto novo e confere a retenção dos bancos dele.
+  @override
+  Future<void> afterSwitch() async {
+    await _reopen;
+    await _startup();
+  }
+
   /// Grava o que falta e fecha o banco.
   Future<void> close() async {
     await flush();
@@ -386,6 +420,7 @@ class DataLogger extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     controller.removeListener(_sync);
+    controller.detachScoped(this);
     for (final e in _listeners.entries) {
       runtime.watch(e.key).removeListener(e.value);
     }

@@ -128,7 +128,10 @@ class _Run {
 ///
 /// Nada disso é intertravamento de segurança — o celular pode demorar ou
 /// parar de ler a qualquer momento. Segurança mora no CLP.
-class RuleEngine extends ChangeNotifier {
+///
+/// Trabalha sobre [ProjectController.liveProject]: as regras do projeto
+/// aberto e as da planta, que podem citar variáveis de outros projetos.
+class RuleEngine extends ChangeNotifier implements ProjectScoped {
   RuleEngine({
     required this.controller,
     required this.runtime,
@@ -136,8 +139,9 @@ class RuleEngine extends ChangeNotifier {
     this.historyFile,
     this.tick = const Duration(seconds: 1),
   }) {
-    _evaluator = CalcEvaluator(() => controller.project);
+    _evaluator = CalcEvaluator(() => controller.liveProject);
     controller.addListener(_sync);
+    controller.attachScoped(this);
     _sync();
     _timer = Timer.periodic(tick, (_) => _evaluateAll());
     unawaited(_loadHistory());
@@ -193,7 +197,7 @@ class RuleEngine extends ChangeNotifier {
   /// Projeto mudou: refaz o que vigiar, solta regra apagada ou desligada.
   void _sync() {
     if (_disposed) return;
-    final project = controller.project;
+    final project = controller.liveProject;
     final ids = <String>{
       for (final r in project.rules)
         if (r.enabled) ...{
@@ -240,7 +244,7 @@ class RuleEngine extends ChangeNotifier {
   void _evaluateAll() {
     if (_disposed || _paused) return;
     var changed = false;
-    for (final r in controller.project.rules) {
+    for (final r in controller.liveProject.rules) {
       changed |= _evaluate(r);
     }
     if (changed) notifyListeners();
@@ -295,7 +299,7 @@ class RuleEngine extends ChangeNotifier {
   /// Por que a regra não pode rodar agora (nulo = pode). Também atualiza a
   /// leitura da condição.
   String? _problem(LogicRule rule, _Run run) {
-    final project = controller.project;
+    final project = controller.liveProject;
     final target = project.tag(rule.targetTagId);
     if (rule.targetTagId.isEmpty) return 'falta escolher onde gravar';
     if (target == null) return 'a variável de destino foi apagada';
@@ -315,7 +319,7 @@ class RuleEngine extends ChangeNotifier {
 
   void _fire(LogicRule rule, Duration held) {
     final now = clock.now();
-    final target = controller.project.tag(rule.targetTagId)!;
+    final target = controller.liveProject.tag(rule.targetTagId)!;
     _addEvent(RuleEvent(at: now, type: RuleEventType.fired, rule: rule.name, text: rule.holdSec == 0 ? 'condição presente' : 'condição durou ${held.inSeconds} s'));
     if (rule.mode == RuleMode.automatic && rule.canBeAutomatic) {
       _log.warning('Regra automática "${rule.name}": ${describeWrite(rule, target)}');
@@ -336,7 +340,7 @@ class RuleEngine extends ChangeNotifier {
 
   /// 'Grava DESLIGADO em "Liga prensa" (Prensa)'.
   String describeWrite(LogicRule rule, Tag target) {
-    final device = controller.project.device(target.deviceId)?.name;
+    final device = controller.liveProject.device(target.deviceId)?.name;
     return 'Grava ${TagCodec.format(target, valueFor(rule, target))} em "${target.name}"${device == null ? '' : ' ($device)'}';
   }
 
@@ -351,8 +355,8 @@ class RuleEngine extends ChangeNotifier {
   Future<String?> confirm(String ruleId) async {
     final p = _take(ruleId);
     if (p == null) return null;
-    final rule = controller.project.rule(ruleId);
-    final target = rule == null ? null : controller.project.tag(rule.targetTagId);
+    final rule = controller.liveProject.rule(ruleId);
+    final target = rule == null ? null : controller.liveProject.tag(rule.targetTagId);
     if (rule == null || target == null) return 'A regra ou o destino não existe mais';
     return _write(rule, target, automatic: false);
   }
@@ -360,7 +364,7 @@ class RuleEngine extends ChangeNotifier {
   /// A pessoa disse não: nada é gravado.
   void ignore(String ruleId) {
     if (_take(ruleId) == null) return;
-    final rule = controller.project.rule(ruleId);
+    final rule = controller.liveProject.rule(ruleId);
     _addEvent(RuleEvent(at: clock.now(), type: RuleEventType.ignored, rule: rule?.name ?? ''));
     notifyListeners();
   }
@@ -382,7 +386,7 @@ class RuleEngine extends ChangeNotifier {
 
   Future<String?> _write(LogicRule rule, Tag target, {required bool automatic}) async {
     // A permissão pode ter sido tirada entre a pergunta e o toque.
-    final now = controller.project.tag(target.id) ?? target;
+    final now = controller.liveProject.tag(target.id) ?? target;
     String? error;
     if (!now.acceptsRuleWrite) {
       error = '"${now.name}" não aceita escrita por regra';
@@ -415,7 +419,7 @@ class RuleEngine extends ChangeNotifier {
     _pausedAt = clock.now();
     _timer?.cancel();
     _timer = null;
-    final project = controller.project;
+    final project = controller.liveProject;
     for (final p in [..._proposals]) {
       final rule = project.rule(p.ruleId);
       if (rule != null) _withdraw(rule, 'app em segundo plano');
@@ -437,7 +441,7 @@ class RuleEngine extends ChangeNotifier {
     final since = _pausedAt;
     _pausedAt = null;
     final away = since == null ? Duration.zero : clock.now().difference(since);
-    if (away >= pausedAlarmAfter && controller.project.rules.any((r) => r.enabled)) {
+    if (away >= pausedAlarmAfter && controller.liveProject.rules.any((r) => r.enabled)) {
       final minutes = away.inMinutes;
       alarms?.raise(pausedKey,
           priority: AlarmPriority.low, message: 'As regras ficaram paradas ${minutes < 1 ? '${away.inSeconds} s' : '$minutes min'}: app em segundo plano');
@@ -447,6 +451,29 @@ class RuleEngine extends ChangeNotifier {
     _timer = Timer.periodic(tick, (_) => _evaluateAll());
     _evaluateAll();
   }
+
+  // ── Troca de projeto ─────────────────────────────────────────────────────────
+
+  /// Grava o histórico do projeto que sai, no arquivo dele.
+  @override
+  Future<void> beforeSwitch() => flush();
+
+  /// As perguntas pendentes eram de máquinas do projeto que saiu: somem sem
+  /// gravar nada. O histórico também era dele.
+  @override
+  void onSwitch() {
+    _generation++;
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    _runs.clear();
+    _proposals.clear();
+    _history.clear();
+    notifyListeners();
+  }
+
+  /// O histórico do projeto que entrou (`historico-regras.json` da pasta dele).
+  @override
+  Future<void> afterSwitch() => _loadHistory();
 
   // ── Histórico em disco ──────────────────────────────────────────────────────
 
@@ -459,9 +486,14 @@ class RuleEngine extends ChangeNotifier {
     }
   }
 
+  /// Sobe a cada troca de projeto: leitura do histórico que termina depois
+  /// da troca é do projeto que saiu e é descartada.
+  int _generation = 0;
+
   Future<void> _loadHistory() async {
     final f = historyFile;
     if (f == null) return;
+    final generation = _generation;
     try {
       final file = await f();
       if (!await file.exists()) return;
@@ -470,7 +502,7 @@ class RuleEngine extends ChangeNotifier {
         for (final j in list)
           if (j is Map) ?RuleEvent.fromJson(Map<String, dynamic>.from(j)),
       ];
-      if (_disposed) return;
+      if (_disposed || generation != _generation) return;
       _history.insertAll(0, loaded);
       notifyListeners();
     } catch (e) {
@@ -503,6 +535,7 @@ class RuleEngine extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     controller.removeListener(_sync);
+    controller.detachScoped(this);
     for (final e in _listeners.entries) {
       runtime.watch(e.key).removeListener(e.value);
     }

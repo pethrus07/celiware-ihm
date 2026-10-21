@@ -21,7 +21,7 @@ import 'camera_form_page.dart';
 /// Câmera em tela cheia (CM-2, CM-3): o vídeo, o estado com o atraso e, se a
 /// câmera tiver, a foto.
 ///
-/// Abre pelo botão "Abrir câmera" da tela de operação ou por Mais → Câmeras.
+/// Abre pelo botão "Abrir câmera" da tela de operação ou por Ferramentas → Câmeras.
 /// Fechar a página ou mandar o app para segundo plano **descarta o player**:
 /// nada fica recebendo nem decodificando vídeo escondido.
 class CameraViewPage extends StatefulWidget {

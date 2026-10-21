@@ -1426,7 +1426,7 @@ class _TagFormPageState extends State<TagFormPage> {
               value: _ruleWritable,
               onChanged: (v) => setState(() => _ruleWritable = v),
               title: const Text('Aceita escrita por regra'),
-              subtitle: const Text('Uma regra de Mais → Regras pode gravar aqui.'),
+              subtitle: const Text('Uma regra de Ferramentas → Regras pode gravar aqui.'),
             ),
           // Endereço como o manual escreve. A "Memória do CLP" (perfis de
           // fabricante) é a outra opção de endereço que mora aqui.

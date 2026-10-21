@@ -50,7 +50,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     CameraVault.instance = MemoryCameraVault();
     dir = await Directory.systemTemp.createTemp('ihm_rotulos');
@@ -184,14 +185,13 @@ void main() {
     return titles;
   }
 
-  testWidgets('Mais tem o "?" com o tutorial da aba, e Câmeras o da página', (tester) async {
+  testWidgets('Ferramentas tem o "?" com o tutorial da aba, e Câmeras o da página', (tester) async {
     final c = await boot(tester, const Size(360, 760));
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Mais')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Ferramentas')));
     await live(tester, 600);
-    expect(await runTour(tester, 'Mande o projeto inteiro para outro celular'), ['Projeto', 'Dados', 'Só neste aparelho', 'Tutoriais'],
+    expect(await runTour(tester, 'Grava variáveis para ver o histórico'), ['Registros', 'Do projeto aberto', 'Só neste aparelho'],
         reason: 'os passos com alvo lá embaixo também aparecem');
 
-    // O tutorial rolou até os Tutoriais: Câmeras ficou para cima.
     await tester.ensureVisible(find.byKey(const ValueKey('cameras'), skipOffstage: false));
     await live(tester, 200);
     await tester.tap(find.byKey(const ValueKey('cameras')));

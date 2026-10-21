@@ -23,8 +23,11 @@ class Tours {
     ('variaveis', 'Criar uma variável', 'Dar nome a uma memória.'),
   ];
 
-  static TourSpec inicio({required GlobalKey screens, required GlobalKey nav, required GlobalKey add, required GlobalKey help}) =>
-      TourSpec(id: 'inicio', version: 1, title: 'Primeiros passos', steps: [
+  /// v2 (reunião de 19–20/10/2026): o app abre dentro de um projeto, a
+  /// seta do topo leva à lista de projetos, e a barra tem Ferramentas e
+  /// Alarmes no lugar de "Mais".
+  static TourSpec inicio({required GlobalKey screens, required GlobalKey nav, required GlobalKey add, required GlobalKey help, GlobalKey? projects}) =>
+      TourSpec(id: 'inicio', version: 2, title: 'Primeiros passos', steps: [
         const TourStep(
           essential: true,
           title: 'Bem-vindo',
@@ -33,10 +36,15 @@ class Tours {
         TourStep(target: screens, essential: true, title: 'Suas telas', body: 'Toque numa tela para abrir e operar.'),
         TourStep(target: add, title: 'Nova tela', body: 'Em branco ou de um modelo pronto: máquina, inversor, balança... Tudo fica salvo sozinho.'),
         TourStep(
+          target: projects,
+          title: 'Projetos',
+          body: 'A seta mostra todos os projetos. Cada um tem os seus equipamentos, variáveis e telas.',
+        ),
+        TourStep(
           target: nav,
           essential: true,
           title: 'O caminho',
-          body: 'Equipamento (o IP) → Variáveis (nomes das memórias) → Telas. Receitas, registros, regras e câmeras ficam em Mais.',
+          body: 'Equipamento (o IP) → Variáveis (nomes das memórias) → Telas. Registros, receitas, regras e câmeras ficam em Ferramentas.',
         ),
         TourStep(target: help, essential: true, title: 'Dúvida?', body: 'O "?" explica a tela em que você está.'),
       ]);
@@ -59,8 +67,8 @@ class Tours {
         TourStep(target: palette, essential: true, title: 'Acrescentar', body: 'Escolha um elemento: botão, lâmpada, gráfico, OEE...'),
         TourStep(target: element, essential: true, title: 'Mover', body: 'Toque para selecionar, arraste para mover, puxe a bolinha para aumentar.'),
         TourStep(target: config, essential: true, title: 'Configurar', body: 'Escolha a variável, o texto e a cor.'),
-        // "Regras da tela", como no botão: "Regras" sozinho agora é o de Mais
-        // (regras entre máquinas).
+        // "Regras da tela", como no botão: "Regras" sozinho é o de
+        // Ferramentas (regras entre máquinas).
         TourStep(target: settings, title: 'Regras da tela', body: 'Nome, grade fina e se a tela pode gravar.'),
         TourStep(target: done, title: 'Pronto', body: 'Já está salvo. Concluir volta para a operação.'),
       ]);
@@ -74,7 +82,7 @@ class Tours {
 
   /// v2: o passo dos ícones do topo (Σ e Criar várias), que chegaram na
   /// etapa 4 sem explicação.
-  // Recursos de Mais: só texto, no "?" de cada página (não abrem sozinhos).
+  // Recursos de Ferramentas: só texto, no "?" de cada página (não abrem sozinhos).
 
   static TourSpec registros() => const TourSpec(id: 'registros', version: 1, title: 'Registros', steps: [
         TourStep(essential: true, title: 'Registros', body: 'Grava variáveis no celular para ver o histórico em gráfico e mandar a planilha.'),
@@ -88,8 +96,10 @@ class Tours {
         TourStep(essential: true, title: 'Aplicar', body: 'Mostra o "de → para" e só grava depois da sua confirmação. Não substitui a segurança da máquina.'),
       ]);
 
-  static TourSpec regras() => const TourSpec(id: 'regras', version: 1, title: 'Regras', steps: [
+  /// v2: as regras da planta (variáveis de qualquer projeto).
+  static TourSpec regras() => const TourSpec(id: 'regras', version: 2, title: 'Regras', steps: [
         TourStep(essential: true, title: 'Regras', body: '"Quando a condição durar um tempo, gravar um valor": uma máquina avisa a outra.'),
+        TourStep(essential: true, title: 'Deste projeto ou da planta', body: 'As do projeto usam as variáveis dele. As da planta usam variáveis de qualquer projeto.'),
         TourStep(essential: true, title: 'Pergunta antes', body: 'O padrão é perguntar antes de gravar. Gravar sozinha só serve para parar.'),
         TourStep(essential: true, title: 'Não é segurança', body: 'Celular não é intertravamento: emergência e proteções continuam na máquina.'),
       ]);
@@ -101,13 +111,35 @@ class Tours {
         TourStep(essential: true, title: 'Senha', body: 'Fica só neste aparelho: não vai junto quando você envia o projeto.'),
       ]);
 
-  /// A aba Mais: o que mora aqui. Como Equipamentos, só abre pelo "?".
-  static TourSpec mais({GlobalKey? project, GlobalKey? data, GlobalKey? device, GlobalKey? tutorials}) =>
-      TourSpec(id: 'mais', version: 1, title: 'Mais', steps: [
-        TourStep(target: project, essential: true, title: 'Projeto', body: 'Mande o projeto inteiro para outro celular. Quem recebe abre em "Importar projeto".'),
-        TourStep(target: data, essential: true, title: 'Dados', body: 'Registros, receitas, regras e câmeras. Cada página tem o seu "?".'),
-        TourStep(target: device, title: 'Só neste aparelho', body: 'Claro ou escuro e a voz dos alarmes valem só para este celular.'),
+  /// A lista de projetos. Como Equipamentos, só abre pelo "?".
+  static TourSpec projetos({GlobalKey? list, GlobalKey? add, GlobalKey? settings}) =>
+      TourSpec(id: 'projetos', version: 1, title: 'Projetos', steps: [
+        TourStep(target: list, essential: true, title: 'Projetos', body: 'Uma máquina por projeto, com os seus equipamentos, variáveis e telas. Toque para abrir.'),
+        TourStep(target: add, title: 'Novo projeto', body: 'Em branco, a demonstração ou um arquivo recebido. Nunca apaga outro projeto.'),
+        const TourStep(essential: true, title: 'Enviar', body: 'O ⋮ do projeto envia, salva ou duplica ele. O ⋮ do topo faz o mesmo com a planta inteira.'),
+        TourStep(target: settings, title: 'Ajustes', body: 'Claro ou escuro, tutoriais e sobre o app.'),
+      ]);
+
+  /// A aba Ferramentas. Como Equipamentos, só abre pelo "?".
+  static TourSpec ferramentas({GlobalKey? logs, GlobalKey? project, GlobalKey? device}) =>
+      TourSpec(id: 'ferramentas', version: 1, title: 'Ferramentas', steps: [
+        TourStep(target: logs, essential: true, title: 'Registros', body: 'Grava variáveis para ver o histórico em gráfico e mandar a planilha.'),
+        TourStep(target: project, title: 'Do projeto aberto', body: 'Câmeras, receitas e regras. Cada página tem o seu "?".'),
+        TourStep(target: device, title: 'Só neste aparelho', body: 'A voz dos alarmes e a procura de equipamentos no Wi-Fi.'),
+      ]);
+
+  /// Ajustes (engrenagem de Projetos).
+  static TourSpec ajustes({GlobalKey? device, GlobalKey? tutorials}) =>
+      TourSpec(id: 'ajustes', version: 1, title: 'Ajustes', steps: [
+        TourStep(target: device, essential: true, title: 'Só neste aparelho', body: 'Claro ou escuro vale só para este celular.'),
         TourStep(target: tutorials, title: 'Tutoriais', body: 'Reveja qualquer tutorial quando quiser.'),
+      ]);
+
+  /// A aba Alarmes: só texto, pelo "?".
+  static TourSpec alarmes() => const TourSpec(id: 'alarmes', version: 1, title: 'Alarmes', steps: [
+        TourStep(essential: true, title: 'Alarmes', body: 'Os do projeto aberto. O mais grave fica em cima: ◆1 alta, ▲2 média, ■3 baixa.'),
+        TourStep(essential: true, title: 'Reconhecer', body: 'Confirma que você viu. O alarme fica na lista enquanto a condição existir.'),
+        TourStep(essential: true, title: 'Histórico', body: 'O que aconteceu, com a hora. Cada projeto tem o seu.'),
       ]);
 
   static TourSpec variaveis({GlobalKey? list, GlobalKey? add, GlobalKey? more}) =>

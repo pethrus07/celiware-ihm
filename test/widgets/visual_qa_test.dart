@@ -52,7 +52,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
-      for (final (id, _, _) in Tours.catalog) 'tour:v1:$id': true,
+      // Todas as versões já vistas (a trilha de início está na v2).
+      for (final (id, _, _) in Tours.catalog) for (final v in [1, 2]) 'tour:v$v:$id': true,
     });
     dir = await Directory.systemTemp.createTemp('ihm_qa_visual');
   });
@@ -290,7 +291,7 @@ void main() {
     memory.pokeRegister(ModbusArea.holdingRegister, DemoMap.hrSpeedSetpoint, 150);
     memory.pokeBit(ModbusArea.coil, DemoMap.coilRun, true);
     await live(tester, 40000);
-    await tester.tap(find.byKey(const ValueKey('sino-alarmes')));
+    await tester.tap(find.descendant(of: find.byType(NavigationRail), matching: find.text('Alarmes')));
     await live(tester, 800);
     final line = find.textContaining('Temperatura do motor · agora');
     expect(line, findsWidgets);

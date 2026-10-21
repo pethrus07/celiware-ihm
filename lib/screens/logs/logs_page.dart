@@ -11,7 +11,7 @@ import 'log_history_page.dart';
 import '../tours.dart';
 import '../../widgets/tour/tour.dart';
 
-/// Mais → Registros: os grupos de variáveis gravadas no aparelho.
+/// Ferramentas → Registros: os grupos de variáveis gravadas no aparelho.
 ///
 /// Uma linha por grupo com o essencial — ritmo, quantas variáveis, quanto
 /// ocupa — e a chave liga/desliga. Tocar abre o histórico; ajustar fica lá

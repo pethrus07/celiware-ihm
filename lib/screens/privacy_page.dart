@@ -5,7 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../widgets/common/adaptive.dart';
 import '../widgets/common/common.dart';
 
-/// Mais → Sobre → Privacidade (PS-5). A Play pede a política também dentro do
+/// Projetos → Ajustes → Privacidade (PS-5). A Play pede a política também dentro do
 /// app, em link ou texto. Texto, de propósito: na rede da máquina quase nunca
 /// há internet, e um link não abriria justo onde o app é usado.
 ///
@@ -20,7 +20,7 @@ class PrivacyPage extends StatelessWidget {
       'O app guarda, só na área privada dele no aparelho:',
       '• o projeto: equipamentos, variáveis, telas, alarmes, receitas e regras que você cadastrou, inclusive usuário e senha de equipamento (broker MQTT, servidor OPC UA), quando houver;',
       '• os históricos de alarmes, de regras e de receitas aplicadas, com o nome digitado em "Quem está aplicando";',
-      '• os registros de dados que você criar (Mais → Registros);',
+      '• os registros de dados que você criar (Ferramentas → Registros);',
       '• preferências do aparelho: aparência, voz e tutoriais já vistos.',
       'Nada disso é enviado para nós nem para ninguém. Com o backup do Android ligado, o próprio Android pode guardar uma cópia do projeto, dos históricos e das preferências na sua conta Google, como faz com os outros apps; os registros de dados ficam de fora. Para apagar tudo, desinstale o app ou limpe os dados dele nos ajustes do Android.',
     ]),

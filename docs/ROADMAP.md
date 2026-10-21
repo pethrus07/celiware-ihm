@@ -101,7 +101,8 @@ várias máquinas numa tela (61).
   depois da 1ª publicação), HTTP (56, 169, 173 — quando houver equipamento que
   fale HTTP), padrões WARE (163, 164 — a Celiware define), vários projetos (9)
   e áudio gravado (10). Não pedem nada externo, mas cada um é um módulo. O
-  OEE (8) entrou: feito em 12/10.
+  OEE (8) entrou: feito em 12/10. Vários projetos (9) entrou na versão
+  seguinte, como planta (20/10, seção acima).
 
 **Do lado do cliente:** ~~nome comercial~~ — **definido em 11/10/2026: Ware IoT** (app, site e tudo o mais; "WARE" já era o nome dos padrões de dados da Celiware); marca e domínio; lista do hardware
 e cadastro na Shopify; uma peça de cada para os testes; testes nas máquinas
@@ -115,6 +116,45 @@ reais com as marcas parceiras.
 - Nomes com `.com.br` livre em 06/10: MáquinaNaMão, IHM no Bolso,
   MonitoraMáquina, LigaMáquina, PainelNaMão, MáquinaConectada, ConectaPLC.
   "Conecta Fácil" já é registrado. **Decidido em 11/10: Ware IoT.**
+
+## Próxima versão — planta, projetos e barra de cinco áreas (20/10/2026)
+
+Reunião com o cliente em 19–20/10/2026 (ata: decisões D2, D6, D7 e D10).
+Construída no branch `feat/projetos-e-barra`, **sem subir a versão** e sem
+juntar ao `main` enquanto a 1.4.0 (12) está em revisão na Play. Detalhe técnico
+em `ARQUITETURA.md` §5.4.1, §6.1 e §6.7.
+
+| # | Item | Estado |
+|---|---|---|
+| 1 | **Planta > Projetos** (D6, D10): o arquivo de hoje vira a planta, cada máquina um projeto isolado (equipamentos, variáveis, telas, regras, registros, receitas, câmeras). Migração automática: o projeto de quem atualizar vira o primeiro da planta, com históricos e registros. | **Feito** (testado também no emulador, com arquivo da 1.4.0 plantado). |
+| 2 | Primeira aba **Projetos**: lista de projetos; dentro, as telas. Novo projeto (em branco, demonstração, de um arquivo), renomear, duplicar, enviar, salvar, apagar com confirmação. "Começar do zero" e "Importar" nunca mais substituem nada. | **Feito** |
+| 3 | Exportar **a planta inteira** (um JSON com a lista de projetos, `schemaVersion` 2) ou **um projeto** (formato de sempre, abre na 1.4.0) (D7). Importar projeto soma; importar planta: somar ou substituir; "Nova planta" e substituir pedem confirmação forte e guardam a cópia da planta atual em `copias/`. | **Feito** |
+| 4 | **Regras da planta** (item 226 da lista nova): usam variáveis de qualquer projeto para interligar máquinas, em Ferramentas → Regras → "Da planta"; só no modo "propor" por padrão, nunca segurança (NR-12). O motor lê só as variáveis que as regras ligadas citam. | **Feito**; não testado com duas máquinas de verdade. |
+| 5 | **Barra com cinco áreas**: Projetos · Equipamentos · Variáveis · Ferramentas · Alarmes (Registros primeiro e em destaque em Ferramentas). Ajustes (aparência, tutoriais, sobre, privacidade) na engrenagem do topo de Projetos. Trilho do tablet com as mesmas cinco. | **Feito** |
+| 7 | **Atualização pela Play** (D2): flexível ao abrir; imediata quando a versão for publicada com prioridade ≥ 4; sem internet ou fora da Play, nada (`PUBLICACAO.md` §12). Commit separado, para descartar se não for agora. | **Feito**; só dá para ver funcionando com a versão seguinte já na Play (teste interno). |
+| 6 | Tutorial de início (v2), Regras (v2) e textos sem "Mais →"; site (`tutoriais.html`, `privacidade.html`) atualizado, **não publicado**. | **Feito** |
+
+**Antes de enviar esta versão à Play** (quando a 1.4.0 for aprovada):
+
+- Subir a versão (`pubspec.yaml` e `AppInfo.version`) e escrever as notas.
+- Refazer as capturas da loja: a barra e a primeira tela mudaram (`docs/loja/ficha.md`).
+- Atualizar `docs/loja/acesso-ao-app.txt` (hoje diz "Mais → Receitas" e
+  "Mais → Restaurar a demonstração"; agora é Ferramentas → Receitas e
+  Projetos → Novo projeto → Demonstração) e o "Mais → Sobre → Privacidade"
+  de `docs/loja/formularios.md`. Ficaram como estão porque descrevem a versão
+  em revisão.
+- Publicar o site só junto com a versão nova (os textos já falam da navegação nova).
+- Conferir a ficha de Segurança dos dados com a biblioteca da Play de
+  atualização (ver `PUBLICACAO.md` §12).
+
+**Para o Pedro confirmar:** o app abre dentro do último projeto (e não na
+lista); rótulos da barra na Plex Condensed (encolhem até 9 sp no celular de
+320 dp); as regras de antes ficaram no projeto migrado (e não na planta);
+histórico de uma regra da planta vai para o histórico do projeto aberto na hora.
+
+**Sem data (registrado na reunião):** projetos de plantas diferentes no mesmo
+aparelho (hoje é uma planta por aparelho, trocada por arquivo); mover um
+projeto de uma planta para outra sem passar por arquivo.
 
 ## Próximo — visual e operação
 

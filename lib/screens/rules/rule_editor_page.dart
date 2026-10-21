@@ -27,9 +27,14 @@ import 'rules_page.dart';
 ///
 /// O destino precisa aceitar escrita por regra (LG-5): escolher um que não
 /// aceita pergunta antes de marcar.
+///
+/// [plant]: regra da planta — as variáveis vêm de todos os projetos
+/// ([ProjectController.plantEditorView]; as dos outros com o nome do projeto
+/// na frente) e a regra é guardada na planta, não no projeto aberto.
 class RuleEditorPage extends StatefulWidget {
-  const RuleEditorPage({super.key, this.rule});
+  const RuleEditorPage({super.key, this.rule, this.plant = false});
   final LogicRule? rule;
+  final bool plant;
 
   @override
   State<RuleEditorPage> createState() => _RuleEditorPageState();
@@ -50,7 +55,25 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
   bool _triedSave = false;
   AutovalidateMode _autovalidate = AutovalidateMode.disabled;
 
-  late final CalcEvaluator _evaluator = CalcEvaluator(() => AppScope.of(context).controller.project);
+  late final CalcEvaluator _evaluator = CalcEvaluator(() => _source);
+
+  /// Visão da planta (regra da planta); nula enquanto lê os projetos.
+  Project? _plantView;
+
+  /// De onde vêm as variáveis: o projeto aberto, ou a planta inteira.
+  Project get _source => widget.plant ? (_plantView ?? const Project()) : AppScope.of(context).controller.project;
+
+  Future<void> _loadPlantView() async {
+    final view = await AppScope.of(context).controller.plantEditorView();
+    if (!mounted) return;
+    final first = _plantView == null;
+    setState(() => _plantView = view);
+    final r = widget.rule;
+    if (first && r != null && !r.condition.isEmpty) {
+      _condition.text = CalcGraph.display(r.condition, view);
+      _initial = _snapshot();
+    }
+  }
   TagReading _last = TagReading.waiting;
   Timer? _tick;
 
@@ -75,6 +98,11 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
     if (_started) return;
     _started = true;
     final r = widget.rule;
+    if (widget.plant) {
+      _initial = _snapshot();
+      unawaited(_loadPlantView());
+      return;
+    }
     if (r != null && !r.condition.isEmpty) _condition.text = CalcGraph.display(r.condition, AppScope.of(context).controller.project);
     _initial = _snapshot();
   }
@@ -112,7 +140,7 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => const _TargetSheet(),
+      builder: (_) => _TargetSheet(source: widget.plant ? _source : null),
     );
     if (tag == null || !mounted) return;
     if (!tag.acceptsRuleWrite) {
@@ -130,7 +158,14 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
         ),
       );
       if (ok != true || !mounted) return;
-      c.saveTag(tag.copyWith(ruleWritable: true));
+      if (widget.plant) {
+        // A variável pode ser de outro projeto: grava no arquivo dele.
+        await c.allowRuleWrite(tag.id);
+        if (mounted) await _loadPlantView();
+        if (!mounted) return;
+      } else {
+        c.saveTag(tag.copyWith(ruleWritable: true));
+      }
     }
     setState(() {
       // Liga/desliga começa em "Desligar": regra existe para parar, não para dar partida.
@@ -196,7 +231,7 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
 
   void _save() {
     final c = AppScope.of(context).controller;
-    final p = c.project;
+    final p = _source;
     final nameOk = _form.currentState?.validate() ?? false;
     setState(() {
       _triedSave = true;
@@ -205,7 +240,7 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
     final (program, _) = _compile(p);
     final value = _valueNum;
     if (!nameOk || program == null || _targetError(p) != null || value == null) return;
-    c.saveRule(LogicRule(
+    final rule = LogicRule(
       id: _id,
       name: _name.text.trim(),
       condition: program.spec,
@@ -214,7 +249,12 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
       value: value,
       mode: _mode,
       enabled: widget.rule?.enabled ?? true,
-    ));
+    );
+    if (widget.plant) {
+      unawaited(c.savePlantRule(rule));
+    } else {
+      c.saveRule(rule);
+    }
     Navigator.pop(context);
   }
 
@@ -237,8 +277,15 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
 
   Future<void> _delete() async {
     final c = AppScope.of(context).controller;
-    if (!await confirmDelete(context, title: 'Apagar "${widget.rule!.name}"?', body: 'A regra para de vigiar e sai do projeto. O histórico fica.')) return;
-    c.deleteRule(_id);
+    if (!await confirmDelete(context,
+        title: 'Apagar "${widget.rule!.name}"?', body: 'A regra para de vigiar e sai ${widget.plant ? 'da planta' : 'do projeto'}. O histórico fica.')) {
+      return;
+    }
+    if (widget.plant) {
+      unawaited(c.deletePlantRule(_id));
+    } else {
+      c.deleteRule(_id);
+    }
     if (mounted) Navigator.pop(context);
   }
 
@@ -247,7 +294,10 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.watch(context);
-    final project = scope.controller.project;
+    if (widget.plant && _plantView == null) {
+      return Scaffold(appBar: AppBar(title: const Text('Regra da planta')), body: const Center(child: CircularProgressIndicator()));
+    }
+    final project = _source;
     final (program, error) = _compile(project);
     if (program != null) _last = _evaluator.evaluate('editor', program.spec, scope.runtime.store.read, previous: _last);
     final target = project.tag(_target);
@@ -263,7 +313,7 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
         tagIds: program == null ? const {} : CalcGraph.expand(project, program.inputIds),
         child: Scaffold(
           appBar: AppBar(
-            title: Text(_editing ? 'Regra' : 'Nova regra'),
+            title: Text(widget.plant ? (_editing ? 'Regra da planta' : 'Nova regra da planta') : (_editing ? 'Regra' : 'Nova regra')),
             actions: [
               if (_editing) IconButton(tooltip: 'Apagar', icon: Icon(Icons.delete_outline_rounded, color: Ind.alarm), onPressed: _delete),
             ],
@@ -300,6 +350,7 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
                   error: error,
                   label: 'Condição',
                   hint: 'Ex.: [Temperatura do motor] > 85',
+                  source: widget.plant ? project : null,
                   onChanged: () => setState(() {}),
                 ),
                 if (program != null) _ConditionNow(reading: _last),
@@ -428,11 +479,15 @@ class _TargetRow extends StatelessWidget {
 /// As variáveis que a tela pode gravar, agrupadas por equipamento; as que
 /// aceitam escrita por regra dizem isso.
 class _TargetSheet extends StatelessWidget {
-  const _TargetSheet();
+  const _TargetSheet({this.source});
+
+  /// Nulo = o projeto aberto; regra da planta passa a visão da planta.
+  final Project? source;
 
   @override
   Widget build(BuildContext context) {
-    final project = AppScope.watch(context).controller.project;
+    final open = AppScope.watch(context).controller.project;
+    final project = source ?? open;
     final writable = [for (final t in project.tags) if (t.canWrite && !t.isArray && !t.isText) t];
     return DraggableScrollableSheet(
       expand: false,

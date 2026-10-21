@@ -8,6 +8,7 @@ import '../../app/app_scope.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/alarm.dart';
 import '../../screens/alarms_page.dart';
+import '../../screens/shell.dart';
 import '../../services/alarms/alarm_engine.dart';
 import '../../services/rules/rule_engine.dart';
 import '../rules/rule_proposal_host.dart';
@@ -183,6 +184,13 @@ class _AlarmBannerHostState extends State<AlarmBannerHost> {
   void _open() {
     final nav = widget.navigator.currentState;
     if (nav == null) return;
+    // Nas abas (nada empilhado): vai para a aba Alarmes. Com uma tela
+    // aberta, a lista abre por cima e o "voltar" devolve a tela.
+    final shell = Shell.active;
+    if (!nav.canPop() && shell != null) {
+      shell.goTo(Shell.alarmsTab);
+      return;
+    }
     // Já está na lista? Não empilha outra.
     var onPage = false;
     nav.popUntil((r) {
@@ -346,10 +354,14 @@ class _Quiet extends StatelessWidget {
   }
 }
 
-/// Sino no topo das telas: abre a lista de alarmes (também o histórico,
-/// quando está tudo normal). O número é dos que esperam reconhecimento.
-class AlarmBell extends StatelessWidget {
-  const AlarmBell({super.key});
+/// Sino da aba Alarmes: o número dos que esperam reconhecimento, na cor do
+/// mais grave; o sino "tocando" enquanto houver alarme na lista. Até a 1.4.0
+/// era um botão no topo da lista de telas — virou a quinta aba.
+class AlarmTabIcon extends StatelessWidget {
+  const AlarmTabIcon({super.key, required this.icon});
+
+  /// Ícone sem alarme (contorno na aba solta, cheio na escolhida).
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -359,17 +371,12 @@ class AlarmBell extends StatelessWidget {
       builder: (context, _) {
         final n = engine.unackCount;
         final top = engine.entries.firstOrNull;
-        return IconButton(
-          key: const ValueKey('sino-alarmes'),
-          tooltip: 'Alarmes',
-          onPressed: () => Navigator.push(context, AlarmsPage.route()),
-          icon: Badge(
-            isLabelVisible: n > 0,
-            label: Text('$n'),
-            backgroundColor: top?.priority.color ?? Ind.alarm,
-            textColor: (top?.priority.color ?? Ind.alarm).computeLuminance() > 0.35 ? const Color(0xFF15181C) : Colors.white,
-            child: Icon(engine.hasAny ? Icons.notifications_active_outlined : Icons.notifications_none_rounded),
-          ),
+        return Badge(
+          isLabelVisible: n > 0,
+          label: Text('$n', key: const ValueKey('selo-alarmes')),
+          backgroundColor: top?.priority.color ?? Ind.alarm,
+          textColor: (top?.priority.color ?? Ind.alarm).computeLuminance() > 0.35 ? const Color(0xFF15181C) : Colors.white,
+          child: Icon(engine.hasAny ? Icons.notifications_active_outlined : icon),
         );
       },
     );

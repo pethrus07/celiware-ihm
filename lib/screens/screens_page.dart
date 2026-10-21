@@ -11,24 +11,29 @@ import '../models/project.dart';
 import '../models/vendor_profiles.dart';
 import '../services/templates/screen_templates.dart';
 import '../services/templates/template_builder.dart';
-import '../widgets/alarms/alarm_widgets.dart';
 import '../widgets/common/common.dart';
 import '../widgets/hmi/element_catalog.dart';
 import '../widgets/tour/tour.dart';
 import 'editor/screen_editor_page.dart';
 import 'screen_run_page.dart';
+import 'settings_page.dart';
 
-/// Lista de telas — a página inicial do app.
+/// Lista de telas do projeto aberto — dentro da aba Projetos, e onde o app
+/// abre (no último projeto aberto).
 ///
 /// Cada cartão mostra a **planta** da tela (miniatura com os blocos de cada
-/// elemento no lugar), para reconhecer a tela de olho, e os equipamentos que
-/// ela usa com o selo de comunicação.
+/// elemento no lugar), para reconhecer a tela de olho. O título é o nome do
+/// projeto; a seta à esquerda volta para a lista de projetos.
 class ScreensPage extends StatelessWidget {
-  const ScreensPage({super.key, required this.screensKey, required this.addKey, required this.helpKey});
+  const ScreensPage({super.key, required this.screensKey, required this.addKey, required this.helpKey, this.backKey, this.onBack});
 
   final GlobalKey screensKey;
   final GlobalKey addKey;
   final GlobalKey helpKey;
+
+  /// Volta para a lista de projetos; nulo = sem lista (um projeto só).
+  final VoidCallback? onBack;
+  final GlobalKey? backKey;
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +43,16 @@ class ScreensPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Telas'),
-        actions: [const AlarmBell(), KeyedSubtree(key: helpKey, child: const HelpButton())],
+        leading: onBack == null
+            ? null
+            : IconButton(
+                key: backKey ?? const ValueKey('voltar-projetos'),
+                tooltip: 'Projetos',
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: onBack,
+              ),
+        title: AdaptiveTitle(project.name),
+        actions: [const SettingsButton(), KeyedSubtree(key: helpKey, child: const HelpButton())],
       ),
       floatingActionButton: FloatingActionButton.extended(
         key: addKey,

@@ -181,7 +181,7 @@ class DemoProject {
       ],
     );
 
-    // Receitas (Mais → Receitas): os dois ajustes graváveis da cortadora,
+    // Receitas (Ferramentas → Receitas): os dois ajustes graváveis da cortadora,
     // aplicados só com ela parada ("Em ciclo" desligado). A de 120 mm é o
     // ajuste com que a máquina abre; a de 60 mm fica abaixo dos 75 °C do
     // alarme baixo (a 70 m/min o motor chegaria a ~75,4 °C).

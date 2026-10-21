@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/image_util.dart';
 import '../../models/hmi_screen.dart';
 import '../common/adaptive.dart';
 import 'element_catalog.dart';
@@ -62,6 +63,12 @@ class HmiElementView extends StatelessWidget {
 /// mede `largura ÷ colunas`. Assim a tela montada num celular fica
 /// proporcional num tablet (tudo cresce junto) e nada depende de pixel.
 ///
+/// Imagem de fundo (sinótico): atrás da grade e dos elementos, medida em
+/// células como eles ([ScreenBackground.areaRows]) — editor e operação a
+/// desenham no mesmo lugar, e a lâmpada posta sobre a prensa fica sobre a
+/// prensa em qualquer aparelho. Elemento com "Fundo transparente" perde o
+/// cartão ([HmiSurface]).
+///
 /// Em edição:
 ///   • pontos marcam as células; sobram linhas vazias embaixo para crescer;
 ///   • tocar seleciona; arrastar o **selecionado** move; a alça do canto
@@ -81,7 +88,16 @@ class HmiCanvas extends StatelessWidget {
     this.keyFor,
     this.onNavigate,
     this.padding = const EdgeInsets.fromLTRB(14, 14, 14, 110),
+    this.onViewRows,
   });
+
+  /// Quantas linhas inteiras da grade cabem à vista (o editor guarda, para o
+  /// encaixe "tela inteira" da imagem de fundo valer a tela que se vê).
+  final ValueChanged<int>? onViewRows;
+
+  /// Opacidade da imagem de fundo no editor: atenuada, para os pontos da
+  /// grade e os elementos aparecerem por cima. Na operação ela é cheia.
+  static const double editorBackgroundOpacity = 0.6;
 
   /// Tela em operação: abre outra tela (botão "Ir para tela" e elementos com
   /// "ao tocar, abrir").
@@ -166,7 +182,12 @@ class HmiCanvas extends StatelessWidget {
         // Linhas vazias embaixo para crescer: 4 (na extra-fina 8, a mesma
         // altura da fina).
         final spare = k >= 4 ? 8 : 4;
-        final rows = math.max(screen.rows + (editMode ? spare : 0), editMode ? 2 * spare : 1);
+        // A imagem de fundo também ocupa linhas: a grade cresce até ela caber.
+        final rows = math.max(screen.drawnRows + (editMode ? spare : 0), editMode ? 2 * spare : 1);
+        if (box.maxHeight.isFinite && cell > 0) {
+          onViewRows?.call(math.max(1, ((box.maxHeight - 2 * padding.top) / cell).floor()));
+        }
+        final bg = screen.background;
 
         return _GridScroll(
           cell: cell,
@@ -185,6 +206,18 @@ class HmiCanvas extends StatelessWidget {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
+                // Atrás de tudo, nas medidas da grade: a mesma conta no
+                // editor e na operação.
+                if (bg != null)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    width: lc * screen.columns,
+                    height: bg.fit == BackgroundFit.width && bg.width > 0
+                        ? lc * screen.columns * bg.height / bg.width
+                        : lc * bg.areaRows(screen.columns),
+                    child: ScreenBackgroundView(key: const ValueKey('fundo-da-tela'), background: bg, editMode: editMode),
+                  ),
                 if (editMode)
                   Positioned.fill(
                     child: GestureDetector(
@@ -206,6 +239,7 @@ class HmiCanvas extends StatelessWidget {
                           cell: lc,
                           gap: g,
                           selected: e.id == selectedId,
+                          bare: ElementCatalog.drawnBare(screen, e),
                           onSelect: () => onSelect?.call(e.id),
                           onChanged: onChanged,
                           tourKey: keyFor?.call(e),
@@ -218,7 +252,12 @@ class HmiCanvas extends StatelessWidget {
                           height: e.h * lc - g,
                           // Uma camada por elemento: o valor que muda redesenha só
                           // o próprio cartão, não a tela (sombras e bordas saem de cache).
-                          child: RepaintBoundary(child: KeyedSubtree(key: keyFor?.call(e), child: _Linked(element: e, onNavigate: onNavigate))),
+                          child: RepaintBoundary(
+                            child: KeyedSubtree(
+                              key: keyFor?.call(e),
+                              child: HmiSurface.wrap(bare: ElementCatalog.drawnBare(screen, e), child: _Linked(element: e, onNavigate: onNavigate)),
+                            ),
+                          ),
                         ),
               ],
             ),
@@ -312,8 +351,12 @@ class _EditableElement extends StatefulWidget {
     required this.selected,
     required this.onSelect,
     required this.onChanged,
+    this.bare = false,
     this.tourKey,
   });
+
+  /// Pousado na imagem de fundo ([HmiSurface]).
+  final bool bare;
 
   final HmiElement element;
   final HmiScreen screen;
@@ -374,7 +417,7 @@ class _EditableElementState extends State<_EditableElement> {
         border: Border.all(color: sel ? Ind.accent : Colors.transparent, width: 2.5),
       ),
       // Em edição o elemento mostra o valor ao vivo, mas não reage ao toque.
-      child: IgnorePointer(child: HmiElementView(element: e)),
+      child: IgnorePointer(child: HmiSurface.wrap(bare: widget.bare, child: HmiElementView(element: e))),
     );
 
     return AnimatedPositioned(
@@ -423,6 +466,45 @@ class _EditableElementState extends State<_EditableElement> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// A imagem de fundo da tela, no retângulo que a grade dá a ela.
+///
+/// "Largura da tela" estica a imagem no retângulo (que já tem a proporção
+/// dela); "tela inteira" cobre e corta; "caber sem cortar" cabe inteira,
+/// centralizada. No editor ela fica a [HmiCanvas.editorBackgroundOpacity]
+/// para os pontos da grade aparecerem; na operação, cheia. "Escurecer a
+/// imagem" é uma camada da cor de fundo do tema por cima (escurece no tema
+/// escuro e clareia no claro — nos dois, o texto dos elementos lê melhor).
+class ScreenBackgroundView extends StatelessWidget {
+  const ScreenBackgroundView({super.key, required this.background, this.editMode = false});
+  final ScreenBackground background;
+  final bool editMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = background;
+    return IgnorePointer(
+      child: ClipRect(
+        child: Stack(fit: StackFit.expand, children: [
+          Image.memory(
+            decodeBase64Cached(b.data),
+            key: const ValueKey('fundo-imagem'),
+            fit: switch (b.fit) {
+              BackgroundFit.width => BoxFit.fill,
+              BackgroundFit.cover => BoxFit.cover,
+              BackgroundFit.contain => BoxFit.contain,
+            },
+            opacity: editMode ? const AlwaysStoppedAnimation(HmiCanvas.editorBackgroundOpacity) : null,
+            filterQuality: FilterQuality.medium,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => Center(child: Icon(Icons.broken_image_outlined, color: Ind.textMuted)),
+          ),
+          if (b.dim > 0) ColoredBox(key: const ValueKey('fundo-escurecer'), color: Ind.bg.withValues(alpha: b.dim / 100)),
+        ]),
       ),
     );
   }

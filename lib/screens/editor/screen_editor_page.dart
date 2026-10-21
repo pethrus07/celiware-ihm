@@ -18,6 +18,7 @@ import '../screen_run_page.dart';
 import '../tours.dart';
 import 'element_config_sheet.dart';
 import 'palette_sheet.dart';
+import 'screen_background_section.dart';
 
 /// Editor de tela.
 ///
@@ -52,6 +53,10 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
 
   /// Setas de ajuste fino à vista no lugar da barra de baixo (extra-fina).
   bool _nudging = false;
+
+  /// Linhas da grade à vista agora (a grade informa a cada desenho): a
+  /// altura do encaixe "tela inteira" da imagem de fundo.
+  int _viewRows = 0;
 
   final _paletteKey = GlobalKey();
   final _configKey = GlobalKey();
@@ -122,7 +127,7 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _ScreenSettingsSheet(screenId: screen.id),
+      builder: (_) => _ScreenSettingsSheet(screenId: screen.id, viewRows: () => _viewRows),
     );
   }
 
@@ -149,7 +154,7 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
           panel: !panel
               ? null
               : selected == null
-                  ? KeyedSubtree(key: _settingsKey, child: _ScreenSettingsSheet(screenId: screen.id, panel: true))
+                  ? KeyedSubtree(key: _settingsKey, child: _ScreenSettingsSheet(screenId: screen.id, viewRows: () => _viewRows, panel: true))
                   : KeyedSubtree(
                       key: _configKey,
                       child: ElementConfigSheet(key: ValueKey('painel-${selected.id}'), screenId: screen.id, elementId: selected.id, panel: true),
@@ -191,6 +196,7 @@ class _ScreenEditorPageState extends State<ScreenEditorPage> {
                 onChanged: (e) => _replace(screen, e),
                 onEmptyCellTap: (x, y) => _lastEmptyCell = (x, y),
                 keyFor: (e) => e.id == firstId ? _firstElementKey : null,
+                onViewRows: (r) => _viewRows = r,
               ),
             ),
             // Grade vazia só com pontinhos não dizia o que fazer. A dica não
@@ -380,10 +386,14 @@ class _ToolButton extends StatelessWidget {
       );
 }
 
-/// Regras da tela: nome, só acompanhamento, confirmação de escrita, apagar.
+/// Regras da tela: nome, grade, imagem de fundo, só acompanhamento,
+/// confirmação de escrita, apagar.
 class _ScreenSettingsSheet extends StatelessWidget {
-  const _ScreenSettingsSheet({required this.screenId, this.panel = false});
+  const _ScreenSettingsSheet({required this.screenId, required this.viewRows, this.panel = false});
   final String screenId;
+
+  /// Linhas da grade à vista no editor ([ScreenBackgroundSection]).
+  final int Function() viewRows;
 
   /// No painel lateral do editor (tablet), quando nada está selecionado.
   final bool panel;
@@ -467,6 +477,8 @@ class _ScreenSettingsSheet extends StatelessWidget {
                         ? 'Cabe o dobro de elementos em cada direção. Bom para telas com muitas variáveis.'
                         : 'Elementos maiores, fáceis de tocar.',
                 style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+            const SizedBox(height: 20),
+            ScreenBackgroundSection(screenId: s.id, viewRows: viewRows),
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -501,8 +513,10 @@ class _ScreenSettingsSheet extends StatelessWidget {
             ),
           ];
     if (panel) return ListView(primary: false, padding: const EdgeInsets.all(Ind.page), children: children);
+    // Rola: com a imagem de fundo e os ajustes dela, no celular de 320 dp a
+    // folha passa da altura da tela.
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,

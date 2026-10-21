@@ -1,9 +1,7 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/image_util.dart';
 import '../../../models/hmi_screen.dart';
 import '../element_catalog.dart';
 import '../hmi_frame.dart';
@@ -96,23 +94,14 @@ class ImageElement extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(Ind.radius),
       child: Image.memory(
-        _decoded(data),
+        // Decodificar base64 a cada leitura (3×/s) gastaria bateria à toa
+        // com imagem de página inteira: decodifica uma vez por conteúdo.
+        decodeBase64Cached(data),
         fit: element.prop<String>('fit', 'contain') == 'cover' ? BoxFit.cover : BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => Center(child: Icon(Icons.broken_image_outlined, color: Ind.alarm)),
       ),
     );
-  }
-
-  // Decodificar base64 a cada leitura (3×/s) gastaria bateria à toa com
-  // imagem de página inteira: guarda as últimas decodificadas.
-  static final _cache = <String, Uint8List>{};
-  static Uint8List _decoded(String b64) {
-    final key = '${b64.length}:${b64.hashCode}';
-    final hit = _cache[key];
-    if (hit != null) return hit;
-    if (_cache.length > 40) _cache.remove(_cache.keys.first);
-    return _cache[key] = base64Decode(b64);
   }
 }
 

@@ -118,7 +118,8 @@ class _ScreenRunPageState extends State<ScreenRunPage> {
                   ),
                 ),
         ),
-        body: screen.elements.isEmpty
+        // Tela só com a imagem de fundo não está vazia: mostra o desenho.
+        body: screen.elements.isEmpty && screen.background == null
             ? EmptyState(
                 icon: Icons.widgets_outlined,
                 title: 'Tela vazia',

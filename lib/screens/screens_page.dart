@@ -530,17 +530,8 @@ class _ScreenMenu extends StatelessWidget {
             final name = await askText(context, title: 'Renomear tela', label: 'Nome da tela', initial: screen.name);
             if (name != null) c.saveScreen(screen.copyWith(name: name));
           case 'duplicate':
-            c.saveScreen(HmiScreen(
-              id: newId('s'),
-              name: '${screen.name} (cópia)',
-              columns: screen.columns,
-              readOnly: screen.readOnly,
-              confirmWrites: screen.confirmWrites,
-              elements: [
-                for (final e in screen.elements)
-                  HmiElement(id: newId('e'), type: e.type, x: e.x, y: e.y, w: e.w, h: e.h, props: Map.of(e.props)),
-              ],
-            ));
+            // A imagem de fundo e as chaves de versão mais nova vão junto.
+            c.saveScreen(screen.duplicate(id: newId('s'), name: '${screen.name} (cópia)', elementId: () => newId('e')));
           case 'delete':
             if (await confirmDelete(context, title: 'Apagar "${screen.name}"?', body: 'A tela e seus ${screen.elements.length} elementos somem. Equipamentos e variáveis continuam.')) {
               c.deleteScreen(screen.id);

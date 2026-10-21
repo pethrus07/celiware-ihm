@@ -62,14 +62,21 @@ class Tours {
         TourStep(target: edit, essential: true, title: 'Editar', body: 'O lápis abre o editor desta tela.'),
       ]);
 
+  /// v2 (21/10/2026): o passo "Regras da tela" cita a grade extra-fina e a
+  /// imagem de fundo (sinótico). Sem alvo à vista (elemento selecionado no
+  /// celular), o passo é pulado — as regras não são essenciais.
   static TourSpec editor({GlobalKey? palette, GlobalKey? element, GlobalKey? config, GlobalKey? settings, GlobalKey? done}) =>
-      TourSpec(id: 'editor', version: 1, title: 'Montar uma tela', steps: [
+      TourSpec(id: 'editor', version: 2, title: 'Montar uma tela', steps: [
         TourStep(target: palette, essential: true, title: 'Acrescentar', body: 'Escolha um elemento: botão, lâmpada, gráfico, OEE...'),
         TourStep(target: element, essential: true, title: 'Mover', body: 'Toque para selecionar, arraste para mover, puxe a bolinha para aumentar.'),
         TourStep(target: config, essential: true, title: 'Configurar', body: 'Escolha a variável, o texto e a cor.'),
         // "Regras da tela", como no botão: "Regras" sozinho é o de
         // Ferramentas (regras entre máquinas).
-        TourStep(target: settings, title: 'Regras da tela', body: 'Nome, grade fina e se a tela pode gravar.'),
+        TourStep(
+          target: settings,
+          title: 'Regras da tela',
+          body: 'Nome, grade (fina ou extra-fina, para encaixar com precisão), imagem de fundo e se a tela pode gravar.',
+        ),
         TourStep(target: done, title: 'Pronto', body: 'Já está salvo. Concluir volta para a operação.'),
       ]);
 

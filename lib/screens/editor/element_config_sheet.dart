@@ -87,7 +87,7 @@ class ElementConfigSheet extends StatelessWidget {
             Expanded(child: Text(info.name, style: Theme.of(context).textTheme.titleLarge)),
           ]),
           const SizedBox(height: 12),
-          _Preview(element: e),
+          _Preview(element: e, bare: ElementCatalog.drawnBare(screen, e)),
           const SizedBox(height: 8),
           ..._fields(context, project, e, info, set, save),
         ],
@@ -370,8 +370,15 @@ class ElementConfigSheet extends StatelessWidget {
     // Na extra-fina o editor tem também as setas na barra de baixo, com a
     // tela à vista (_NudgeBar em screen_editor_page.dart).
     final screen = project.screen(screenId);
-    if (screen != null) {
+    // ── Mais opções ── "Fundo transparente": só numa tela com imagem de
+    // fundo (sem ela não há o que ver através) e só nos tipos que mostram um
+    // estado ou um número (ElementCatalog.transparentTypes).
+    if (screen?.background != null && ElementCatalog.transparentTypes.contains(e.type)) {
       w.add(const SizedBox(height: 20));
+      w.add(_MoreOptions(element: e, onTransparent: (v) => set('transparent', v ? true : null)));
+    }
+    if (screen != null) {
+      w.add(SizedBox(height: screen.background != null && ElementCatalog.transparentTypes.contains(e.type) ? 0 : 20));
       w.add(_GeometryEditor(screen: screen, element: e, onChanged: save));
     }
     return w;
@@ -391,8 +398,11 @@ class ElementConfigSheet extends StatelessWidget {
 
 /// A prévia usa a própria célula da grade, na proporção real do elemento.
 class _Preview extends StatelessWidget {
-  const _Preview({required this.element});
+  const _Preview({required this.element, this.bare = false});
   final HmiElement element;
+
+  /// Sem cartão, como fica sobre a imagem de fundo ([HmiSurface]).
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
@@ -408,7 +418,7 @@ class _Preview extends StatelessWidget {
             child: SizedBox(
               width: w - 24 > 0 ? w - 24 : w,
               height: h,
-              child: HmiScreenContext(editMode: true, readOnly: true, confirmWrites: true, child: HmiElementView(element: element)),
+              child: HmiScreenContext(editMode: true, readOnly: true, confirmWrites: true, child: HmiSurface.wrap(bare: bare, child: HmiElementView(element: element))),
             ),
           ),
         ]),
@@ -1063,6 +1073,37 @@ class _Hint extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(child: Text(text, style: const TextStyle(height: 1.35))),
         ]),
+      );
+}
+
+/// "Mais opções" do elemento numa tela com imagem de fundo: **Fundo
+/// transparente** — sem cartão, pousado no desenho, com o texto contornado
+/// para ler sobre qualquer cor. Fechado, o resumo diz como está.
+class _MoreOptions extends StatelessWidget {
+  const _MoreOptions({required this.element, required this.onTransparent});
+  final HmiElement element;
+  final ValueChanged<bool> onTransparent;
+
+  @override
+  Widget build(BuildContext context) => Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: const ValueKey('mais-opcoes-elemento'),
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 8),
+          title: const Text('Mais opções'),
+          subtitle: Text(element.transparent ? 'Fundo transparente' : 'Com cartão', style: TextStyle(color: Ind.textMuted, fontSize: 13)),
+          children: [
+            SwitchListTile(
+              key: const ValueKey('fundo-transparente'),
+              contentPadding: EdgeInsets.zero,
+              value: element.transparent,
+              onChanged: onTransparent,
+              title: const Text('Fundo transparente'),
+              subtitle: const Text('Sem cartão, direto sobre a imagem de fundo.'),
+            ),
+          ],
+        ),
       );
 }
 

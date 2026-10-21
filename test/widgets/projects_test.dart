@@ -8,6 +8,8 @@ import 'package:ihm/app/project_controller.dart';
 import 'package:ihm/main.dart';
 import 'package:ihm/models/project.dart';
 import 'package:ihm/screens/alarms_page.dart';
+import 'package:ihm/screens/devices/device_form_page.dart';
+import 'package:ihm/screens/projects/backups_page.dart';
 import 'package:ihm/screens/projects/projects_page.dart';
 import 'package:ihm/screens/screens_page.dart';
 import 'package:ihm/screens/shell.dart';
@@ -269,6 +271,74 @@ void main() {
       expect(copies.listSync(), hasLength(1), reason: 'a planta de antes ficou guardada');
       final saved = ProjectRepository.decodePlant(File(copies.listSync().single.path).readAsBytesSync());
       expect(saved.projects.single.project.name, before);
+      await shutdown(tester, c);
+    });
+
+    testWidgets('Cópias de segurança: o aviso aponta para elas, a cópia aparece com a data e Abrir soma à planta', (tester) async {
+      final c = await boot(tester);
+      final before = c.projects.single.name;
+      tester.state<ShellState>(find.byType(Shell)).showProjectList();
+      await settle(tester, rounds: 3);
+
+      // Sem cópia ainda: a página diz o que vai aparecer ali.
+      await tester.tap(find.byKey(const ValueKey('menu-planta')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.text('Cópias de segurança'));
+      await settle(tester, rounds: 3);
+      expect(find.byType(BackupsPage), findsOneWidget);
+      expect(find.text('Nenhuma cópia ainda'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await settle(tester, rounds: 3);
+
+      // O aviso de "Nova planta": singular com um projeto, e o caminho de volta.
+      await tester.tap(find.byKey(const ValueKey('menu-planta')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.text('Nova planta'));
+      await settle(tester, rounds: 2);
+      expect(find.textContaining('O projeto desta planta sai do app'), findsOneWidget);
+      expect(find.textContaining('Os 1 projetos'), findsNothing);
+      expect(find.textContaining('menu da planta (⋮) → Cópias de segurança'), findsOneWidget);
+      expect(find.textContaining('De um arquivo'), findsNothing, reason: 'o seletor de arquivos não enxerga a pasta das cópias');
+      await tester.tap(find.byKey(const ValueKey('confirmar-substituir-planta')));
+      await settle(tester, until: () => c.projects.length == 1 && c.projects.first.name == 'Meu projeto' && find.byType(ScreensPage).evaluate().isNotEmpty);
+
+      tester.state<ShellState>(find.byType(Shell)).showProjectList();
+      await settle(tester, rounds: 3);
+      await tester.tap(find.byKey(const ValueKey('menu-planta')));
+      await settle(tester, rounds: 2);
+      await tester.tap(find.text('Cópias de segurança'));
+      await settle(tester, rounds: 3);
+      final copy = c.backups().single;
+      expect(find.text(BackupsPage.when(copy.when)), findsOneWidget);
+      expect(find.text('Enviar'), findsOneWidget);
+
+      await tester.tap(find.byKey(ValueKey('abrir-copia-${copy.file.uri.pathSegments.last}')));
+      await settle(tester, until: () => c.projects.length == 2 && find.byType(BackupsPage).evaluate().isEmpty);
+      expect(c.projects.map((e) => e.name), containsAll([before, 'Meu projeto']), reason: 'somou: nada foi substituído');
+      expect(find.byType(ProjectsPage), findsOneWidget, reason: 'volta para a lista, com o projeto de volta');
+      expect(find.text('1 projeto somado à planta.'), findsOneWidget);
+      await shutdown(tester, c);
+    });
+
+    testWidgets('tablet: trocar de projeto fecha o cadastro aberto ao lado (o Salvar não grava no projeto novo)', (tester) async {
+      final c = await boot(tester, size: const Size(1280, 800));
+      final first = c.openId!;
+      final device = c.project.equipment.first;
+      await tester.tap(find.descendant(of: find.byType(NavigationRail), matching: find.text('Equipamentos')));
+      await settle(tester, rounds: 3);
+      await tester.tap(find.text(device.name).first);
+      await settle(tester, rounds: 3);
+      expect(find.byType(DeviceFormPage), findsOneWidget, reason: 'cadastro aberto no painel ao lado');
+
+      // Troca de projeto pelo trilho: Projetos → lista → outro projeto.
+      await tester.runAsync(() => c.createProject(const Project(name: 'Prensa')));
+      await settle(tester, until: () => c.project.name == 'Prensa');
+      await tester.tap(find.descendant(of: find.byType(NavigationRail), matching: find.text('Equipamentos')));
+      await settle(tester, rounds: 3);
+      expect(c.openId, isNot(first));
+      expect(find.byType(DeviceFormPage), findsNothing, reason: 'o cadastro era do outro projeto');
+      expect(find.text('Escolha um equipamento'), findsOneWidget);
+      expect(c.project.devices, isEmpty, reason: 'nada do projeto anterior entrou no novo');
       await shutdown(tester, c);
     });
 

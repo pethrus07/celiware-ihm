@@ -33,6 +33,24 @@ class DemoProject {
   static const calcTagId = 'demo_rotulos_min';
   static const ruleId = 'demo_regra_motor';
 
+  /// Nome do projeto da demonstração.
+  static const name = 'Demonstração';
+
+  /// [p] só tem coisas da demonstração (equipamentos, variáveis e telas com
+  /// os ids dela, nenhuma câmera) — mexidas ou não. Um projeto chamado
+  /// "Demonstração" com algo a mais é trabalho de alguém, não a vitrine: a
+  /// migração da 1.4.0 o renomeia ([PlantStore]).
+  static bool isOnlyDemo(Project p) {
+    final demo = build();
+    final devices = {for (final d in demo.devices) d.id};
+    final tags = {for (final t in demo.tags) t.id};
+    final screens = {for (final s in demo.screens) s.id};
+    return p.cameras.isEmpty &&
+        p.devices.every((d) => devices.contains(d.id)) &&
+        p.tags.every((t) => tags.contains(t.id)) &&
+        p.screens.every((s) => screens.contains(s.id));
+  }
+
   static Project build() {
     const dev = Device(id: deviceId, name: 'Cortadora de rótulos', kind: DeviceKind.demo, pollMs: 300);
 
@@ -216,7 +234,7 @@ class DemoProject {
     );
 
     return Project(
-      name: 'Demonstração',
+      name: name,
       devices: const [dev, CalcDevice.device],
       tags: tags,
       screens: [operation, leader],

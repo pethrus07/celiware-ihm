@@ -86,6 +86,7 @@ void main() {
       'Serviços de fala do Google',
       'estado da rede e troca de rede',
       'áudio nem identificadores do aparelho',
+      'O app pergunta à Google Play se há versão nova; isso é feito pela própria Play.',
     ]) {
       expect(app, contains(fato), reason: 'app sem "$fato"');
       expect(site, contains(fato), reason: 'site/privacidade.html sem "$fato"');

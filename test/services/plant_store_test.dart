@@ -12,6 +12,7 @@ import 'package:ihm/models/project.dart';
 import 'package:ihm/models/tag.dart';
 import 'package:ihm/services/alarms/alarm_engine.dart';
 import 'package:ihm/services/cameras/camera_vault.dart';
+import 'package:ihm/services/demo/demo_project.dart';
 import 'package:ihm/services/logging/data_logger.dart';
 import 'package:ihm/services/logging/log_store.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
@@ -291,6 +292,146 @@ void main() {
     });
   });
 
+  group('revisão de 21/10/2026', () {
+    Future<ProjectController> start(PlantStore plant) async {
+      final c = await ProjectController.start(runtime: HmiRuntime(), plant: plant);
+      addTearDown(() async {
+        await c.flush();
+        c.dispose();
+        await c.runtime.dispose();
+      });
+      return c;
+    }
+
+    test('a planta não abre (pasta que não se cria): abre o projeto antigo como a 1.4.0 e migra na abertura seguinte', () async {
+      writeLegacy();
+      // Um arquivo no lugar da pasta "projetos": criar a pasta falha.
+      at('projetos').writeAsStringSync('não é pasta');
+
+      final rescued = await start(PlantStore(root: root));
+      expect(rescued.manyProjects, isFalse, reason: 'modo de socorro: um projeto só, como a 1.4.0');
+      expect(rescued.project.name, 'Cortadora');
+      expect(rescued.project.tags.single.name, 'Velocidade');
+      expect(at('projeto.ihm.json').existsSync(), isTrue, reason: 'o antigo fica na raiz para migrar depois');
+      expect((await rescued.repository.sidecar('historico-alarmes.json')).readAsStringSync(), contains('Porta aberta'));
+
+      // Na abertura seguinte a pasta já se cria: migra como sempre.
+      at('projetos').deleteSync();
+      final next = await start(PlantStore(root: root));
+      expect(next.manyProjects, isTrue);
+      expect(next.projects.map((e) => e.id), [PlantStore.legacyId]);
+      expect(next.project.name, 'Cortadora');
+      expect(at('projeto.ihm.json').existsSync(), isFalse);
+    });
+
+    test('exceção qualquer na planta: o app abre mesmo assim; sem projeto antigo, a demonstração fica só na memória', () async {
+      final rescued = await start(_BrokenPlant(root: root));
+      expect(rescued.manyProjects, isFalse);
+      expect(rescued.project.screens, isNotEmpty, reason: 'abre com a demonstração');
+      expect(at('projeto.ihm.json').existsSync(), isFalse, reason: 'senão ela viraria um projeto a mais na próxima migração');
+
+      final withLegacy = Directory('${root.path}${sep}outro')..createSync();
+      File('${withLegacy.path}${sep}projeto.ihm.json').writeAsBytesSync(ProjectRepository.encode(cortadora));
+      final again = await start(_BrokenPlant(root: withLegacy));
+      expect(again.project.name, 'Cortadora');
+    });
+
+    test('migração que copiou e não apagou o antigo: a abertura seguinte termina sem projeto duplicado', () async {
+      writeLegacy();
+      // A abertura anterior copiou tudo (outro volume) e não conseguiu
+      // apagar a origem: os dois lados com os mesmos bytes.
+      final dir = Directory('${root.path}${sep}projetos$sep${PlantStore.legacyId}')..createSync(recursive: true);
+      for (final name in ['projeto.ihm.json', 'historico-alarmes.json']) {
+        at(name).copySync('${dir.path}$sep$name');
+      }
+
+      final c = await controller();
+      expect(c.projects.map((e) => e.id), [PlantStore.legacyId], reason: 'sem "Cortadora" em dobro');
+      expect(c.project.name, 'Cortadora');
+      expect(at('projeto.ihm.json').existsSync(), isFalse, reason: 'a origem igual ao destino sai');
+      expect(at('historico-alarmes.json').existsSync(), isFalse);
+      expect(at('projetos/${PlantStore.legacyId}/historico-alarmes.json').readAsStringSync(), contains('Porta aberta'));
+      expect(at('registros/${PlantStore.legacyId}/g1.db').readAsStringSync(), 'banco do grupo g1');
+      expect(dir.listSync().where((f) => f.path.endsWith('.tmp')), isEmpty);
+    });
+
+    test('pasta inicial com OUTRO projeto: o antigo vai para uma pasta nova, nada se sobrescreve', () async {
+      writeLegacy();
+      const other = Project(name: 'Prensa');
+      Directory('${root.path}${sep}projetos$sep${PlantStore.legacyId}').createSync(recursive: true);
+      at('projetos/${PlantStore.legacyId}/projeto.ihm.json').writeAsBytesSync(ProjectRepository.encode(other));
+
+      final c = await controller();
+      expect(c.projects.map((e) => e.name), ['Cortadora', 'Prensa']);
+      expect(at('projetos/${PlantStore.legacyId}/projeto.ihm.json').readAsBytesSync(), ProjectRepository.encode(other));
+    });
+
+    test('projeto ilegível: uma cópia .corrompido-… só, por mais que o app abra', () async {
+      final c = await controller();
+      final id = await c.createProject(const Project(name: 'Prensa'));
+      await c.flush();
+      at('projetos/$id/projeto.ihm.json').writeAsStringSync('{ estragado');
+      final folder = Directory('${root.path}${sep}projetos$sep$id');
+      List<FileSystemEntity> copies() => folder.listSync().where((f) => f.path.contains('.corrompido-')).toList();
+
+      for (var i = 0; i < 3; i++) {
+        final again = await controller();
+        await again.open(id);
+        expect(again.project.name, 'Prensa', reason: 'o nome da lista segura o projeto ilegível');
+      }
+      // Lista perdida também lê a pasta (e não copia de novo).
+      at('projetos/planta.json').deleteSync();
+      await PlantStore(root: root).load();
+
+      expect(copies(), hasLength(1));
+      expect(File(copies().single.path).readAsStringSync(), '{ estragado');
+
+      // Estragou de outro jeito: essa é outra cópia.
+      at('projetos/$id/projeto.ihm.json').writeAsStringSync('{ estragado de novo');
+      await ProjectRepository(directory: folder).load();
+      expect(copies(), hasLength(2));
+    });
+
+    test('projeto da 1.4.0 chamado "Demonstração" com coisas do usuário vira "Meu projeto"', () async {
+      const mine = Device(id: 'd_meu', name: 'Prensa do galpão', host: '192.168.0.20');
+      final demo = DemoProject.build();
+      final edited = demo.copyWith(devices: [...demo.devices, mine], screens: [...demo.screens, const HmiScreen(id: 's_meu', name: 'Minha tela')]);
+      at('projeto.ihm.json').writeAsBytesSync(ProjectRepository.encode(edited));
+
+      final c = await controller();
+      expect(c.project.name, 'Meu projeto');
+      expect(c.projects.single.name, 'Meu projeto');
+      expect(c.project.devices.map((d) => d.id), contains('d_meu'), reason: 'só o nome muda');
+      expect(c.project.screens, hasLength(edited.screens.length));
+    });
+
+    test('a demonstração intacta da 1.4.0 continua "Demonstração"', () async {
+      at('projeto.ihm.json').writeAsBytesSync(ProjectRepository.encode(DemoProject.build()));
+      final c = await controller();
+      expect(c.project.name, 'Demonstração');
+      expect(at('projetos/${PlantStore.legacyId}/projeto.ihm.json').readAsBytesSync(), ProjectRepository.encode(DemoProject.build()), reason: 'byte a byte');
+      expect(DemoProject.isOnlyDemo(cortadora), isFalse);
+    });
+
+    test('cópias de segurança: a planta substituída aparece na lista e abrir SOMA os projetos dela', () async {
+      writeLegacy();
+      final c = await controller();
+      expect(c.backups(), isEmpty);
+      await c.newPlant();
+      expect(c.projects.map((e) => e.name), ['Meu projeto']);
+
+      final list = c.backups();
+      expect(list, hasLength(1));
+      expect(DateTime.now().difference(list.single.when).inMinutes, lessThan(2), reason: 'a data sai do nome do arquivo');
+
+      final n = await c.restoreBackup(list.single);
+      expect(n, 1);
+      expect(c.projects.map((e) => e.name), ['Cortadora', 'Meu projeto'], reason: 'somou, não substituiu');
+      expect(c.project.name, 'Meu projeto', reason: 'o aberto não muda');
+      expect(c.backups(), hasLength(1), reason: 'abrir não cria cópia nova');
+    });
+  });
+
   test('o índice guarda o último aberto e não guarda dado do projeto', () async {
     writeLegacy();
     final c = await controller();
@@ -299,4 +440,12 @@ void main() {
     expect(index['open'], c.openId);
     expect((index['projects'] as List).single, containsPair('name', 'Cortadora'));
   });
+}
+
+/// Planta que não abre (disco cheio, migração que lança no meio).
+class _BrokenPlant extends PlantStore {
+  _BrokenPlant({super.root});
+
+  @override
+  Future<void> load() async => throw const FileSystemException('Sem espaço no aparelho');
 }

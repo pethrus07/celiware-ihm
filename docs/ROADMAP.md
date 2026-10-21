@@ -138,14 +138,14 @@ em `ARQUITETURA.md` §5.4.1, §6.1 e §6.7.
 
 - Subir a versão (`pubspec.yaml` e `AppInfo.version`) e escrever as notas.
 - Refazer as capturas da loja: a barra e a primeira tela mudaram (`docs/loja/ficha.md`).
-- Atualizar `docs/loja/acesso-ao-app.txt` (hoje diz "Mais → Receitas" e
-  "Mais → Restaurar a demonstração"; agora é Ferramentas → Receitas e
-  Projetos → Novo projeto → Demonstração) e o "Mais → Sobre → Privacidade"
-  de `docs/loja/formularios.md`. Ficaram como estão porque descrevem a versão
-  em revisão.
-- Publicar o site só junto com a versão nova (os textos já falam da navegação nova).
+- ~~Atualizar `docs/loja/acesso-ao-app.txt` e o caminho da privacidade em
+  `docs/loja/formularios.md`~~ — **feito em 21/10/2026**, com as notas da
+  1.5.0 em `notas-da-versao.txt`.
+- Publicar o site só junto com a versão nova (os textos já falam da navegação
+  nova; a política ganhou em 21/10 a frase da pergunta à Play sobre versão nova).
 - Conferir a ficha de Segurança dos dados com a biblioteca da Play de
-  atualização (ver `PUBLICACAO.md` §12).
+  atualização (ver `PUBLICACAO.md` §12). `formularios.md` já explica a pergunta
+  à Play e lista o `in_app_update` (21/10).
 
 **Para o Pedro confirmar:** o app abre dentro do último projeto (e não na
 lista); rótulos da barra na Plex Condensed (encolhem até 9 sp no celular de
@@ -155,6 +155,26 @@ histórico de uma regra da planta vai para o histórico do projeto aberto na hor
 **Sem data (registrado na reunião):** projetos de plantas diferentes no mesmo
 aparelho (hoje é uma planta por aparelho, trocada por arquivo); mover um
 projeto de uma planta para outra sem passar por arquivo.
+
+## Planta: o que ficou para depois (revisão de 21/10/2026)
+
+A revisão da 1.5.0 (planta com projetos) achou pontos que foram corrigidos
+no mesmo dia: o app abre mesmo se a planta não abrir (modo de socorro, como a
+1.4.0, e a migração tenta de novo na abertura seguinte); a migração copia para
+`.tmp` e só apaga a origem com o destino inteiro, sem duplicar o projeto se
+parar no meio; uma cópia `.corrompido-…` só por arquivo estragado; `copias/`
+fora do backup do Android; "Cópias de segurança" no menu da planta (abrir
+soma, enviar); trocar de projeto no tablet fecha o cadastro aberto ao lado;
+atualização pela Play que respeita o download já feito e não reabre a
+imediata em laço (24 h, menos prioridade 5); "Demonstração" da 1.4.0 com
+coisas do usuário vira "Meu projeto". O que ficou para depois:
+
+| Item | Por que ficou |
+|---|---|
+| **Modo de socorro sem aviso na tela.** Se a planta não abrir, o app abre um projeto só (sem lista, sem regras da planta) e não diz por quê; só o log registra. | Caso raro (disco cheio, pasta que não se cria). Decidir com o Pedro se vale uma faixa "Não consegui abrir a planta; tento de novo na próxima vez". |
+| **Imediata cancelada fica 24 h sem nada** (prioridade 4). Durante o intervalo o app não oferece nem a flexível. | Escolha por menos interrupção; trocar pela flexível no intervalo é decisão do Pedro. |
+| **Duas cópias da planta no mesmo segundo** têm o mesmo nome: a segunda substitui a primeira. | Só acontece com dois "Substituir" seguidos no mesmo segundo; a cópia que fica é a da planta mais recente. |
+| **Mover entre volumes** (`PlantStore._move`, copiar para `.tmp` e renomear) não tem teste direto: o teste cobre a retomada (destino igual à origem), não a cópia em si. | No Android a pasta do app é um volume só; o caminho da cópia é defensivo. |
 
 ## Próximo — visual e operação
 

@@ -70,9 +70,40 @@ class ProjectRepository {
     } catch (e) {
       // Arquivo ilegível: preserva uma cópia para análise em vez de apagar.
       _log.severe('Projeto ilegível, guardando cópia: $e');
-      await file.copy('${file.path}.corrompido-${DateTime.now().millisecondsSinceEpoch}');
+      keepCorruptCopy(file);
       return null;
     }
+  }
+
+  /// Guarda `<arquivo>.corrompido-<hora>` ao lado do arquivo ilegível — uma
+  /// vez só: o mesmo arquivo estragado é lido de novo a cada abertura, e
+  /// cada leitura deixava mais uma cópia igual na pasta. Já existe cópia com
+  /// o mesmo conteúdo: devolve essa. Nunca lança (sem cópia, segue); devolve
+  /// nulo quando não deu para copiar.
+  static File? keepCorruptCopy(File file) {
+    try {
+      final bytes = file.readAsBytesSync();
+      final prefix = '${file.uri.pathSegments.last}.corrompido-';
+      for (final f in file.parent.listSync().whereType<File>()) {
+        if (!f.uri.pathSegments.last.startsWith(prefix)) continue;
+        if (f.lengthSync() == bytes.length && sameBytes(f.readAsBytesSync(), bytes)) return f;
+      }
+      final copy = File('${file.path}.corrompido-${DateTime.now().millisecondsSinceEpoch}');
+      copy.writeAsBytesSync(bytes, flush: true);
+      return copy;
+    } catch (e) {
+      _log.warning('Não guardou a cópia de $file: $e');
+      return null;
+    }
+  }
+
+  /// Mesmo conteúdo, byte a byte.
+  static bool sameBytes(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   Future<void> save(Project project) async {

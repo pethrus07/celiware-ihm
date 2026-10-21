@@ -10,7 +10,8 @@
 // ACRESCENTAM (o "Começar do zero" antigo apagou um projeto do cliente).
 // O título é o nome da planta; o menu dela (⋮) envia ou salva a planta
 // inteira e cria uma planta nova — o único jeito de trocar tudo, com
-// confirmação forte e cópia automática da planta atual antes.
+// confirmação forte e cópia automática da planta atual antes. As cópias se
+// abrem de novo em "Cópias de segurança", no mesmo menu (backups_page.dart).
 
 import 'dart:io';
 
@@ -33,6 +34,7 @@ import '../../widgets/tour/tour.dart';
 import '../screens_page.dart';
 import '../settings_page.dart';
 import '../tours.dart';
+import 'backups_page.dart';
 
 /// Lista de projetos. [onOpened] mostra as telas do projeto que acabou de
 /// abrir (a casca troca a aba para "dentro do projeto").
@@ -221,8 +223,8 @@ class _PlantMenu extends StatelessWidget {
       context: context,
       builder: (_) => DecisionDialog<bool>(
         title: title,
-        body: 'Os $n projetos desta planta saem do app, com os históricos e os registros gravados deles. '
-            'Antes, a planta inteira é guardada numa cópia no celular — dá para abrir de novo em Novo projeto → De um arquivo.',
+        body: '${n == 1 ? 'O projeto desta planta sai do app, com os históricos e os registros gravados dele.' : 'Os $n projetos desta planta saem do app, com os históricos e os registros gravados deles.'} '
+            'Antes, a planta inteira é guardada numa cópia no celular. Para abrir de novo: menu da planta (⋮) → Cópias de segurança.',
         actions: const [
           DialogAction(label: 'Cancelar', value: false),
           DialogAction(label: 'Substituir', value: true, kind: DialogActionKind.destructive, key: ValueKey('confirmar-substituir-planta')),
@@ -230,9 +232,9 @@ class _PlantMenu extends StatelessWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
-    final backup = await c.replacePlant(next);
+    await c.replacePlant(next);
     if (!context.mounted) return;
-    WriteActions.toast(context, 'Pronto. Cópia da planta anterior: ${backup.uri.pathSegments.last}');
+    WriteActions.toast(context, 'Pronto. A planta anterior está em Cópias de segurança.');
     onReplaced();
   }
 
@@ -254,6 +256,8 @@ class _PlantMenu extends StatelessWidget {
           case 'export':
             final p = await c.exportPlant();
             if (context.mounted) await ProjectFiles.savePlant(context, p);
+          case 'backups':
+            await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const BackupsPage()));
           case 'new':
             await replace(context, const Plant(), onReplaced: onReplaced, title: 'Começar uma planta nova?');
         }
@@ -262,6 +266,9 @@ class _PlantMenu extends StatelessWidget {
         PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.drive_file_rename_outline), title: Text('Renomear planta'))),
         PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.share_rounded), title: Text('Enviar a planta'))),
         PopupMenuItem(value: 'export', child: ListTile(leading: Icon(Icons.save_alt_rounded), title: Text('Salvar a planta em arquivo'))),
+        // As cópias automáticas ficam na área privada do app, que o
+        // seletor de arquivos não vê: este é o caminho de volta a elas.
+        PopupMenuItem(value: 'backups', child: ListTile(leading: Icon(Icons.history_rounded), title: Text('Cópias de segurança'))),
         PopupMenuItem(value: 'new', child: ListTile(leading: Icon(Icons.restart_alt_rounded), title: Text('Nova planta'))),
       ],
     );
@@ -395,7 +402,7 @@ class ProjectFiles {
       await SharePlus.instance.share(ShareParams(
         files: [XFile(file.path, mimeType: 'application/json')],
         subject: 'Planta ${p.name} — ${AppInfo.name}',
-        text: 'Planta "${p.name}" do ${AppInfo.name} (${p.projects.length} projetos). Para abrir: Projetos → Novo projeto → De um arquivo.',
+        text: 'Planta "${p.name}" do ${AppInfo.name} (${p.projects.length == 1 ? '1 projeto' : '${p.projects.length} projetos'}). Para abrir: Projetos → Novo projeto → De um arquivo.',
       ));
     } catch (e) {
       if (context.mounted) WriteActions.toast(context, 'Não consegui enviar: $e', error: true);

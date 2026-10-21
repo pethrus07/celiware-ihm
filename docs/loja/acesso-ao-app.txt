@@ -1,6 +1,6 @@
 O app não tem login. Ele opera CLPs pela rede local; sem equipamento, use a demonstração embutida (uma máquina simulada no próprio celular), que já abre pronta:
-1. Em Telas, toque em "Cortadora — operação".
+1. Na aba Projetos, toque em "Cortadora — operação".
 2. Toque em LIGA e confirme: a máquina entra em ciclo e os valores mudam.
 3. Toque no lápis para abrir o editor da tela.
-4. Variáveis, Alarmes e Mais → Receitas usam a mesma máquina.
-Se a demonstração sumir: Mais → Restaurar a demonstração.
+4. Equipamentos, Variáveis, Alarmes e Ferramentas → Receitas usam a mesma máquina.
+Se a demonstração sumir: Projetos, seta do topo, Novo projeto → Demonstração.

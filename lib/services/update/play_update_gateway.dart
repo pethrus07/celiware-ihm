@@ -21,8 +21,17 @@ class PlayUpdateGateway implements UpdateGateway {
       priority: info.updatePriority,
       immediateAllowed: info.immediateUpdateAllowed,
       flexibleAllowed: info.flexibleUpdateAllowed,
+      install: installOf(info.installStatus),
     );
   }
+
+  /// O `installStatus` da Play no que a decisão usa: baixada (oferecer
+  /// "Reiniciar" em vez de baixar de novo), baixando, ou nada.
+  static UpdateInstall installOf(InstallStatus s) => switch (s) {
+        InstallStatus.downloaded => UpdateInstall.downloaded,
+        InstallStatus.pending || InstallStatus.downloading => UpdateInstall.downloading,
+        _ => UpdateInstall.none,
+      };
 
   @override
   Future<void> immediate() async {

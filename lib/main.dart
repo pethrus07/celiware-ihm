@@ -34,9 +34,10 @@ Future<void> main() async {
 
   final runtime = HmiRuntime();
   // Vários projetos, cada um na sua pasta; o projeto único das versões
-  // antigas vira o primeiro da lista ao abrir (PlantStore.load).
-  final controller = ProjectController(library: PlantStore(), runtime: runtime);
-  await controller.load();
+  // antigas vira o primeiro da lista ao abrir (PlantStore.load). Se a planta
+  // não abrir, abre o projeto como a 1.4.0 e migra na próxima vez: uma
+  // exceção aqui, antes do runApp, deixaria o app sem abrir.
+  final controller = await ProjectController.start(runtime: runtime, plant: PlantStore());
 
   // Atualização pela Play (D2, 19–20/10/2026): oferece ao abrir; sem
   // internet ou fora da Play, nada acontece (§6.15).

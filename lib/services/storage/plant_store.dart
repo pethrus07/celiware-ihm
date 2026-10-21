@@ -16,6 +16,10 @@
 //   projetos/<id>/historico-*.json    alarmes, regras e receitas DESTE projeto
 //   registros/<id>/<grupo>.db         registro de dados (fora do backup, §6.10)
 //   copias/planta-<data>.ihm.json     cópia automática antes de substituir
+//                                     (fora do backup do Android, como os
+//                                     registros: as cinco passam de 25 MB);
+//                                     abrir ou enviar em menu da planta →
+//                                     Cópias de segurança
 //
 // Por que um arquivo por projeto, e não a planta inteira num arquivo só:
 // cada edição grava só o projeto mexido (projeto com 2.000 variáveis tem
@@ -36,6 +40,7 @@ import '../../core/utils/ids.dart';
 import '../../models/logic_rule.dart';
 import '../../models/plant.dart';
 import '../../models/project.dart';
+import '../demo/demo_project.dart';
 import 'project_repository.dart';
 
 /// Um projeto na lista: o que a lista mostra sem abrir o arquivo.
@@ -79,6 +84,32 @@ class ProjectEntry {
 
   @override
   int get hashCode => Object.hash(id, name, equipment, tags, screens);
+}
+
+/// Uma cópia automática da planta (`copias/planta-<data>.ihm.json`).
+class PlantBackup {
+  const PlantBackup({required this.file, required this.when});
+
+  /// A data sai do nome do arquivo (`planta-2026-10-21_143205`); nome fora
+  /// do padrão usa a data de modificação.
+  factory PlantBackup.of(File f) {
+    final m = RegExp(r'planta-(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})(\d{2})').firstMatch(f.uri.pathSegments.last);
+    DateTime when;
+    if (m != null) {
+      final n = [for (var i = 1; i <= 6; i++) int.parse(m.group(i)!)];
+      when = DateTime(n[0], n[1], n[2], n[3], n[4], n[5]);
+    } else {
+      try {
+        when = f.lastModifiedSync();
+      } on FileSystemException {
+        when = DateTime(2000);
+      }
+    }
+    return PlantBackup(file: f, when: when);
+  }
+
+  final File file;
+  final DateTime when;
 }
 
 /// A planta deste aparelho: os projetos e as regras da planta.
@@ -158,6 +189,21 @@ class PlantStore {
     await _reconcile();
   }
 
+  /// Para quando [load] falhou (disco cheio, pasta que não se cria): o
+  /// projeto que dá para abrir sem a planta, como a 1.4.0 abria. O projeto
+  /// único ainda na raiz (a migração não terminou e tenta de novo na próxima
+  /// abertura); se ele já foi migrado, a pasta dele; senão, a raiz.
+  ProjectRepository rescueRepository() {
+    final root = _root ?? _rootOverride;
+    if (root == null) return ProjectRepository();
+    final legacy = File('${root.path}$_sep${ProjectRepository.fileName}');
+    final migrated = Directory('${root.path}$_sep$folder$_sep$legacyId');
+    if (!legacy.existsSync() && File('${migrated.path}$_sep${ProjectRepository.fileName}').existsSync()) {
+      return ProjectRepository(directory: migrated, logsDirectory: Directory('${root.path}$_sep${ProjectRepository.logsFolder}$_sep$legacyId'));
+    }
+    return ProjectRepository(directory: root);
+  }
+
   /// Versões até a 1.4.0: um projeto só, solto na raiz. Vira o primeiro
   /// projeto da lista, com os históricos e o registro de dados dele — nada
   /// se perde. Move (renomeia) em vez de copiar: rápido e sem dobrar o disco.
@@ -166,15 +212,18 @@ class PlantStore {
   Future<void> _migrateLegacy() async {
     final legacy = File('${_rootDir.path}$_sep${ProjectRepository.fileName}');
     if (!legacy.existsSync()) return;
+    _renameEditedDemo(legacy);
     var id = legacyId;
-    // Já existe um projeto nessa pasta (não devia): o antigo vai para uma
-    // pasta nova em vez de sobrescrever.
-    if (File('${_projectDir(id).path}$_sep${ProjectRepository.fileName}').existsSync()) id = newId('p');
+    // Já existe um projeto nessa pasta. Com os mesmos bytes, é a migração de
+    // uma abertura anterior que copiou mas não conseguiu apagar o antigo:
+    // termina o serviço (sem projeto duplicado). Diferente (não devia): o
+    // antigo vai para uma pasta nova em vez de sobrescrever.
+    final done = File('${_projectDir(id).path}$_sep${ProjectRepository.fileName}');
+    if (done.existsSync() && !_same(legacy, done)) id = newId('p');
     final dir = _projectDir(id)..createSync(recursive: true);
     for (final name in legacySidecars) {
       final f = File('${_rootDir.path}$_sep$name');
-      final target = File('${dir.path}$_sep$name');
-      if (f.existsSync() && !target.existsSync()) _move(f, target.path);
+      if (f.existsSync()) _moveInto(f, File('${dir.path}$_sep$name'));
     }
     // Bancos do registro: só os arquivos soltos em registros/ (as subpastas
     // já são de projetos da biblioteca).
@@ -184,12 +233,11 @@ class PlantStore {
       if (files.isNotEmpty) {
         final target = _logsDir(id)..createSync(recursive: true);
         for (final f in files) {
-          final name = f.uri.pathSegments.last;
-          if (!File('${target.path}$_sep$name').existsSync()) _move(f, '${target.path}$_sep$name');
+          _moveInto(f, File('${target.path}$_sep${f.uri.pathSegments.last}'));
         }
       }
     }
-    _move(legacy, '${dir.path}$_sep${ProjectRepository.fileName}');
+    _moveInto(legacy, File('${dir.path}$_sep${ProjectRepository.fileName}'));
     _log.info('Projeto único das versões antigas migrado para $folder/$id');
     // O índice se refaz em _reconcile, que acha a pasta nova; lá o migrado
     // vira o "último aberto" — quem atualiza o app abre no projeto de sempre.
@@ -199,13 +247,73 @@ class PlantStore {
   /// Projeto migrado nesta abertura.
   String? _pendingOpen;
 
+  /// A 1.4.0 abria com a demonstração, e muita gente montou a própria
+  /// máquina em cima dela: o projeto chega aqui chamado "Demonstração". Com
+  /// coisas que não são da demonstração, vira "Meu projeto" — na lista de
+  /// projetos, "Demonstração" ao lado da demonstração nova confundiria. A
+  /// demonstração intacta mantém o nome. Grava no lugar (atômico) ANTES de
+  /// mover: se o app fechar no meio, a próxima abertura já acha renomeado.
+  void _renameEditedDemo(File legacy) {
+    try {
+      final p = ProjectRepository.decode(legacy.readAsBytesSync());
+      if (p.name.trim() != DemoProject.name || DemoProject.isOnlyDemo(p)) return;
+      final tmp = File('${legacy.path}.tmp');
+      tmp.writeAsBytesSync(ProjectRepository.encode(p.copyWith(name: 'Meu projeto')), flush: true);
+      tmp.renameSync(legacy.path);
+    } catch (e) {
+      // Ilegível ou sem espaço: migra como está.
+      _log.info('Projeto antigo migrado com o nome de sempre: $e');
+    }
+  }
+
+  /// Mesmo conteúdo nos dois arquivos.
+  static bool _same(File a, File b) {
+    try {
+      return a.lengthSync() == b.lengthSync() && ProjectRepository.sameBytes(a.readAsBytesSync(), b.readAsBytesSync());
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  /// Leva [f] para [target]. O destino já existe: com os mesmos bytes, a
+  /// cópia de uma abertura anterior ficou pronta e só falta apagar a origem;
+  /// diferente, a origem fica onde está (nada se sobrescreve).
+  static void _moveInto(File f, File target) {
+    if (!target.existsSync()) {
+      _move(f, target.path);
+    } else if (_same(f, target)) {
+      _deleteQuietly(f);
+    }
+  }
+
+  /// Renomeia; noutro volume ou com o arquivo preso, copia para `.tmp`,
+  /// renomeia para o destino e só então apaga a origem. Assim o destino
+  /// nunca fica pela metade, e a origem só some com o destino inteiro. Se
+  /// apagar a origem falhar, a próxima abertura acha os dois iguais e
+  /// termina ([_moveInto]). Sem espaço para a cópia, lança — e a origem fica.
   static void _move(File f, String to) {
     try {
       f.renameSync(to);
+      return;
     } on FileSystemException {
-      // Outro volume ou arquivo preso: copia e apaga.
-      f.copySync(to);
-      f.deleteSync();
+      // segue para a cópia
+    }
+    final tmp = File('$to.tmp');
+    try {
+      f.copySync(tmp.path);
+      tmp.renameSync(to);
+    } catch (_) {
+      _deleteQuietly(tmp);
+      rethrow;
+    }
+    _deleteQuietly(f);
+  }
+
+  static void _deleteQuietly(File f) {
+    try {
+      if (f.existsSync()) f.deleteSync();
+    } on FileSystemException catch (e) {
+      _log.warning('Não apagou $f: $e');
     }
   }
 
@@ -238,9 +346,7 @@ class PlantStore {
       // A lista se refaz pelas pastas; nome e regras da planta voltam ao
       // padrão (o arquivo estragado fica guardado ao lado).
       _log.warning('Planta ilegível, refazendo a lista pelas pastas: $e');
-      try {
-        f.copySync('${f.path}.corrompido-${DateTime.now().millisecondsSinceEpoch}');
-      } catch (_) {/* sem cópia, segue */}
+      ProjectRepository.keepCorruptCopy(f);
       _entries.clear();
     }
   }
@@ -405,6 +511,22 @@ class PlantStore {
       } catch (_) {/* fica para a próxima */}
     }
     return file;
+  }
+
+  /// As cópias guardadas por [backup], da mais nova para a mais antiga.
+  /// Moram na pasta privada (o seletor de arquivos do Android não as vê):
+  /// a tela "Cópias de segurança" as lista para abrir ou enviar.
+  List<PlantBackup> backups() {
+    final dir = Directory('${_rootDir.path}$_sep$backupFolder');
+    if (!dir.existsSync()) return const [];
+    final list = [
+      for (final f in dir.listSync().whereType<File>())
+        if (f.path.endsWith('.${ProjectRepository.exportExtension}')) PlantBackup.of(f),
+    ]..sort((a, b) {
+        final c = b.when.compareTo(a.when);
+        return c != 0 ? c : b.file.path.compareTo(a.file.path);
+      });
+    return list;
   }
 
   /// "Cortadora", "Cortadora (2)", "Cortadora (3)"… — nome que ainda não

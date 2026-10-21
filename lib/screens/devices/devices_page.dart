@@ -27,7 +27,8 @@ class _DevicesPageState extends State<DevicesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final project = AppScope.watch(context).controller.project;
+    final controller = AppScope.watch(context).controller;
+    final project = controller.project;
     // O equipamento virtual das calculadas não se cadastra nem se testa.
     final devices = project.equipment;
 
@@ -40,6 +41,9 @@ class _DevicesPageState extends State<DevicesPage> {
       forceStart: widget.startTour,
       child: ListDetail(
         key: _panes,
+        // Trocou de projeto (pelo trilho, no tablet): o cadastro aberto ao
+        // lado era do outro projeto e fecha.
+        owner: controller.openId,
         placeholder: const Scaffold(
           body: EmptyState(
             icon: Icons.router_outlined,

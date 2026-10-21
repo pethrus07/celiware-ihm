@@ -62,7 +62,8 @@ class _TagsPageState extends State<TagsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final project = AppScope.watch(context).controller.project;
+    final controller = AppScope.watch(context).controller;
+    final project = controller.project;
     final rows = _rows(project);
     // A primeira linha de variável da tela (a linha 0 é o cabeçalho do equipamento).
     final firstId = rows.length > 1 ? rows[1].$2?.id : null;
@@ -75,6 +76,9 @@ class _TagsPageState extends State<TagsPage> {
         forceStart: widget.startTour,
         child: ListDetail(
           key: _panes,
+          // Trocou de projeto (pelo trilho, no tablet): o cadastro aberto ao
+          // lado era do outro projeto e fecha.
+          owner: controller.openId,
           placeholder: const Scaffold(
             body: EmptyState(
               icon: Icons.data_object_rounded,

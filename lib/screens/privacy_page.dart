@@ -27,6 +27,7 @@ class PrivacyPage extends StatelessWidget {
     ('A rede local', [
       'O app conversa com os equipamentos que você cadastrar (CLP, inversor, conversor, broker), no endereço que você informar ou pelo cabo USB ligado ao celular. A conversa vai direto do celular para o equipamento, pela sua rede, pela VPN que você configurar ou pelo cabo, sem passar por servidor nosso.',
       'O app também consulta em qual Wi-Fi o celular está, para usar a rede da máquina e avisar quando a faixa de IP é diferente. Isso não sai do aparelho.',
+      'O app pergunta à Google Play se há versão nova; isso é feito pela própria Play.',
     ]),
     ('Câmeras', [
       'O vídeo das câmeras que você cadastrar vai direto da câmera para o celular, pela sua rede, e só é mostrado na tela: o app não grava vídeo nem guarda foto. A foto só sai do aparelho quando você toca em Enviar e escolhe para onde.',

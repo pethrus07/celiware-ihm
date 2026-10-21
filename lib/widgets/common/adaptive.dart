@@ -148,8 +148,16 @@ class _SupportingPaneScaffoldState extends State<SupportingPaneScaffold> {
 /// lugar na árvore sem perder rolagem nem o que foi digitado. Detalhe aberto
 /// numa janela que encolheu até o tamanho de celular continua aberto, no
 /// lugar da lista, até alguém voltar.
+///
+/// [owner] é de quem é o que o painel mostra (o projeto aberto). Quando
+/// muda, o painel fecha sem perguntar: no tablet o trilho fica à vista com
+/// um cadastro aberto, e trocar de projeto por ele deixava o cadastro do
+/// projeto antigo vivo no painel — o Salvar gravava no projeto NOVO.
 class ListDetail extends StatefulWidget {
-  const ListDetail({super.key, required this.list, required this.placeholder, this.listWidth = 360});
+  const ListDetail({super.key, required this.list, required this.placeholder, this.listWidth = 360, this.owner});
+
+  /// Dono do que está no painel; mudou, o painel fecha.
+  final Object? owner;
 
   /// A página da lista (com o próprio AppBar e botão flutuante).
   final Widget list;
@@ -198,6 +206,27 @@ class ListDetailState extends State<ListDetail> {
       return;
     }
     _push(id, builder);
+  }
+
+  @override
+  void didUpdateWidget(ListDetail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.owner != widget.owner) _closeAll();
+  }
+
+  /// Fecha tudo o que está no painel, sem o "Descartar alterações?": o que
+  /// estava aberto é de outro dono e não pode mais ser salvo. Já fecha na
+  /// hora o que a tela mostra; as rotas saem no fim do quadro (não se mexe
+  /// num Navigator no meio da reconstrução).
+  void _closeAll() {
+    _pending = null;
+    if (!_open) return;
+    _open = false;
+    _selected = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _navKey.currentState?.popUntil((r) => r.isFirst);
+    });
   }
 
   void _push(Object id, WidgetBuilder builder) {

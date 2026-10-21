@@ -21,7 +21,7 @@ import '../services/runtime/hmi_runtime.dart';
 import '../services/storage/plant_store.dart';
 import '../services/storage/project_repository.dart';
 
-export '../services/storage/plant_store.dart' show ProjectEntry, PlantStore;
+export '../services/storage/plant_store.dart' show ProjectEntry, PlantStore, PlantBackup;
 
 /// Dono do projeto aberto: toda edição passa por aqui.
 ///
@@ -46,11 +46,37 @@ export '../services/storage/plant_store.dart' show ProjectEntry, PlantStore;
 /// Sem planta (testes, bancada), o controlador cuida de um projeto só, no
 /// [ProjectRepository] dado — o comportamento das versões até a 1.4.0.
 class ProjectController extends ChangeNotifier {
-  ProjectController({ProjectRepository? repository, this.library, required this.runtime})
+  ProjectController({ProjectRepository? repository, this.library, required this.runtime, this.saveFirstDemo = true})
       : assert(repository != null || library != null, 'repository ou library'),
         _repository = repository;
 
   static final Logger _log = Logger('ProjectController');
+
+  /// Abre o app: a planta ([plant]) e, se ela não abrir (disco cheio, pasta
+  /// que não se cria, migração que parou no meio), o projeto como a 1.4.0
+  /// abria ([PlantStore.rescueRepository]) — o app nunca deixa de abrir por
+  /// causa da planta. O projeto único das versões antigas continua na raiz
+  /// e a migração tenta de novo na próxima abertura.
+  static Future<ProjectController> start({required HmiRuntime runtime, required PlantStore plant}) async {
+    final c = ProjectController(library: plant, runtime: runtime);
+    try {
+      await c.load();
+      return c;
+    } catch (e, st) {
+      _log.severe('A planta não abriu; abrindo o projeto como na 1.4.0: $e', e, st);
+      c.dispose();
+    }
+    // Sem gravar a demonstração na raiz: ela viraria um projeto a mais na
+    // migração da próxima abertura.
+    final rescue = ProjectController(repository: plant.rescueRepository(), runtime: runtime, saveFirstDemo: false);
+    await rescue.load();
+    return rescue;
+  }
+
+  /// Sem planta e sem projeto salvo: grava a demonstração aberta (o normal).
+  /// Falso no modo de socorro ([start]): ela só vai para o disco se a pessoa
+  /// mexer.
+  final bool saveFirstDemo;
 
   /// Os projetos guardados no aparelho. Nulo = um projeto só ([repository]).
   final PlantStore? library;
@@ -137,11 +163,22 @@ class ProjectController extends ChangeNotifier {
   Future<void> load() async {
     final lib = library;
     if (lib == null) {
-      final saved = await repository.load();
+      Project? saved;
+      try {
+        saved = await repository.load();
+      } catch (e) {
+        _log.severe('Projeto não abriu: $e');
+      }
       _project = saved ?? DemoProject.build();
       await runtime.apply(_project);
       _loaded = true;
-      if (saved == null) await repository.save(_project);
+      if (saved == null && saveFirstDemo) {
+        try {
+          await repository.save(_project);
+        } catch (e) {
+          _log.severe('Não gravou a demonstração: $e');
+        }
+      }
       notifyListeners();
       return;
     }
@@ -429,6 +466,18 @@ class ProjectController extends ChangeNotifier {
         notifyListeners();
         return backup;
       });
+
+  /// As cópias automáticas da planta, da mais nova para a mais antiga (sem
+  /// planta, nenhuma).
+  List<PlantBackup> backups() => library?.backups() ?? const [];
+
+  /// Abre uma cópia: os projetos dela entram **somados** à planta (como
+  /// "Somar" ao importar uma planta), nunca no lugar dos atuais. Devolve
+  /// quantos projetos entraram.
+  Future<int> restoreBackup(PlantBackup b) async {
+    final plant = ProjectRepository.decodePlant(await b.file.readAsBytes());
+    return addPlantProjects(plant);
+  }
 
   /// "Nova planta": uma planta com um projeto vazio (cópia da atual antes).
   Future<File> newPlant() => replacePlant(const Plant(projects: [PlantProject('novo', Project(name: 'Meu projeto'))]));

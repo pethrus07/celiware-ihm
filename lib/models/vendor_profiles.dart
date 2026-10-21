@@ -781,10 +781,10 @@ abstract final class VendorProfiles {
     notes: 'Fala Modbus RTU: precisa de gateway. Para comandar pela rede: F0-02 = 2 e F0-03 = 9; velocidade e endereço no grupo FD (FD-00, FD-02).',
     parameters: ParameterRule(ParameterStyle.inovance),
     templates: [
-      TagTemplate(key: 'comando', name: 'Comando', address: 0x2000, writable: true, description: '1 avante · 2 ré · 3/4 jog · 5 parada livre · 6 parada em rampa · 7 reset de falha'),
+      TagTemplate(key: 'comando', name: 'Comando', address: 0x2000, writable: true, description: '1 avante · 2 reverso · 3/4 jog · 5 parada livre · 6 parada em rampa · 7 reset de falha'),
       // ±10000 = ±100,00 % da frequência máxima (F0-10).
       TagTemplate(key: 'referencia', name: 'Referência de frequência', address: 0x1000, dataType: TagDataType.int16, writable: true, unit: '%', scale: 0.01, description: '% da frequência máxima (F0-10)'),
-      TagTemplate(key: 'estado', name: 'Estado', address: 0x3000, description: '1 avante · 2 ré · 3 parado'),
+      TagTemplate(key: 'estado', name: 'Estado', address: 0x3000, description: '1 avante · 2 reverso · 3 parado'),
       TagTemplate(key: 'falha', name: 'Falha', address: 0x8000, description: 'Código da falha'),
     ],
   );
@@ -801,9 +801,9 @@ abstract final class VendorProfiles {
     notes: 'Fala Modbus RTU: precisa de gateway. Para comandar pela rede: P00.01 = 2 e P00.06 = 8; comunicação no grupo P14.',
     parameters: ParameterRule(ParameterStyle.invt),
     templates: [
-      TagTemplate(key: 'comando', name: 'Comando', address: 0x2000, writable: true, description: '1 avante · 2 ré · 3/4 jog · 5 parar · 6 parada livre · 7 reset de falha · 8 parar jog'),
+      TagTemplate(key: 'comando', name: 'Comando', address: 0x2000, writable: true, description: '1 avante · 2 reverso · 3/4 jog · 5 parar · 6 parada livre · 7 reset de falha · 8 parar jog'),
       TagTemplate(key: 'referencia', name: 'Referência de frequência', address: 0x2001, writable: true, unit: 'Hz', scale: 0.01, description: '0 até a frequência máxima, em 0,01 Hz'),
-      TagTemplate(key: 'estado', name: 'Estado', address: 0x2100, description: '1 avante · 2 ré · 3 parado · 4 falha'),
+      TagTemplate(key: 'estado', name: 'Estado', address: 0x2100, description: '1 avante · 2 reverso · 3 parado · 4 falha'),
       TagTemplate(key: 'falha', name: 'Falha', address: 0x2102, description: 'Código da falha'),
     ],
   );

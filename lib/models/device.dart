@@ -183,8 +183,11 @@ class Device {
   bool get isNetwork =>
       kind == DeviceKind.modbusTcp || kind == DeviceKind.modbusRtuTcp || kind == DeviceKind.mqtt || kind == DeviceKind.s7 || kind == DeviceKind.raw || kind == DeviceKind.opcua || kind == DeviceKind.http;
 
-  /// Descrição curta para listas: "192.168.0.10:502 · ID 1".
-  String get addressLabel => isDemo
+  /// Descrição curta para listas: "192.168.0.10:502 · ID 1". Equipamento de
+  /// projeto pronto nasce sem IP: "IP a configurar", nunca ":502".
+  String get addressLabel => isNetwork && host.trim().isEmpty
+      ? 'IP a configurar'
+      : isDemo
       ? 'Simulada neste aparelho'
       : isCalc
           ? 'Contas feitas neste aparelho'

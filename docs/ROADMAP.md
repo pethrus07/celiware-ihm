@@ -156,6 +156,18 @@ histórico de uma regra da planta vai para o histórico do projeto aberto na hor
 aparelho (hoje é uma planta por aparelho, trocada por arquivo); mover um
 projeto de uma planta para outra sem passar por arquivo.
 
+## Modelos e projetos prontos — pedidos da reunião de 19/10/2026 (confirmados em 21/10)
+
+Detalhe em `ARQUITETURA.md` §6.1 ("Modelos de tela" e "Projetos prontos").
+
+| # | Pedido | Estado |
+|---|---|---|
+| 1 | "Ré" vira **"Reverso"** nos modelos de inversor e servo ("Avante" fica) | **Feito (21/10):** botão, estado das marcas (MD500, GD20) e descrições dos perfis. |
+| 2 | Modelo **Máquina** mais completo: OEE e manual/automático | **Feito (21/10):** modo só de leitura ("Em automático" → MANUAL/AUTOMÁTICO) e o OEE da paleta, calculado pelas três parcelas. O comando de troca de modo não entrou (fica no painel da máquina; sem botão na tela). |
+| 3 | Modelo de tela **I/O de CLP** (8/8 e 16/16) | **Feito (21/10):** uma lâmpada por entrada e por saída, endereços a configurar. Saída em lâmpada, não em botão (o CLP reescreve a saída a cada ciclo). |
+| 4 | **Telas pré-definidas → projetos prontos** (decisão do Pedro: projetos que somam à planta) | **Feito (21/10):** Projetos → Novo projeto → **De um projeto pronto**: Diretoria, Supervisão, Operador, Monitoramento rápido e Tex G4. Somam à planta com nome único; tudo com o endereço e o IP a configurar. |
+| 5 | Projeto pronto do **Tex G4** (teste de estanqueidade) | **Feito (21/10)** com os nomes e descrições do Padrão TEX. **Falta:** os endereços Modbus do G4 (manual Modbus do Tex), os códigos de State/Status e as unidades de pressão, vazamento e tempo (as mesmas pendências do material do Padrão TEX). Nenhum teste em equipamento real. |
+
 ## Planta: o que ficou para depois (revisão de 21/10/2026)
 
 A revisão da 1.5.0 (planta com projetos) achou pontos que foram corrigidos

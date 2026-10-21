@@ -1,5 +1,7 @@
 // Modelos prontos de tela (itens 28, 161, 162, 165, 166 e 167 da lista do
-// cliente): "Nova tela" começa de um destes, ou em branco.
+// cliente; Máquina com modo e OEE e o I/O de CLP pedidos na reunião de
+// 19/10/2026): "Nova tela" começa de um destes, ou em branco. Os projetos
+// prontos (`ready_projects.dart`) montam as telas deles com as mesmas peças.
 //
 // Só dados. Cada modelo diz **quais variáveis** a tela usa e **onde cada
 // elemento fica** na grade fina (12 colunas); quem transforma isso em tela e
@@ -25,6 +27,7 @@
 
 import 'package:flutter/material.dart' show IconData, Icons;
 
+import '../../core/modbus/modbus_memory.dart';
 import '../../models/alarm.dart';
 import '../../models/hmi_screen.dart';
 import '../../models/tag.dart';
@@ -35,7 +38,7 @@ enum CommandStyle {
   /// Serve para qualquer equipamento: é o CLP que repassa ao acionamento.
   bits,
 
-  /// Palavra de comando do inversor ("Comando": 1 avante, 2 ré…) com os
+  /// Palavra de comando do inversor ("Comando": 1 avante, 2 reverso…) com os
   /// endereços do mapa da marca. Só com perfil de inversor que tenha o mapa
   /// e os códigos em [ScreenTemplates.driveCodes].
   word,
@@ -68,6 +71,7 @@ class TemplateTag {
     this.map,
     this.alarms = const [],
     this.only,
+    this.area,
   });
 
   /// Como os elementos do modelo se referem a ela.
@@ -93,6 +97,11 @@ class TemplateTag {
 
   /// Só existe num dos jeitos de comandar (nulo = nos dois).
   final CommandStyle? only;
+
+  /// Onde a variável sem mapa nasce. Nulo = o mais provável pelo tipo (coil
+  /// para liga/desliga, holding para número); entrada física de CLP pede
+  /// `discreteInput`. Só o tipo de memória: o endereço continua a configurar.
+  final ModbusArea? area;
 }
 
 /// Um elemento do modelo, em células da grade fina.
@@ -220,7 +229,7 @@ List<TemplateTag> _driveBasicTags({required String what, required String running
       // Comando por bits (genérico).
       TemplateTag('liga', 'Liga $what', type: _bool, writable: true, description: 'Comando de partida e parada', only: CommandStyle.bits),
       TemplateTag('emOperacao', '${_capital(what)} em operação', type: _bool, description: 'Retorno: o $what confirma que está $running', only: CommandStyle.bits),
-      const TemplateTag('sentido', 'Sentido reverso', type: _bool, writable: true, description: 'Ligado = ré; desligado = avante', only: CommandStyle.bits),
+      const TemplateTag('sentido', 'Sentido reverso', type: _bool, writable: true, description: 'Ligado = reverso; desligado = avante', only: CommandStyle.bits),
       const TemplateTag('reset', 'Reset de falha', type: _bool, writable: true, description: 'Pulso: limpa a falha depois que a causa sumiu', only: CommandStyle.bits),
       TemplateTag('falha', 'Falha do $what', type: _bool, alarms: [TemplateAlarm(AlarmKind.on, 'Falha no $what', priority: AlarmPriority.high)], only: CommandStyle.bits),
       // Comando pela palavra do inversor (mapa da marca).
@@ -243,12 +252,12 @@ List<TemplateElement> _driveBasicElements({required String motorLabel, required 
       const TemplateElement(ElementType.lamp, 6, 0, 6, 4,
           tag: 'falha', props: {'label': 'Falha', 'onText': 'ATIVA', 'offText': 'OK', 'color': 'red'}, only: CommandStyle.bits),
       // O que faço.
-      for (final (i, cmd, label) in [(0, DriveCommand.forward, 'Avante'), (1, DriveCommand.reverse, 'Ré'), (2, DriveCommand.stop, 'Parar'), (3, DriveCommand.reset, 'Reset')])
+      for (final (i, cmd, label) in [(0, DriveCommand.forward, 'Avante'), (1, DriveCommand.reverse, 'Reverso'), (2, DriveCommand.stop, 'Parar'), (3, DriveCommand.reset, 'Reset')])
         TemplateElement(ElementType.button, i * 3, 4, 3, 3,
             tag: 'comando', command: cmd, props: {'label': label, 'mode': 'value', 'color': cmd == DriveCommand.reset ? 'amber' : _neutral}, only: CommandStyle.word),
       const TemplateElement(ElementType.button, 0, 4, 4, 3,
           tag: 'liga', feedback: 'emOperacao', props: {'label': 'Liga', 'mode': 'toggle', 'color': 'green'}, only: CommandStyle.bits),
-      const TemplateElement(ElementType.button, 4, 4, 4, 3, tag: 'sentido', props: {'label': 'Ré', 'mode': 'toggle', 'color': _neutral}, only: CommandStyle.bits),
+      const TemplateElement(ElementType.button, 4, 4, 4, 3, tag: 'sentido', props: {'label': 'Reverso', 'mode': 'toggle', 'color': _neutral}, only: CommandStyle.bits),
       const TemplateElement(ElementType.button, 8, 4, 4, 3, tag: 'reset', props: {'label': 'Reset', 'mode': 'momentary', 'color': 'amber'}, only: CommandStyle.bits),
       // Como responde.
       const TemplateElement(ElementType.input, 0, 7, 6, 4, tag: 'referencia', props: {'label': 'Referência', 'min': 0}),
@@ -312,14 +321,35 @@ abstract final class ScreenTemplates {
     icon: Icons.crop_square_rounded,
   );
 
-  /// Item 28: máquina genérica.
+  /// Estados da variável "Estado da máquina" (códigos a ajustar aos do CLP).
+  static const machineStates = [
+    {'value': 0, 'text': 'PARADA', 'color': _neutral},
+    {'value': 1, 'text': 'EM OPERAÇÃO', 'color': 'green'},
+    {'value': 2, 'text': 'ALARME', 'color': 'red'},
+  ];
+
+  /// "Em automático" (liga/desliga) como estado: desligado = MANUAL. Azul
+  /// (informação) no automático: é modo, não falha nem marcha.
+  static const modeStates = [
+    {'value': 0, 'text': 'MANUAL', 'color': _neutral},
+    {'value': 1, 'text': 'AUTOMÁTICO', 'color': 'blue'},
+  ];
+
+  /// O OEE como o app já usa (`ElementCatalog.defaultProps`): calculado no
+  /// app pelas três parcelas, de 0 a 100, sem faixa inventada.
+  static const oeeProps = {'label': 'OEE', 'source': 'calc', 'scale': 'percent'};
+
+  /// Item 28: máquina genérica. Na reunião de 19/10/2026 ganhou o modo
+  /// (manual ou automático, só leitura — o comando de troca de modo é do
+  /// painel da máquina) e o OEE.
   static const machine = ScreenTemplate(
     id: 'maquina',
     name: 'Máquina',
-    description: 'Estado, liga com retorno, velocidade, produção e alarme.',
+    description: 'Estado, modo, liga com retorno, velocidade, produção, alarme e OEE.',
     icon: Icons.precision_manufacturing_outlined,
     tags: [
       TemplateTag('estado', 'Estado da máquina', type: _code, description: '0 parada · 1 em operação · 2 alarme — ajuste aos códigos do CLP'),
+      TemplateTag('emAutomatico', 'Em automático', type: _bool, description: 'Ligado = automático; desligado = manual'),
       TemplateTag('liga', 'Liga máquina', type: _bool, writable: true, description: 'Comando de partida e parada'),
       TemplateTag('emOperacao', 'Máquina em operação', type: _bool, description: 'Retorno: a máquina confirma que partiu'),
       TemplateTag('reset', 'Reset de alarme', type: _bool, writable: true, description: 'Pulso: limpa o alarme depois que a causa sumiu'),
@@ -327,24 +357,60 @@ abstract final class ScreenTemplates {
       TemplateTag('ajusteVelocidade', 'Ajuste de velocidade', type: _number, writable: true, decimals: 1),
       TemplateTag('producao', 'Produção', type: _count, unit: 'un'),
       TemplateTag('alarme', 'Alarme da máquina', type: _bool, alarms: [TemplateAlarm(AlarmKind.on, 'Máquina em alarme')]),
+      TemplateTag('disponibilidade', 'Disponibilidade', unit: '%', decimals: 1, description: 'Parcela do OEE: tempo produzindo ÷ tempo planejado'),
+      TemplateTag('desempenho', 'Desempenho', unit: '%', decimals: 1, description: 'Parcela do OEE: produção real ÷ produção no ritmo ideal'),
+      TemplateTag('qualidade', 'Qualidade', unit: '%', decimals: 1, description: 'Parcela do OEE: peças boas ÷ peças feitas'),
     ],
     elements: [
-      TemplateElement(ElementType.multistate, 0, 0, 12, 3, tag: 'estado', props: {
-        'label': 'Estado',
-        'states': [
-          {'value': 0, 'text': 'PARADA', 'color': _neutral},
-          {'value': 1, 'text': 'EM OPERAÇÃO', 'color': 'green'},
-          {'value': 2, 'text': 'ALARME', 'color': 'red'},
-        ],
-      }),
-      TemplateElement(ElementType.button, 0, 3, 6, 4, tag: 'liga', feedback: 'emOperacao', props: {'label': 'Liga', 'mode': 'toggle', 'color': 'green'}),
-      TemplateElement(ElementType.button, 6, 3, 6, 4, tag: 'reset', props: {'label': 'Reset', 'mode': 'momentary', 'color': 'amber'}),
-      TemplateElement(ElementType.value, 0, 7, 6, 4, tag: 'velocidade', props: {'label': 'Velocidade'}),
-      TemplateElement(ElementType.input, 6, 7, 6, 4, tag: 'ajusteVelocidade', props: {'label': 'Ajuste', 'min': 0}),
-      TemplateElement(ElementType.value, 0, 11, 6, 4, tag: 'producao', props: {'label': 'Produção'}),
-      TemplateElement(ElementType.lamp, 6, 11, 6, 4, tag: 'alarme', props: {'label': 'Alarme', 'onText': 'ATIVO', 'offText': 'OK', 'color': 'red'}),
+      // Como está.
+      TemplateElement(ElementType.multistate, 0, 0, 12, 3, tag: 'estado', props: {'label': 'Estado', 'states': machineStates}),
+      TemplateElement(ElementType.multistate, 0, 3, 6, 4, tag: 'emAutomatico', props: {'label': 'Modo', 'states': modeStates}),
+      TemplateElement(ElementType.lamp, 6, 3, 6, 4, tag: 'alarme', props: {'label': 'Alarme', 'onText': 'ATIVO', 'offText': 'OK', 'color': 'red'}),
+      // O que faço.
+      TemplateElement(ElementType.button, 0, 7, 6, 4, tag: 'liga', feedback: 'emOperacao', props: {'label': 'Liga', 'mode': 'toggle', 'color': 'green'}),
+      TemplateElement(ElementType.button, 6, 7, 6, 4, tag: 'reset', props: {'label': 'Reset', 'mode': 'momentary', 'color': 'amber'}),
+      // Como responde.
+      TemplateElement(ElementType.value, 0, 11, 6, 4, tag: 'velocidade', props: {'label': 'Velocidade'}),
+      TemplateElement(ElementType.input, 6, 11, 6, 4, tag: 'ajusteVelocidade', props: {'label': 'Ajuste', 'min': 0}),
+      TemplateElement(ElementType.value, 0, 15, 12, 3, tag: 'producao', props: {'label': 'Produção'}),
+      // Largura toda e 6 de altura: o tamanho com que o OEE nasce na grade fina.
+      TemplateElement(ElementType.oee, 0, 18, 12, 6, tags: ['disponibilidade', 'desempenho', 'qualidade'], props: oeeProps),
     ],
   );
+
+  /// I/O de CLP (reunião de 19/10/2026): uma lâmpada por entrada e por
+  /// saída, só para ligar as memórias e ver o estado. Saída também em
+  /// lâmpada, e não em botão: o programa do CLP reescreve a saída a cada
+  /// ciclo, e forçar saída é com o CLP em manutenção, não pela tela.
+  static final io8 = _io('io-8', 8);
+  static final io16 = _io('io-16', 16);
+
+  static ScreenTemplate _io(String id, int n) {
+    // Duas por linha, 6×4: com quatro por linha (3×4), no celular de 320 dp,
+    // "DESLIGADA" e "A configurar" encolhiam abaixo de 10 dp.
+    List<TemplateElement> lamps(String prefix, String key, int top) => [
+          for (var i = 0; i < n; i++)
+            TemplateElement(ElementType.lamp, (i % 2) * 6, top + (i ~/ 2) * 4, 6, 4,
+                tag: '$key$i', props: {'label': '$prefix$i', 'onText': 'LIGADA', 'offText': 'DESLIGADA', 'color': 'green'}),
+        ];
+    final rows = (n / 2).ceil() * 4;
+    return ScreenTemplate(
+      id: id,
+      name: 'I/O de CLP — $n entradas e $n saídas',
+      description: 'Uma lâmpada por entrada (E0…E${n - 1}) e por saída (S0…S${n - 1}).',
+      icon: Icons.developer_board_outlined,
+      tags: [
+        for (var i = 0; i < n; i++) TemplateTag('e$i', 'Entrada E$i', type: _bool, area: ModbusArea.discreteInput, description: 'Entrada física do CLP'),
+        for (var i = 0; i < n; i++) TemplateTag('s$i', 'Saída S$i', type: _bool, area: ModbusArea.coil, description: 'Saída física do CLP'),
+      ],
+      elements: [
+        const TemplateElement(ElementType.label, 0, 0, 12, 2, props: {'text': 'Entradas', 'size': 'm', 'align': 'left'}),
+        ...lamps('E', 'e', 2),
+        TemplateElement(ElementType.label, 0, 2 + rows, 12, 2, props: const {'text': 'Saídas', 'size': 'm', 'align': 'left'}),
+        ...lamps('S', 's', 4 + rows),
+      ],
+    );
+  }
 
   /// Item 162: inversor, básico e completo. Com perfil de inversor (MD500,
   /// GD20), comanda pela palavra de comando com os endereços do manual.
@@ -461,25 +527,26 @@ abstract final class ScreenTemplates {
     ],
   );
 
-  static final List<ScreenTemplate> all = [blank, machine, inverterBasic, inverterFull, servoBasic, servoFull, barcode, temperature, loadCell];
+  static final List<ScreenTemplate> all = [blank, machine, inverterBasic, inverterFull, servoBasic, servoFull, barcode, temperature, loadCell, io8, io16];
 
   static ScreenTemplate? byId(String id) => all.where((t) => t.id == id).firstOrNull;
 
   /// Palavra de comando e estados por perfil de inversor (id do perfil).
   /// Perfil de inversor fora daqui usa o comando por bits.
   static const driveCodes = <String, DriveCodes>{
-    // MD500: 0x2000 1 avante · 2 ré · 5 parada livre · 6 parada em rampa ·
-    // 7 reset; 0x3000 1 avante · 2 ré · 3 parado.
+    // MD500: 0x2000 1 avante · 2 reverso · 5 parada livre · 6 parada em
+    // rampa · 7 reset; 0x3000 1 avante · 2 reverso · 3 parado. "Reverso", e
+    // não "ré", a pedido do cliente (reunião de 19/10/2026).
     'inovance-md500': DriveCodes(forward: 1, reverse: 2, stop: 6, reset: 7, states: [
       {'value': 1, 'text': 'AVANTE', 'color': 'green'},
-      {'value': 2, 'text': 'RÉ', 'color': 'green'},
+      {'value': 2, 'text': 'REVERSO', 'color': 'green'},
       {'value': 3, 'text': 'PARADO', 'color': _neutral},
     ]),
-    // GD20: 0x2000 1 avante · 2 ré · 5 parar · 6 parada livre · 7 reset;
-    // 0x2100 1 avante · 2 ré · 3 parado · 4 falha.
+    // GD20: 0x2000 1 avante · 2 reverso · 5 parar · 6 parada livre · 7 reset;
+    // 0x2100 1 avante · 2 reverso · 3 parado · 4 falha.
     'invt-gd20': DriveCodes(forward: 1, reverse: 2, stop: 5, reset: 7, states: [
       {'value': 1, 'text': 'AVANTE', 'color': 'green'},
-      {'value': 2, 'text': 'RÉ', 'color': 'green'},
+      {'value': 2, 'text': 'REVERSO', 'color': 'green'},
       {'value': 3, 'text': 'PARADO', 'color': _neutral},
       {'value': 4, 'text': 'FALHA', 'color': 'red'},
     ]),

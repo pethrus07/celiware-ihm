@@ -18,6 +18,7 @@ import '../../widgets/common/adaptive.dart';
 import '../../widgets/common/common.dart';
 import '../../widgets/hmi/live_tags.dart';
 import '../tags/calc_expression_field.dart';
+import 'condition_help.dart';
 import 'rules_page.dart';
 
 /// Cadastro de regra: **Quando** (a condição, escrita como uma conta, com o
@@ -130,6 +131,33 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
     } on CalcError catch (e) {
       return (null, e);
     }
+  }
+
+  // ── Como escrever ─────────────────────────────────────────────────────────
+
+  /// Folha de exemplos: o escolhido entra no lugar do que estava no campo,
+  /// com a primeira variável selecionada (o "Variável" troca por outra). Se
+  /// havia uma condição escrita, "Desfazer" devolve.
+  Future<void> _showExamples() async {
+    final text = await ConditionHelpSheet.show(context, _source);
+    if (text == null || !mounted) return;
+    final before = _condition.value;
+    _condition.value = TextEditingValue(text: text, selection: ConditionHelpSheet.selectionFor(text));
+    setState(() {});
+    if (before.text.trim().isEmpty || before.text == text) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: const Text('Exemplo no lugar da condição.'),
+        action: SnackBarAction(
+          label: 'Desfazer',
+          onPressed: () {
+            if (!mounted) return;
+            _condition.value = before;
+            setState(() {});
+          },
+        ),
+      ));
   }
 
   // ── Destino ───────────────────────────────────────────────────────────────
@@ -344,7 +372,18 @@ class _RuleEditorPageState extends State<RuleEditorPage> {
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
-                const SectionHeader('Quando', padding: EdgeInsets.fromLTRB(0, 28, 0, 12)),
+                // "Como escrever" na linha do título: à mão, sem somar uma
+                // linha de botões ao formulário.
+                SectionHeader(
+                  'Quando',
+                  padding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
+                  trailing: TextButton.icon(
+                    key: const ValueKey('como-escrever'),
+                    onPressed: _showExamples,
+                    icon: const Icon(Icons.help_outline_rounded, size: 18),
+                    label: const Text('Como escrever'),
+                  ),
+                ),
                 CalcExpressionField(
                   controller: _condition,
                   error: error,

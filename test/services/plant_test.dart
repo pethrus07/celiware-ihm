@@ -168,6 +168,91 @@ void main() {
       expect(rules.proposals, hasLength(1));
     });
 
+    // Revisão de 21/10/2026: a regra que citava o projeto apagado virava
+    // "Regra X parada" em todos os projetos até alguém apagá-la.
+    test('apagar um projeto DESLIGA (não apaga) as regras da planta que o citam', () async {
+      final c = ProjectController(library: PlantStore(root: root), runtime: HmiRuntime());
+      addTearDown(() async {
+        c.dispose();
+        await c.runtime.dispose();
+      });
+      await c.load();
+      final demo = c.openId!;
+      final pp = await c.createProject(prensa);
+      final pf = await c.createProject(forno);
+      await c.open(pp);
+      final t = PlantRef.of(pf, 'temp');
+      await c.savePlantRule(LogicRule(id: 'g1', name: 'A', condition: CalcSpec(expression: '{$t} > 80'), targetTagId: 'liga'));
+      await c.savePlantRule(LogicRule(id: 'g2', name: 'B', condition: CalcSpec(expression: '{$t} > 90'), targetTagId: 'liga'));
+      await c.savePlantRule(const LogicRule(id: 'g3', name: 'Só a prensa', condition: CalcSpec(expression: '{liga}'), targetTagId: 'liga'));
+      await c.savePlantRule(LogicRule(id: 'g4', name: 'Já desligada', condition: CalcSpec(expression: '{$t} > 99'), targetTagId: 'liga', enabled: false));
+      expect(c.plantRulesUsing(pf).map((r) => r.id), ['g1', 'g2'], reason: 'o diálogo conta só as ligadas');
+      expect(c.plantRulesUsing(pp).map((r) => r.id), ['g1', 'g2', 'g3'], reason: 'o destino também conta');
+      expect(c.plantRulesUsing(demo), isEmpty);
+      expect(c.liveProject.tag(t), isNotNull);
+
+      await c.deleteProject(pf);
+      expect(c.plantRules.map((r) => r.id), ['g1', 'g2', 'g3', 'g4'], reason: 'nenhuma regra é apagada');
+      expect({for (final r in c.plantRules) r.id: r.enabled}, {'g1': false, 'g2': false, 'g3': true, 'g4': false});
+      expect(c.liveProject.tags.where((x) => x.id.startsWith('$pf/')), isEmpty, reason: 'o motor não procura mais o projeto apagado');
+      // Guardado no índice da planta: a próxima abertura já vem desligada.
+      final again = PlantStore(root: root);
+      await again.load();
+      expect(again.rules.where((r) => r.enabled).map((r) => r.id), ['g3']);
+    });
+
+    // Revisão de 21/10/2026: a troca descartava a pergunta em silêncio.
+    test('trocar de projeto retira a pergunta pendente e registra no histórico do projeto que saiu', () async {
+      final memPrensa = ModbusMemory(holdingRegisters: 4, coils: 4)..pokeBit(ModbusArea.coil, 0, true);
+      final memForno = ModbusMemory(holdingRegisters: 4, coils: 4)..pokeRegister(ModbusArea.holdingRegister, 0, 90);
+      final runtime = HmiRuntime(
+        clientFactory: (d) => SimulatedModbusClient(memory: d.host == 'prensa' ? memPrensa : memForno, latency: Duration.zero),
+      );
+      final c = ProjectController(library: PlantStore(root: root), runtime: runtime);
+      await c.load();
+      final demo = c.openId!;
+      final pp = await c.createProject(prensa);
+      final pf = await c.createProject(forno);
+      await c.deleteProject(demo);
+      await c.open(pp);
+      final rules = RuleEngine(
+        controller: c,
+        runtime: runtime,
+        historyFile: () => c.repository.sidecar('historico-regras.json'),
+        tick: const Duration(milliseconds: 100),
+      );
+      addTearDown(() async {
+        rules.dispose();
+        c.dispose();
+        await runtime.dispose();
+      });
+
+      await c.savePlantRule(LogicRule(id: 'g1', name: 'Parar a prensa', condition: CalcSpec(expression: '{${PlantRef.of(pf, 'temp')}} > 80'), targetTagId: 'liga'));
+      await until(() => rules.proposals.isNotEmpty);
+      expect(rules.proposals.single.ruleId, 'g1');
+
+      // Forno frio antes de abrir o forno: a pergunta não volta lá.
+      memForno.pokeRegister(ModbusArea.holdingRegister, 0, 20);
+      await c.open(pf);
+      expect(rules.proposals, isEmpty);
+      expect(memPrensa.bit(ModbusArea.coil, 0), isTrue, reason: 'retirar nunca grava');
+      expect(rules.history.where((e) => e.type == RuleEventType.withdrawn), isEmpty, reason: 'o histórico na tela agora é o do forno');
+
+      final file = await c.library!.repositoryFor(pp).sidecar('historico-regras.json');
+      final saved = [for (final j in jsonDecode(file.readAsStringSync()) as List) RuleEvent.fromJson(Map<String, dynamic>.from(j as Map))!];
+      expect(saved.last.type, RuleEventType.withdrawn);
+      expect(saved.last.rule, 'Parar a prensa');
+      expect(saved.last.text, 'troca de projeto');
+
+      // De volta à prensa: a retirada está no histórico dela.
+      await c.open(pp);
+      expect(rules.history.first.type, RuleEventType.withdrawn);
+      expect(rules.history.first.text, 'troca de projeto');
+      // O motor recebe o projeto antes do aviso às telas: salvar a regra e
+      // trocar de projeto não passam por "variável apagada".
+      expect(rules.history.where((e) => e.type == RuleEventType.stopped), isEmpty);
+    });
+
     test('exportar a planta; importar soma os projetos (regras apontando para os novos) ou substitui com cópia antes', () async {
       final c = ProjectController(library: PlantStore(root: root), runtime: HmiRuntime());
       addTearDown(() async {

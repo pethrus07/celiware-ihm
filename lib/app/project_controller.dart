@@ -254,7 +254,13 @@ class ProjectController extends ChangeNotifier {
     _openId = id;
     _project = next;
     _refreshLive();
+    // O motor recebe o projeto novo antes do aviso (a parte síncrona do
+    // apply já troca o projeto dele): quem se inscreve ao ouvir o aviso
+    // (regras, alarmes) encontra as variáveis — sem isso a regra da planta
+    // via "variável apagada" por um instante e registrava "parada" a cada troca.
+    final applying = runtime.apply(liveProject);
     notifyListeners();
+    await applying;
     await _loadReferenced();
     _refreshLive();
     await runtime.apply(liveProject);
@@ -325,12 +331,29 @@ class ProjectController extends ChangeNotifier {
         notifyListeners();
       });
 
+  /// Regras da planta ligadas que citam o projeto [id] (na condição ou no
+  /// destino) — as que apagar o projeto desliga.
+  List<LogicRule> plantRulesUsing(String id) => [
+        for (final r in plantRules)
+          if (r.enabled && PlantRef.projectsOf(r).contains(id)) r,
+      ];
+
   /// Apaga um projeto e o que é dele no aparelho (históricos, registro de
   /// dados, senhas das câmeras). O último que sobrou não se apaga: o app
   /// precisa de um projeto aberto. Apagar o aberto abre outro antes.
+  ///
+  /// As regras da planta que citam o projeto são **desligadas** (não
+  /// apagadas): sem isso viravam o alarme "Regra X parada" em todos os
+  /// projetos até alguém apagar a regra. O diálogo de apagar avisa quantas.
   Future<void> deleteProject(String id) => _serial(() async {
         final lib = _lib;
         if (lib.entries.length <= 1 || lib.entry(id) == null) return;
+        // Antes de abrir outro: o motor nunca chega a ler as máquinas de
+        // quem está saindo por causa dessas regras.
+        final using = {for (final r in plantRulesUsing(id)) r.id};
+        if (using.isNotEmpty) {
+          await lib.setRules([for (final r in plantRules) using.contains(r.id) ? r.copyWith(enabled: false) : r]);
+        }
         final doomed = await _snapshot(id);
         if (id == _openId) await _open(lib.entries.firstWhere((e) => e.id != id).id);
         await lib.remove(id);
@@ -386,8 +409,10 @@ class ProjectController extends ChangeNotifier {
     await _lib.setRules(rules);
     await _loadReferenced();
     _refreshLive();
+    // Motor antes do aviso, como em [_open].
+    final applying = runtime.apply(liveProject);
     notifyListeners();
-    await runtime.apply(liveProject);
+    await applying;
   }
 
   /// Todas as variáveis da planta, para o editor das regras da planta (lê

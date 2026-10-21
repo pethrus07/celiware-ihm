@@ -72,6 +72,12 @@ class ProbeResult {
 /// e o runtime tenta gravar 0 a cada segundo até conseguir. [releaseAll] é
 /// chamado quando a tela fecha e quando o app vai para segundo plano — um
 /// comando momentâneo nunca fica "preso" ligado por causa do celular.
+///
+/// **Uma conexão por CLP.** Dois equipamentos com o mesmo endereço de
+/// conexão ([linkKey]: protocolo, IP, porta e escravo ou rack/slot) dividem
+/// uma sessão — a do primeiro da lista. Acontece com as regras da planta:
+/// um projeto duplicado traz o mesmo CLP com outro id, e uma segunda
+/// conexão TCP derrubaria o CLP que só aceita uma.
 class HmiRuntime {
   HmiRuntime({ModbusClient Function(Device)? clientFactory})
       : _clientFactory = clientFactory ?? DeviceSession.defaultClientFactory {
@@ -84,7 +90,12 @@ class HmiRuntime {
   final TagStore store = TagStore();
 
   Project _project = const Project();
+
+  /// Sessões por id do equipamento dono (o primeiro com aquele endereço).
   final Map<String, DeviceSession> _sessions = {};
+
+  /// Equipamento que usa a sessão de outro (mesmo [linkKey]) → id do dono.
+  Map<String, String> _alias = const {};
   final Map<String, int> _refs = {};
   final Set<String> _pressed = {};
   final Set<String> _pendingRelease = {};
@@ -93,6 +104,42 @@ class HmiRuntime {
 
   Project get project => _project;
 
+  /// O endereço da conexão, para dois equipamentos dividirem uma sessão;
+  /// nulo = sessão própria. Só Modbus TCP, Modbus RTU/ASCII pelo gateway e
+  /// S7. Cabo USB fica de fora (a porta já é dividida no `UsbSerialPool`),
+  /// como MQTT, OPC UA, Arduino, demonstração e calculadas, em que a
+  /// conexão carrega mais que o endereço.
+  static String? linkKey(Device d) {
+    final host = d.host.trim().toLowerCase();
+    if (host.isEmpty) return null;
+    return switch (d.kind) {
+      DeviceKind.modbusTcp => 'modbus-tcp|$host|${d.port}|${d.unitId}',
+      DeviceKind.modbusRtuTcp => 'modbus-gateway|$host|${d.port}|${d.framing.name}|${d.unitId}',
+      DeviceKind.s7 => 's7|$host|${d.port}|${d.s7.rack}|${d.s7.slot}',
+      _ => null,
+    };
+  }
+
+  /// Quem usa a sessão de quem: o primeiro equipamento com um [linkKey] é o
+  /// dono; os seguintes com o mesmo apontam para ele.
+  static Map<String, String> _aliases(Project p) {
+    final owner = <String, String>{};
+    final alias = <String, String>{};
+    for (final d in p.devices) {
+      final key = linkKey(d);
+      if (key == null) continue;
+      final o = owner[key];
+      if (o == null) {
+        owner[key] = d.id;
+      } else {
+        alias[d.id] = o;
+      }
+    }
+    return alias;
+  }
+
+  String _ownerId(String deviceId) => _alias[deviceId] ?? deviceId;
+
   // ── Projeto ──────────────────────────────────────────────────────────────────
 
   /// Aplica um projeto novo (edição, importação). Reaproveita as sessões dos
@@ -100,11 +147,14 @@ class HmiRuntime {
   Future<void> apply(Project next) async {
     final old = _project;
     _project = next;
+    _alias = _aliases(next);
 
     for (final id in _sessions.keys.toList()) {
-      if (next.device(id) == null) {
+      final gone = next.device(id) == null;
+      // Passou a usar a sessão de outro equipamento (mesmo endereço).
+      if (gone || _alias.containsKey(id)) {
         await _sessions.remove(id)!.dispose();
-        DemoRegistry.discard(id);
+        if (gone) DemoRegistry.discard(id);
         _sessionsRevision.value++;
       }
     }
@@ -144,7 +194,7 @@ class HmiRuntime {
   ValueListenable<TagReading> watch(String tagId) => store.watch(tagId);
 
   /// Saúde da comunicação de um equipamento (nulo se nada dele está em uso).
-  ValueListenable<DeviceHealth>? health(String deviceId) => _sessions[deviceId]?.health;
+  ValueListenable<DeviceHealth>? health(String deviceId) => _sessions[_ownerId(deviceId)]?.health;
 
   final ValueNotifier<int> _sessionsRevision = ValueNotifier(0);
 
@@ -178,10 +228,11 @@ class HmiRuntime {
         store.publish(id, const TagReading(quality: TagQuality.configError, message: pendingMessage));
         continue;
       }
-      byDevice.putIfAbsent(tag.deviceId, () => []).add(tag);
+      byDevice.putIfAbsent(_ownerId(tag.deviceId), () => []).add(tag);
     }
 
     for (final d in _project.devices) {
+      if (_alias.containsKey(d.id)) continue; // lido pela sessão do dono
       final tags = byDevice[d.id] ?? const [];
       var session = _sessions[d.id];
       if (session == null && tags.isEmpty) continue;
@@ -272,8 +323,8 @@ class HmiRuntime {
   void releaseIdle() => _refreshSessions();
 
   DeviceSession _sessionFor(Tag tag) {
-    final device = _project.device(tag.deviceId);
-    if (device == null) throw const TagValueError('Equipamento não encontrado');
+    if (_project.device(tag.deviceId) == null) throw const TagValueError('Equipamento não encontrado');
+    final device = _project.device(_ownerId(tag.deviceId))!;
     var s = _sessions[device.id];
     if (s == null) {
       s = _sessions[device.id] = _newSession(device);

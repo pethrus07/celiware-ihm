@@ -1,6 +1,6 @@
 # Simulação — testar sem equipamento
 
-Cinco formas de testar o app sem CLP, da mais simples à mais realista.
+Seis formas de testar o app sem CLP, da mais simples à mais realista.
 
 | Forma | Serve para | Rede de verdade? |
 |---|---|---|
@@ -9,6 +9,7 @@ Cinco formas de testar o app sem CLP, da mais simples à mais realista.
 | Modbus Slave / ModbusTool (programas no PC) | Mexer em valores à mão, imitar um mapa de memória qualquer. | Sim. |
 | Escravo Dart (`ModbusTcpServer`) | Testes automatizados (`flutter test`). | Sim, local. |
 | Arduino falso (`sim/arduino_falso.py`) | Protocolo cru: texto de Arduino/ESP por TCP ou UDP (seção 7). | Sim. |
+| Equipamento HTTP falso (`sim/http_falso.py`) | Equipamento HTTP: ESP32/gateway com API REST, JSON, POST/PUT/GET, senha (seção 8). | Sim. |
 
 ## 1. Máquina de demonstração
 
@@ -167,3 +168,40 @@ O perfil que lê isto é o padrão do app — **Linha chave=valor** (fim de linh
 3. Variáveis: campo `T` (número com vírgula, °C) e campo `P` (liga/desliga, "pode ser alterada pela tela": o botão grava `SET P=0`/`SET P=1` e acende quando o "Arduino" confirma). **Ouvir o equipamento e escolher** lista os dois com o valor.
 
 Variações: `--intervalo 0` pede **O app pergunta** no editor (a pergunta `?\n` já vem); em UDP, escolha **UDP** no cadastro e **O app pergunta** (o sketch responde a quem falou e passa a transmitir para ele) ou rode com `--destino IP_DO_CELULAR:PORTA` e ponha essa porta em **Porta deste celular**. Sem o app, um terminal TCP cru também serve (PuTTY em modo *Raw* ou `ncat 127.0.0.1 5030`). Nos testes automatizados o mesmo papel é do `FakeArduinoServer` em Dart (`lib/core/rawlink/`), por TCP e UDP.
+
+## 8. Equipamento HTTP falso (ESP32 com API REST)
+
+`sim/http_falso.py` imita um ESP32 ou gateway com servidor web: responde JSON com valores que mudam e aceita comandos. Python puro, não precisa do `.venv`:
+
+```
+python sim/http_falso.py                                  porta 8080, sem senha
+python sim/http_falso.py --usuario admin --senha 1234     exige usuário e senha (Basic)
+python sim/http_falso.py --token abc123                   exige "Authorization: abc123"
+python sim/http_falso.py --token abc123 --cabecalho X-API-Key
+python sim/http_falso.py --lento 3000                     demora 3 s (provoca o tempo esgotado)
+```
+
+| Pedido | Resposta |
+|---|---|
+| `GET /api/status` | `{"data": {"temperatura": 25.3, "umidade": 61, "bomba": true, "setpoint": 45}, "itens": [{"nome": "pecas", "valor": 120}], "producao": [8 números]}` |
+| `GET /api/temperatura` | só o número (`25.3`) |
+| `GET /texto` | `T=25.3C;U=61%` (texto puro, para a expressão regular) |
+| `POST /api/consulta` com `{"canal": 3}` | `{"canal": 3, "valor": …}` (leitura por POST) |
+| `POST /api/bomba` com `{"ligar": 1}` (ou só `1`, `true`, `ON`) | liga/desliga a bomba |
+| `PUT /api/setpoint` com `55` (ou `{"setpoint": 55}`) | muda o setpoint |
+| `GET /api/set?bomba=0` · `GET /api/set?setpoint=55` | o mesmo pela URL |
+| qualquer outro caminho | 404 |
+
+Bomba ligada, a temperatura sobe devagar até o setpoint e as peças contam; desligada, a temperatura volta a ~25 °C. Sem senha certa: 401 (Basic) ou 403 (token).
+
+**No emulador** (o PC é `10.0.2.2`; no celular pelo Wi-Fi, o IP do PC):
+
+1. Rode `python sim/http_falso.py` no PC.
+2. **Equipamentos → +** → Na rede → **Mais opções → Protocolo → HTTP / API REST**. Em **Endereço do equipamento**: `http://10.0.2.2:8080`. **Testar conexão** → "Equipamento respondeu em N ms".
+3. **Variáveis → +**: caminho `/api/status`, **Testar** → "A resposta é um JSON: diga qual campo ler" e a lista dos campos; tocar em `data.temperatura` preenche campo, nome e tipo; **Testar** de novo → "Valor: 25,3 · 200 · N ms". O "Lendo agora" do topo acompanha.
+4. Outras variáveis da mesma resposta: `data.bomba` (liga/desliga), `itens[0].valor` (peças), `producao` (8 valores, para o gráfico de barras, em Mais opções → "Quantos valores seguidos"). As três saem da mesma requisição a cada ciclo.
+5. Comando: na `data.bomba`, ligue **Pode ser alterada pela tela**; **Comando para gravar** POST, caminho `/api/bomba`, corpo `{"ligar": {valor}}`. Um Botão liga/desliga na tela grava e acende quando a próxima leitura confirma. Setpoint: PUT em `/api/setpoint` com o corpo vazio (vai só o valor), ou GET em `/api/set?setpoint={valor}`.
+6. Regex: caminho `/texto`, **Expressão regular** `T=(?<valor>[\d.]+)C`.
+7. Erros de propósito: rode com `--usuario admin --senha 1234` e teste sem senha (401: pede usuário e senha), com a senha errada (401: recusou) e certa (em Mais opções → Autenticação → Usuário e senha; a senha vai para o cofre do Android, não para o projeto); um caminho que não existe (404 só naquela variável); `--lento 3000` com tempo de resposta 1500 ms (sem comunicação, último valor esmaecido); pare o simulador (sem comunicação) e rode de novo (volta sozinho).
+
+Nos testes automatizados o mesmo papel é do `HttpTestServer` em Dart (`test/support/http_test_server.dart`), um `HttpServer` do `dart:io` escrito sem o código do app.

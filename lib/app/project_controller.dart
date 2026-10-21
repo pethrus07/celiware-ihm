@@ -7,6 +7,7 @@ import 'package:logging/logging.dart';
 import '../models/camera.dart';
 import '../models/device.dart';
 import '../models/hmi_screen.dart';
+import '../models/http_config.dart';
 import '../models/log_group.dart';
 import '../models/logic_rule.dart';
 import '../models/plant.dart';
@@ -15,6 +16,7 @@ import '../models/recipe.dart';
 import '../models/tag.dart';
 import '../services/cameras/camera_vault.dart';
 import '../services/demo/demo_project.dart';
+import '../services/net/device_vault.dart';
 import '../core/utils/ids.dart';
 import '../services/plant/plant_view.dart';
 import '../services/runtime/hmi_runtime.dart';
@@ -285,7 +287,8 @@ class ProjectController extends ChangeNotifier {
   /// Acrescenta um projeto vindo de arquivo e abre. O nome ganha "(2)" se já
   /// existir; senha de câmera não vem no arquivo, então cada câmera ganha
   /// uma chave nova no cofre e pede a senha de novo (CM-5).
-  Future<String> importProject(Project p) => createProject(p.withFreshCameraSecrets());
+  /// O mesmo vale para a senha dos equipamentos HTTP.
+  Future<String> importProject(Project p) => createProject(p.withFreshCameraSecrets().withFreshDeviceSecrets());
 
   /// Cópia de um projeto, com "(cópia)" no nome. Não abre. Os históricos
   /// (alarmes, regras, receitas, registro) não vão junto: são do aparelho e
@@ -294,13 +297,19 @@ class ProjectController extends ChangeNotifier {
         final lib = _lib;
         final source = await _snapshot(id);
         if (source == null) throw StateError('Projeto não encontrado');
-        final copy = source.withFreshCameraSecrets();
+        final copy = source.withFreshCameraSecrets().withFreshDeviceSecrets();
         final vault = CameraVault.instance;
         for (var i = 0; i < source.cameras.length; i++) {
           final from = source.cameras[i].secretRef, to = copy.cameras[i].secretRef;
           if (from == null || to == null) continue;
           final password = await vault.read(from);
           if (password != null) await vault.write(to, password);
+        }
+        for (var i = 0; i < source.devices.length; i++) {
+          final from = source.devices[i].http.secretRef, to = copy.devices[i].http.secretRef;
+          if (from == null || to == null || from == to) continue;
+          final secret = await DeviceVault.instance.read(from);
+          if (secret != null) await DeviceVault.instance.write(to, secret);
         }
         final copyId = await lib.add(copy.copyWith(name: lib.uniqueName('${source.name} (cópia)')));
         notifyListeners();
@@ -340,6 +349,9 @@ class ProjectController extends ChangeNotifier {
         notifyListeners();
         for (final ref in doomed?.cameraSecretRefs ?? const <String>{}) {
           await CameraVault.instance.delete(ref);
+        }
+        for (final ref in doomed?.deviceSecretRefs ?? const <String>{}) {
+          await DeviceVault.instance.delete(ref);
         }
       });
 
@@ -448,8 +460,11 @@ class ProjectController extends ChangeNotifier {
         final backup = await lib.backup();
         final old = [for (final e in lib.entries) e.id];
         final oldSecrets = <String>{};
+        final oldDeviceSecrets = <String>{};
         for (final id in old) {
-          oldSecrets.addAll((await _snapshot(id))?.cameraSecretRefs ?? const <String>{});
+          final p = await _snapshot(id);
+          oldSecrets.addAll(p?.cameraSecretRefs ?? const <String>{});
+          oldDeviceSecrets.addAll(p?.deviceSecretRefs ?? const <String>{});
         }
         final ids = await _addAll(p.projects.isEmpty ? Plant(name: p.name, projects: const [PlantProject('novo', Project(name: 'Meu projeto'))]) : p);
         await lib.setName(p.name);
@@ -461,6 +476,9 @@ class ProjectController extends ChangeNotifier {
         }
         for (final ref in oldSecrets) {
           await CameraVault.instance.delete(ref);
+        }
+        for (final ref in oldDeviceSecrets) {
+          await DeviceVault.instance.delete(ref);
         }
         _refreshLive();
         notifyListeners();

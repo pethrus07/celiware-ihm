@@ -98,8 +98,8 @@ várias máquinas numa tela (61).
 - **Sem data (49 itens, cada um com o motivo na rastreabilidade):** os
   módulos locais de gestão (painéis por perfil, turnos, metas, paradas,
   manutenção, peças, relatórios — 24, 93–154), alarme com o app fechado (92,
-  depois da 1ª publicação), HTTP (56, 169, 173 — quando houver equipamento que
-  fale HTTP), padrões WARE (163, 164 — a Celiware define), vários projetos (9)
+  depois da 1ª publicação), HTTP (56, 169, 173 — **feito em 21/10**, a pedido
+  do cliente; seção "Equipamento HTTP" abaixo), padrões WARE (163, 164 — a Celiware define), vários projetos (9)
   e áudio gravado (10). Não pedem nada externo, mas cada um é um módulo. O
   OEE (8) entrou: feito em 12/10. Vários projetos (9) entrou na versão
   seguinte, como planta (20/10, seção acima).
@@ -178,6 +178,35 @@ coisas do usuário vira "Meu projeto". O que ficou para depois:
 | **Apagar um projeto deixa as regras da planta que o citam** (`project_controller.dart` ~294-307, `plant_view.dart` ~82): elas viram o alarme médio "Regra X parada" em todos os projetos até alguém apagar a regra. | Avisar no diálogo de apagar ("2 regras da planta usam este projeto") e desligar essas regras. Pequeno; entra na próxima versão. |
 | **Trocar de projeto descarta em silêncio a pergunta pendente de uma regra da planta** (`rule_engine.dart`, `onSwitch`), sem evento no histórico. Contraria o §6.12 / LG-7 ("toda retirada vai para o histórico"). | Não é segurança (o modo é "propor"); registrar "pergunta retirada ao trocar de projeto" no histórico. |
 | **Duas conexões para o mesmo CLP** (`hmi_runtime.dart` ~186): as sessões são por id de equipamento; uma regra da planta que cite um projeto duplicado abre uma segunda conexão TCP ao mesmo CLP, e CLP que aceita uma conexão só oscila em "sem comunicação". | Não confirmado em hardware. Reaproveitar a sessão por IP + porta + id do escravo. |
+
+## Equipamento HTTP — itens 56, 169 e 173 (21/10/2026)
+
+Pedido do cliente, confirmado pelo Pedro em 21/10: equipamento da rede local
+que fala HTTP/HTTPS (gateway, ESP32, controlador com API REST). Detalhe
+técnico em `ARQUITETURA.md` §4.21; testar sem equipamento em `SIMULACAO.md` §8.
+Feito num worktree, **sem subir a versão**.
+
+| O que | Estado |
+|---|---|
+| Tipo de equipamento **HTTP** (Na rede → Mais opções → Protocolo → HTTP / API REST): URL base no lugar do IP, tempo-limite, autenticação nenhuma / Basic / token no cabeçalho, cabeçalhos extras; senha e token no cofre do Android, nunca no arquivo do projeto | **Feito** |
+| Variável com requisição (GET/POST, caminho, corpo) e seletor do valor: caminho JSON (`data.temperatura`, `itens[0].valor`) ou expressão regular com grupo; requisições iguais feitas uma vez por ciclo | **Feito** |
+| Leitura por intervalo (mínimo 500 ms, "Ler a cada" do equipamento) e comando por botão: POST/PUT/GET com `{valor}` no corpo ou na URL | **Feito** |
+| "Testar" no cadastro da variável (código, tempo, valor e os campos da resposta para escolher com um toque); "Testar conexão" com o que conferir (401, 403, porta, certificado) | **Feito** |
+| Sem comunicação = último valor esmaecido; 404/400 marcam só as variáveis daquela requisição; 5xx deixa o último valor | **Feito** |
+| `http://` só para a rede local; IP da internet só com `https://` | **Feito** (regra do app; o Android não aceita faixa de IP na política de texto claro — §4.21) |
+| Simulador `sim/http_falso.py` (JSON que muda, POST/PUT/GET, Basic, token, lentidão) | **Feito** |
+
+**Falta / ficou de fora:**
+
+- **Bancada:** nada passou por ESP32 ou gateway de verdade, nem pelo emulador
+  com o simulador (o roteiro está na SIMULACAO §8). Só testes automatizados
+  contra `HttpServer` do Dart e uma conferência do driver contra o simulador
+  Python no PC.
+- **Digest** (só Basic e token), redirecionamento (3xx vira erro com o
+  código), resposta acima de 1 MB (recusada), HTTPS com certificado próprio
+  (opção existe, sem teste automatizado).
+- Sem "push" (WebSocket, SSE, long-poll): a leitura é sempre por intervalo.
+- "Criar várias" continua só Modbus; texto continua só leitura.
 
 ## Próximo — visual e operação
 
@@ -342,7 +371,7 @@ número de usuário, logo ou depoimento que não exista.
 
 - **Tudo da etapa 4 em equipamento real:** nada passou de simulador —
   Siemens S7, OPC UA, MQTT (broker), Arduino/protocolo cru, cabo USB-OTG,
-  câmera IP, mapas das marcas (H3U primeiro), a voz no fone e a prova da 1.3.2
+  equipamento HTTP (ESP32/gateway), câmera IP, mapas das marcas (H3U primeiro), a voz no fone e a prova da 1.3.2
   (Wi-Fi sem internet + 4G). Depende das peças do cliente.
 - **Teste de campo** na cortadora de rótulos do cliente (mapa Modbus já
   preparado no CLP). É o que valida a 1.x de verdade.

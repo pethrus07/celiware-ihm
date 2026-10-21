@@ -179,6 +179,9 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('campo-senha-opcua')), '1234');
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byKey(const ValueKey('testar-conexao')), -300, scrollable: list);
+    // Construído não quer dizer à vista: pode parar embaixo da barra do topo.
+    await tester.ensureVisible(find.byKey(const ValueKey('testar-conexao')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('testar-conexao')));
     await waitFor(tester, find.byKey(const ValueKey('teste-ok')));
     expect(find.textContaining('Servidor respondeu'), findsOneWidget);

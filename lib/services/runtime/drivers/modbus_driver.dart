@@ -50,13 +50,13 @@ class ModbusDriver extends DeviceDriver {
   @override
   Future<int> scan(List<Tag> tags, TagStore store, {required bool Function() stillCurrent}) async {
     if (!client.isConnected) await client.connect();
-    // Variável com tópico MQTT, endereço S7, campo de mensagem crua ou NodeId (o
+    // Variável com tópico MQTT, endereço S7, campo de mensagem crua, NodeId ou requisição HTTP (o
     // equipamento mudou de protocolo): não tem endereço Modbus de verdade —
     // ler o HR 0 no lugar dela mostraria um número qualquer como se fosse o dado.
-    bool foreign(Tag t) => t.mqtt != null || t.s7 != null || t.raw != null || t.opcua != null;
+    bool foreign(Tag t) => t.mqtt != null || t.s7 != null || t.raw != null || t.opcua != null || t.http != null;
     for (final t in tags.where(foreign)) {
       if (store.read(t.id).quality != TagQuality.configError) {
-        final what = t.mqtt != null ? 'MQTT' : t.s7 != null ? 'Siemens S7' : t.opcua != null ? 'OPC UA' : 'mensagem crua (Arduino)';
+        final what = t.mqtt != null ? 'MQTT' : t.s7 != null ? 'Siemens S7' : t.opcua != null ? 'OPC UA' : t.http != null ? 'HTTP' : 'mensagem crua (Arduino)';
         store.publish(t.id, TagReading(quality: TagQuality.configError, message: 'variável de $what num equipamento Modbus', at: DateTime.now()));
       }
     }

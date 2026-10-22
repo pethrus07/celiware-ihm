@@ -31,6 +31,7 @@ import '../../core/modbus/modbus_memory.dart';
 import '../../models/alarm.dart';
 import '../../models/hmi_screen.dart';
 import '../../models/tag.dart';
+import 'ready_projects.dart';
 
 /// Como o modelo comanda o acionamento (inversor, servo).
 enum CommandStyle {
@@ -385,6 +386,30 @@ abstract final class ScreenTemplates {
   static final io8 = _io('io-8', 8);
   static final io16 = _io('io-16', 16);
 
+  /// Tex G4 (teste de estanqueidade) como modelo de tela, para pôr as telas
+  /// do Tex dentro de um projeto que já existe (a máquina que tem um Tex
+  /// ligado). O cliente pediu o Tex "na lista oficial, como item de escolha de
+  /// tela" (27/09/2026). As mesmas variáveis e elementos do projeto pronto
+  /// (`ReadyProjects.texOperation`/`texIo`): endereços a configurar, conferir
+  /// no manual Modbus do Tex G4.
+  static final texOperation = ScreenTemplate(
+    id: 'tex-g4-operacao',
+    name: 'Tex G4 — operação',
+    description: 'Teste de estanqueidade: comandos, resultado, pressão, vazamento e BCD.',
+    icon: Icons.compress_rounded,
+    tags: ReadyProjects.texOperation.tags,
+    elements: ReadyProjects.texOperation.elements,
+  );
+
+  static final texIo = ScreenTemplate(
+    id: 'tex-g4-io',
+    name: 'Tex G4 — entradas e saídas',
+    description: 'Entradas e saídas do Tex G4 e o diagnóstico.',
+    icon: Icons.developer_board_outlined,
+    tags: ReadyProjects.texIo.tags,
+    elements: ReadyProjects.texIo.elements,
+  );
+
   static ScreenTemplate _io(String id, int n) {
     // Duas por linha, 6×4: com quatro por linha (3×4), no celular de 320 dp,
     // "DESLIGADA" e "A configurar" encolhiam abaixo de 10 dp.
@@ -527,7 +552,7 @@ abstract final class ScreenTemplates {
     ],
   );
 
-  static final List<ScreenTemplate> all = [blank, machine, inverterBasic, inverterFull, servoBasic, servoFull, barcode, temperature, loadCell, io8, io16];
+  static final List<ScreenTemplate> all = [blank, machine, inverterBasic, inverterFull, servoBasic, servoFull, barcode, temperature, loadCell, io8, io16, texOperation, texIo];
 
   static ScreenTemplate? byId(String id) => all.where((t) => t.id == id).firstOrNull;
 

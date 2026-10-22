@@ -11,6 +11,7 @@ import 'package:ihm/services/import/tag_batch.dart';
 import 'package:ihm/services/runtime/hmi_runtime.dart';
 import 'package:ihm/services/runtime/tag_codec.dart';
 import 'package:ihm/services/runtime/tag_store.dart';
+import 'package:ihm/services/templates/ready_projects.dart';
 import 'package:ihm/services/templates/screen_templates.dart';
 import 'package:ihm/services/templates/template_builder.dart';
 import 'package:ihm/widgets/hmi/element_catalog.dart';
@@ -366,5 +367,19 @@ void main() {
       );
       expect(batch.conflicts, 0);
     });
+  });
+
+  // Pedido do cliente (27/09/2026): o Tex "na lista oficial, como item de
+  // escolha de tela". Além do projeto pronto, as telas do Tex G4 entram em
+  // Nova tela → Começar de, com as mesmas variáveis (endereços a configurar).
+  test('Tex G4 na lista de modelos de tela, igual ao projeto pronto', () {
+    final ids = ScreenTemplates.all.map((t) => t.id).toList();
+    expect(ids, containsAll(['tex-g4-operacao', 'tex-g4-io']));
+    expect(ScreenTemplates.byId('tex-g4-operacao')!.name, contains('Tex G4'));
+    expect(ScreenTemplates.byId('tex-g4-io')!.name, contains('Tex G4'));
+    expect(ScreenTemplates.texOperation.tags, same(ReadyProjects.texOperation.tags));
+    expect(ScreenTemplates.texOperation.elements, same(ReadyProjects.texOperation.elements));
+    expect(ScreenTemplates.texIo.tags, same(ReadyProjects.texIo.tags));
+    expect(ScreenTemplates.texIo.elements, same(ReadyProjects.texIo.elements));
   });
 }

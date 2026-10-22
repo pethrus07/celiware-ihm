@@ -82,6 +82,11 @@ class ReadyProject {
 
 /// A biblioteca, na ordem da lista.
 abstract final class ReadyProjects {
+  /// As telas do Tex G4, também oferecidas soltas em Nova tela → Começar de
+  /// (`ScreenTemplates.texOperation`/`texIo`), com as mesmas variáveis.
+  static ScreenTemplate get texOperation => _Screens.texOperation;
+  static ScreenTemplate get texIo => _Screens.texIo;
+
   static final all = <ReadyProject>[
     ReadyProject(
       id: 'diretoria',

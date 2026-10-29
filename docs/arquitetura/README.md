@@ -11,7 +11,17 @@ cada uma numa notação padrão:
 
 App Flutter para Android, grátis na Play, que transforma o celular na IHM da máquina: o usuário cadastra o equipamento, dá nome às variáveis e monta as telas de operação sem programar. A receita da Celiware vem do hardware da loja.
 
-![Ware IoT · a IHM da máquina no celular](./celiware-ihm.svg)
+### Quem usa e para quê (UML)
+
+![Casos de uso · Ware IoT · a IHM da máquina no celular](./celiware-ihm-1-casos-de-uso.svg)
+
+### Da instalação à máquina operando no celular (BPMN 2.0)
+
+![Processo · Ware IoT · a IHM da máquina no celular](./celiware-ihm-2-processo.svg)
+
+### Arquitetura (C4, containers)
+
+![Arquitetura · Ware IoT · a IHM da máquina no celular](./celiware-ihm-3-arquitetura.svg)
 
 Editável: [`celiware-ihm.excalidraw`](./celiware-ihm.excalidraw), abre em [excalidraw.com](https://excalidraw.com) ou no VS Code com a extensão Excalidraw.
 

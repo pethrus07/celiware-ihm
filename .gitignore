@@ -78,3 +78,6 @@ tool/site/saida/
 !.dev.vars.example
 .env*
 !.env.example
+
+# Word gerado da ARQUITETURA (node tool/gerar_docx.js); não versionar
+docs/*.docx

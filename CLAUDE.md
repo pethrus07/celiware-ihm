@@ -8,10 +8,11 @@ a ficha da Play (`docs/loja/`) e o simulador (`sim/`).
 
 ## Onde está cada coisa (ler antes de mexer)
 
-- `README.md` — visão geral e estrutura de `lib/`.
+- `README.md` (inglês) e `README.pt-BR.md` — visão geral, protocolos, dependências, estrutura de `lib/`.
 - `docs/ARQUITETURA.md` — documentação técnica completa (camadas, protocolos, modelo de dados,
   telas, identidade visual §8, padrões §9, como estender §10, código crítico §11, testes §13).
-- `docs/ROADMAP.md` — **fonte da verdade das pendências** e do que ficou fora de propósito.
+- `docs/ROADMAP.md` — **fonte da verdade das pendências** (Agora / Depois / Talvez / Fora de propósito).
+- `docs/HISTORICO.md` — o diário do roadmap até 01/11/2026 (versões, etapa 4, reuniões, Play, site).
 - `docs/REQUISITOS-ETAPA4.md` + `docs/pesquisa-etapa4/` — requisitos numerados e pesquisas.
 - `docs/RASTREABILIDADE-LISTA-CLIENTE.md` — lista do cliente item a item (contada por script).
 - `docs/SIMULACAO.md` — testar sem hardware (demonstração, simulador Python, celular por Wi-Fi, vídeo).
@@ -21,10 +22,10 @@ a ficha da Play (`docs/loja/`) e o simulador (`sim/`).
 ## Rodar e testar (comandos conferidos nos docs)
 
 ```
-flutter pub get                          # README.md:20
-flutter run                              # README.md:21 — abre com a demonstração (cortadora)
-flutter test                             # README.md:66
-flutter analyze                          # README.md:67 — tem de dar "No issues found"
+flutter pub get
+flutter run                              # abre com a demonstração (cortadora)
+flutter test
+flutter analyze                          # tem de dar "No issues found"
 python tool/gerar_icone.py               # docs/ARQUITETURA.md:1199 — regera ícones (app, loja, site)
 node tool/gerar_docx.js                  # docs/ARQUITETURA.md:1200 — regera o .docx da ARQUITETURA
 ```
@@ -58,7 +59,7 @@ Não há CI no repo (sem `.github/`): a conferência é `flutter analyze` + `flu
 - **O app nunca é função de segurança da máquina** (NR-12): regras entre máquinas só no modo
   "propor"; sem comunicação mostra o último valor esmaecido, nunca zero falso (§6.12, §1.3).
 - Senha de câmera vai no cofre do Android, nunca no arquivo do projeto (§5.7).
-- `targetSdk` fixo em 36 (subir quebra as conexões locais) — ver ROADMAP 1.3.2 e REQUISITOS-ETAPA4.
+- `targetSdk` fixo em 36 (subir quebra as conexões locais) — ver HISTORICO (1.3.2) e REQUISITOS-ETAPA4.
 - Versão: subir o número depois do `+` em `pubspec.yaml` a cada envio à Play e manter
   `AppInfo.version` (`lib/app/app_info.dart`) igual (docs/PUBLICACAO.md §7/§11).
 - No Windows, `flutter pub get` exige Modo de Desenvolvedor (docs/PUBLICACAO.md:114).
@@ -76,8 +77,8 @@ Não há CI no repo (sem `.github/`): a conferência é `flutter analyze` + `flu
   (borda só quando comunica estado). Legenda só onde muda a decisão. Espaçamento por tokens,
   cartões sem borda. Conferir com screenshot real antes de mostrar.
 - **Etapa 4 é uma entrega só**: prévias de teste não levam tag nem viram "lançamento"
-  (docs/ROADMAP.md, "Forma").
-- Pendência nova, decisão ou mudança de escopo vai para `docs/ROADMAP.md`, não para este arquivo.
+  (docs/HISTORICO.md, "Forma").
+- Pendência nova vai para `docs/ROADMAP.md`; decisão datada vai para `docs/HISTORICO.md`; nunca para este arquivo.
 - Escopo do app: entra só o que vive DENTRO do app (sem servidor, nuvem, contas/login, licenças).
   Versão Windows está adiada por decisão do Pedro.
 - Não publicar o site, não criar/enviar nada na Play Console e não mexer em conta/domínio sem

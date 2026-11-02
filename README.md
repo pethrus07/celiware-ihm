@@ -123,4 +123,4 @@ technical description is in [docs/ARQUITETURA.md](docs/ARQUITETURA.md). What com
 
 ## License
 
-All rights reserved.
+All rights reserved. Published as portfolio; not licensed for reuse. See [LICENSE](LICENSE).

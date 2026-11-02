@@ -1,7 +1,7 @@
 # Ware IoT · roadmap
 
 Fila curta, em ordem. Atualizado em 01/11/2026.
-O diário até esta data (etapa 4, reuniões, versões, site, Play) está em [HISTORICO.md](HISTORICO.md).
+O diário até esta data (etapa 4, reuniões, versões, site, Play) é interno e fica fora do repositório.
 O que existe e como funciona: [ARQUITETURA.md](ARQUITETURA.md).
 
 ## Estado em 01/11/2026
@@ -18,7 +18,7 @@ O que existe e como funciona: [ARQUITETURA.md](ARQUITETURA.md).
 
 1. **Enviar a 1.5.0 ao teste interno** (Pedro): gerar o `.aab` de novo a partir do `main`,
    subir no teste interno, o cliente testa pela Play, depois promover para produção
-   (`PUBLICACAO.md` §0 e §12). Antes: refazer as capturas da loja (a barra e a primeira tela
+   (roteiro interno de publicação). Antes: refazer as capturas da loja (a barra e a primeira tela
    mudaram) e conferir a ficha de Segurança dos dados com a biblioteca de atualização.
 2. **Publicar o site junto com a 1.5.0** (Pedro), não antes: `tutoriais.html` e
    `privacidade.html` já descrevem a navegação nova.
@@ -51,7 +51,7 @@ O que existe e como funciona: [ARQUITETURA.md](ARQUITETURA.md).
 - Sinótico da planta: uma tela que junta máquinas de vários projetos.
 - Várias plantas no mesmo aparelho; mover projeto entre plantas sem arquivo.
 - Versão Windows do app (adiada em 11/10/2026; `windows/` existe, `.exe` nunca gerado).
-- Monetização dentro do app (estudo de 19/10 no HISTORICO; não é intenção agora).
+- Monetização dentro do app (estudo de 19/10 no diário interno; não é intenção agora).
 - Texto gravável pela tela; backup e comparação de parâmetros de inversor; CANopen.
 - Módulos locais de gestão da lista do cliente (turnos, metas, paradas, manutenção), cada um
   é um módulo próprio.

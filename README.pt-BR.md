@@ -124,4 +124,4 @@ técnica completa está em [docs/ARQUITETURA.md](docs/ARQUITETURA.md). O que vem
 
 ## Licença
 
-Todos os direitos reservados.
+Todos os direitos reservados. Publicado como portfólio; sem licença de reuso. Veja [LICENSE](LICENSE).

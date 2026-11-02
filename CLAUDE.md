@@ -12,11 +12,11 @@ a ficha da Play (`docs/loja/`) e o simulador (`sim/`).
 - `docs/ARQUITETURA.md` — documentação técnica completa (camadas, protocolos, modelo de dados,
   telas, identidade visual §8, padrões §9, como estender §10, código crítico §11, testes §13).
 - `docs/ROADMAP.md` — **fonte da verdade das pendências** (Agora / Depois / Talvez / Fora de propósito).
-- `docs/HISTORICO.md` — o diário do roadmap até 01/11/2026 (versões, etapa 4, reuniões, Play, site).
-- `docs/REQUISITOS-ETAPA4.md` + `docs/pesquisa-etapa4/` — requisitos numerados e pesquisas.
-- `docs/RASTREABILIDADE-LISTA-CLIENTE.md` — lista do cliente item a item (contada por script).
+- Documentos internos (fora do repositório desde 01/11/2026, guardados com o Pedro): o diário
+  `HISTORICO.md`, `REQUISITOS-ETAPA4.md` + `pesquisa-etapa4/`, a rastreabilidade da lista do cliente,
+  `PUBLICACAO.md` (roteiro da Play) e `loja/formularios.md`. Referências a eles no código são históricas.
 - `docs/SIMULACAO.md` — testar sem hardware (demonstração, simulador Python, celular por Wi-Fi, vídeo).
-- `docs/PUBLICACAO.md` — roteiro da Play Store; `docs/PESQUISA-UI-UX.md` — base do visual.
+- `docs/PESQUISA-UI-UX.md` — base do visual.
 - `site/README.md` — site estático (Cloudflare Pages), marcadores a preencher, regras do site.
 
 ## Rodar e testar (comandos conferidos nos docs)
@@ -78,7 +78,7 @@ Não há CI no repo (sem `.github/`): a conferência é `flutter analyze` + `flu
   cartões sem borda. Conferir com screenshot real antes de mostrar.
 - **Etapa 4 é uma entrega só**: prévias de teste não levam tag nem viram "lançamento"
   (docs/HISTORICO.md, "Forma").
-- Pendência nova vai para `docs/ROADMAP.md`; decisão datada vai para `docs/HISTORICO.md`; nunca para este arquivo.
+- Pendência nova vai para `docs/ROADMAP.md`; decisão datada vai para o diário interno (fora do repositório); nunca para este arquivo.
 - Escopo do app: entra só o que vive DENTRO do app (sem servidor, nuvem, contas/login, licenças).
   Versão Windows está adiada por decisão do Pedro.
 - Não publicar o site, não criar/enviar nada na Play Console e não mexer em conta/domínio sem

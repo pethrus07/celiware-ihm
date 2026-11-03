@@ -85,7 +85,7 @@ flutter analyze   # tem de responder "No issues found"
 
 Não há CI.
 
-## Estrutura
+## Pastas
 
 ```
 lib/
